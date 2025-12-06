@@ -1,0 +1,253 @@
+Generate a full-stack P2P marketplace web application (a complete runnable project) that visually and functionally matches the screenshot I provided. The system must include escrow, chat, vendor ratings, multi-language support, multi-country vendors, KYC, fraud detection, 2FA, dispute management, notifications, audit logs, admin panel, and all features listed below. Build clean, modular, production-ready code.
+
+Use:
+- Frontend: React + TypeScript + TailwindCSS + React Router + react-i18next + Socket.io client.
+- Backend: Node.js + Express + TypeScript (or JS), MongoDB + Mongoose, Socket.io server, JWT auth.
+- Optional: Redis or in-memory store for rate limits/sessions.
+- Full folder structure for /frontend and /backend.
+- Output code file-by-file in correct order.
+
+====================================================
+CORE FEATURES TO INCLUDE
+====================================================
+
+1. P2P Marketplace UI (must match screenshot style):
+- Buy/Sell toggle
+- Currency selector (KES, USD, NGN, EUR, etc.)
+- Vendor list with: name, trades count, rating %, payment methods, available amount, price per USDT, limits, "Buy" button.
+- Promoted vendor highlight style.
+- Fully mobile responsive.
+
+2. Vendor System:
+- Vendor profile page
+- Vendor ratings (stars + %)
+- Vendor subscription plans (Free, Basic, Pro, Featured)
+- Promoted ads for higher-tier vendors
+
+3. Multi-Language (Internationalization):
+- Use react-i18next
+- Provide translation JSON for: English, Chinese, Russian, Swahili, French
+- All UI text must be translatable
+
+4. Multi-Currency & Multi-Country Vendors:
+- Vendors choose country + currency + payment methods
+- Buyers filter by both
+
+5. Escrow System:
+- Orders hold vendor crypto in escrow
+- Buyer marks “I have paid”
+- Vendor confirms payment
+- Auto-release or admin-release escrow
+- Escrow balance & available balance handled in Wallet model
+
+6. Real-time Trade Chat:
+- Use Socket.io
+- Chat per order
+- Typing indicator
+- Image upload (mock local storage)
+- Admin can join chats
+
+7. Wallet System:
+- Available balance
+- Escrow balance
+- Deposit (mock)
+- Withdraw (mock)
+- Transaction history
+
+8. Admin Dashboard:
+- Approve/freeze vendors
+- Release escrow
+- Handle disputes
+- Manage KYC
+- Manage users
+- View audit logs
+- Maintenance mode controls
+
+====================================================
+ADVANCED FEATURES YOU MUST ADD
+(Your selected features: 1,2,3,4,5,8,9,11,13,14,15)
+====================================================
+
+1. FRAUD DETECTION SYSTEM:
+- Detect suspicious vendor behavior (high cancel rate, abnormal price gaps)
+- Auto-flag accounts
+- Device fingerprinting to detect multiple accounts
+- Freeze suspicious accounts automatically
+- Alert admin of unusual activities
+
+2. FULL KYC VERIFICATION SYSTEM:
+- Upload ID (National ID, Passport)
+- Upload selfie
+- Face match check (mock)
+- KYC tiers: Tier 0, Tier 1, Tier 2
+- Admin KYC review dashboard (approve/reject/resubmit)
+
+3. TWO-FACTOR AUTHENTICATION (2FA):
+- Google Authenticator (TOTP)
+- Email OTP
+- Optional SMS OTP (mock implementation)
+- 2FA recovery codes stored hashed
+
+4. FULL TRADE DISPUTE SYSTEM:
+- Buyer/vendor can open dispute
+- Upload screenshot/file evidence
+- Separate dispute chat for buyer, vendor, admin
+- Admin can refund buyer OR release escrow
+- Admin notes + timestamps
+
+5. RATE LIMITING & ANTI-SPAM:
+- API rate limits per IP/account
+- Login/register brute-force protection
+- Chat cooldown per user
+- Auto-ban after repeated failed attempts
+- Protect payment confirmation endpoints
+
+8. NOTIFICATION CENTER:
+- Email notifications (Nodemailer templates)
+- In-app notifications
+- Real-time notifications with Socket.io
+- Push notification setup (FCM/Web Push placeholders)
+- Notifications for:
+  - New order
+  - Payment confirmation
+  - Escrow release
+  - Dispute updates
+  - KYC updates
+  - Vendor approvals
+  - Wallet actions
+
+9. AUDIT LOG SYSTEM:
+- Log all sensitive actions:
+  - Logins
+  - Password changes
+  - KYC submissions
+  - Escrow actions
+  - Dispute decisions
+  - Admin approvals/rejections
+- Admin panel to search/filter logs
+
+11. VENDOR PERFORMANCE DASHBOARD:
+- Charts showing:
+  - Daily/weekly/monthly trades
+  - Cancel rate
+  - Revenue
+  - Ratings history
+  - Best payment methods
+  - Country demand analytics
+
+13. ADVANCED FILTERS FOR BUYERS:
+- Filter by verified vendors only
+- Filter by rating %
+- Filter by number of trades
+- Filter by payment methods
+- Sort by lowest price or highest price
+- Sort by best rating
+- Country and currency filters
+
+14. MAINTENANCE MODE:
+- Admin enables:
+  - Full maintenance (locks whole site)
+  - Partial (disables new orders)
+- Customizable maintenance message
+- Frontend shows a banner when active
+
+15. THEME CUSTOMIZATION SYSTEM:
+- Light mode / Dark mode / System mode
+- Admin can change:
+  - Primary color
+  - Logo
+  - Branding
+  - Banner images
+- Use CSS variables + Tailwind for dynamic themes
+
+====================================================
+BACKEND REQUIREMENTS
+====================================================
+
+Models needed:
+- User (roles: admin, vendor, customer, support)
+- KYC
+- VendorProfile
+- Offer/Ad
+- Order
+- ChatMessage
+- Dispute
+- Wallet
+- Transaction
+- Rating
+- SubscriptionPlan
+- Notification
+- AuditLog
+- MaintenanceSettings
+
+Backend features:
+- JWT auth
+- Role-based access control middleware
+- File upload handling
+- Validation (Joi/Zod)
+- Secure password hashing (bcrypt)
+- Clean modular architecture
+
+====================================================
+FRONTEND REQUIREMENTS
+====================================================
+
+Pages needed:
+- Home (P2P list)
+- Vendor profile
+- Order page with escrow + chat
+- Notifications page
+- KYC submission page
+- Wallet page
+- Dashboard (user)
+- Vendor dashboard
+- Vendor performance analytics
+- Admin dashboard
+- Admin KYC review
+- Admin disputes
+- Admin maintenance settings
+- Profile settings + 2FA management
+
+Components needed:
+- VendorCard
+- CurrencySelector
+- PaymentMethodChips
+- ChatWindow
+- RatingStars
+- NotificationBell
+- ThemeToggle
+- FilterDrawer
+- EscrowStatusStepper
+
+====================================================
+OUTPUT INSTRUCTIONS TO THE AI MODEL
+====================================================
+
+1. First print the full folder tree (root → backend → frontend).
+2. Then generate backend code file-by-file in correct order:
+   - backend/package.json
+   - tsconfig.json (if TS)
+   - env example
+   - server index
+   - models
+   - controllers
+   - routes
+   - middleware
+   - sockets
+   - seed scripts
+3. Then generate frontend code in the same manner.
+4. End with detailed run instructions:
+   - Install
+   - Set environment variables
+   - Start backend
+   - Start frontend
+   - Test chat
+   - Test escrow flow
+5. Provide a deployment guide for:
+   - Render/Heroku (backend)
+   - Vercel/Netlify (frontend)
+   - MongoDB Atlas (DB)
+
+The code must be real, runnable—not pseudo-code. All features above MUST be included.
+
+Start now by printing the full folder tree.
