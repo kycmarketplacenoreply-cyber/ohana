@@ -1,4 +1,3 @@
-import { useState, useEffect } from "react";
 import { Moon, Sun, Monitor } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -7,51 +6,20 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-
-type Theme = "light" | "dark" | "system";
+import { useTheme } from "@/components/ThemeProvider";
 
 export function ThemeToggle() {
-  const [theme, setTheme] = useState<Theme>("dark");
-
-  useEffect(() => {
-    const stored = localStorage.getItem("theme") as Theme;
-    if (stored) {
-      setTheme(stored);
-      applyTheme(stored);
-    }
-  }, []);
-
-  const applyTheme = (newTheme: Theme) => {
-    const root = document.documentElement;
-    const isDark =
-      newTheme === "dark" ||
-      (newTheme === "system" &&
-        window.matchMedia("(prefers-color-scheme: dark)").matches);
-
-    if (isDark) {
-      root.classList.add("dark");
-      root.classList.remove("light");
-    } else {
-      root.classList.add("light");
-      root.classList.remove("dark");
-    }
-  };
-
-  const handleThemeChange = (newTheme: Theme) => {
-    setTheme(newTheme);
-    localStorage.setItem("theme", newTheme);
-    applyTheme(newTheme);
-  };
+  const { theme, setTheme, resolvedTheme } = useTheme();
 
   const getIcon = () => {
-    switch (theme) {
-      case "light":
-        return <Sun className="h-5 w-5" />;
-      case "dark":
-        return <Moon className="h-5 w-5" />;
-      default:
-        return <Monitor className="h-5 w-5" />;
+    if (theme === "system") {
+      return <Monitor className="h-5 w-5" />;
     }
+    return resolvedTheme === "dark" ? (
+      <Moon className="h-5 w-5" />
+    ) : (
+      <Sun className="h-5 w-5" />
+    );
   };
 
   return (
@@ -60,32 +28,32 @@ export function ThemeToggle() {
         <Button
           variant="ghost"
           size="icon"
-          className="text-gray-400 hover:text-white"
+          className="text-muted-foreground hover:text-foreground"
           data-testid="theme-toggle"
         >
           {getIcon()}
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="bg-gray-900 border-gray-800">
+      <DropdownMenuContent align="end" className="bg-popover border-border">
         <DropdownMenuItem
-          onClick={() => handleThemeChange("light")}
-          className="text-gray-300 focus:text-white focus:bg-gray-800"
+          onClick={() => setTheme("light")}
+          className={theme === "light" ? "bg-accent" : ""}
           data-testid="theme-light"
         >
           <Sun className="h-4 w-4 mr-2" />
           Light
         </DropdownMenuItem>
         <DropdownMenuItem
-          onClick={() => handleThemeChange("dark")}
-          className="text-gray-300 focus:text-white focus:bg-gray-800"
+          onClick={() => setTheme("dark")}
+          className={theme === "dark" ? "bg-accent" : ""}
           data-testid="theme-dark"
         >
           <Moon className="h-4 w-4 mr-2" />
           Dark
         </DropdownMenuItem>
         <DropdownMenuItem
-          onClick={() => handleThemeChange("system")}
-          className="text-gray-300 focus:text-white focus:bg-gray-800"
+          onClick={() => setTheme("system")}
+          className={theme === "system" ? "bg-accent" : ""}
           data-testid="theme-system"
         >
           <Monitor className="h-4 w-4 mr-2" />
