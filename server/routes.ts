@@ -404,6 +404,11 @@ export async function registerRoutes(
         return res.status(403).json({ message: "Vendor profile not approved" });
       }
 
+      const kyc = await storage.getKycByUserId(req.user!.userId);
+      if (!kyc || kyc.status !== "approved") {
+        return res.status(403).json({ message: "KYC verification required before posting ads. Please complete your KYC verification." });
+      }
+
       const validatedData = insertOfferSchema.parse({
         ...req.body,
         vendorId: profile.id,
@@ -919,6 +924,33 @@ export async function registerRoutes(
         resource: "kyc",
         resourceId: req.params.id,
         changes: { status, tier },
+        ipAddress: req.ip,
+        userAgent: req.headers["user-agent"],
+      });
+
+      res.json(updated);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  // Toggle star verification
+  app.post("/api/admin/kyc/:id/star-verify", requireAuth, requireAdmin, async (req: AuthRequest, res) => {
+    try {
+      const kyc = await storage.getKyc(req.params.id);
+      if (!kyc) {
+        return res.status(404).json({ message: "KYC not found" });
+      }
+
+      const updated = await storage.updateKyc(req.params.id, {
+        isStarVerified: !kyc.isStarVerified,
+      });
+
+      await storage.createAuditLog({
+        userId: req.user!.userId,
+        action: kyc.isStarVerified ? "star_verification_removed" : "star_verification_added",
+        resource: "kyc",
+        resourceId: req.params.id,
         ipAddress: req.ip,
         userAgent: req.headers["user-agent"],
       });

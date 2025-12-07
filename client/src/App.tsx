@@ -13,6 +13,7 @@ import OrderDetailPage from "@/pages/OrderDetailPage";
 import TradePage from "@/pages/TradePage";
 import NotificationsPage from "@/pages/NotificationsPage";
 import SettingsPage from "@/pages/SettingsPage";
+import AdminPage from "@/pages/AdminPage";
 import NotFound from "@/pages/not-found";
 
 function ProtectedRoute({ component: Component }: { component: React.ComponentType }) {
@@ -33,6 +34,7 @@ function Router() {
       <Route path="/trade/:id" component={TradePage} />
       <Route path="/notifications" component={NotificationsPage} />
       <Route path="/settings" component={SettingsPage} />
+      <Route path="/admin" component={() => <ProtectedRoute component={AdminPage} />} />
       <Route component={NotFound} />
     </Switch>
   );

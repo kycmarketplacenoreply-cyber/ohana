@@ -63,6 +63,7 @@ export interface IStorage {
   getUsersByRole(role: string): Promise<User[]>;
 
   // KYC
+  getKyc(id: string): Promise<Kyc | undefined>;
   getKycByUserId(userId: string): Promise<Kyc | undefined>;
   createKyc(kyc: InsertKyc): Promise<Kyc>;
   updateKyc(id: string, updates: Partial<Kyc>): Promise<Kyc | undefined>;
@@ -214,6 +215,11 @@ export class DatabaseStorage implements IStorage {
   }
 
   // KYC
+  async getKyc(id: string): Promise<Kyc | undefined> {
+    const [kycRecord] = await db.select().from(kyc).where(eq(kyc.id, id));
+    return kycRecord || undefined;
+  }
+
   async getKycByUserId(userId: string): Promise<Kyc | undefined> {
     const [kycRecord] = await db.select().from(kyc).where(eq(kyc.userId, userId));
     return kycRecord || undefined;
