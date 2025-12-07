@@ -129,32 +129,12 @@ async function seed() {
       console.log(`Created user ${i + 1}/20: ${username}`);
     }
     
-    console.log("\n=== Creating 14 Offers for Each User (7 Buy + 7 Sell) ===");
+    console.log("\n=== Creating 7 Buying Ads for Each User ===");
     for (let i = 0; i < 20; i++) {
       const vendorId = vendorIds[i];
       const username = usernames[i];
       
-      // Create 7 SELL offers
-      for (let j = 0; j < 7; j++) {
-        const exchangeName = exchangeNames[j % exchangeNames.length];
-        const basePrice = 120 + Math.random() * 30;
-        
-        await db.insert(offers).values({
-          vendorId,
-          type: "sell",
-          currency: "USDT",
-          pricePerUnit: basePrice.toFixed(2),
-          minLimit: (1000 + Math.random() * 2000).toFixed(2),
-          maxLimit: (50000 + Math.random() * 150000).toFixed(2),
-          availableAmount: (100 + Math.random() * 500).toFixed(2),
-          paymentMethods: [paymentMethods[j % paymentMethods.length], paymentMethods[(j + 1) % paymentMethods.length]],
-          terms: `${exchangeName} verified account for sale. Level 2 KYC completed. Instant transfer.`,
-          isActive: true,
-          isPriority: j < 2,
-        });
-      }
-      
-      // Create 7 BUY offers
+      // Create 7 BUY offers (ads for buying accounts)
       for (let j = 0; j < 7; j++) {
         const exchangeName = exchangeNames[j % exchangeNames.length];
         const basePrice = 100 + Math.random() * 25;
@@ -173,7 +153,7 @@ async function seed() {
           isPriority: j < 2,
         });
       }
-      console.log(`Created 14 offers for user: ${username} (7 buy + 7 sell)`);
+      console.log(`Created 7 buying ads for user: ${username}`);
     }
     
     console.log("\n=== Seed Summary ===");
@@ -184,11 +164,9 @@ async function seed() {
     console.log(`  Role: admin`);
     console.log(`\n20 Verified Users:`);
     usernames.forEach((name, i) => {
-      console.log(`  ${i + 1}. ${name} - 14 offers (7 buy + 7 sell)`);
+      console.log(`  ${i + 1}. ${name} - 7 buying ads`);
     });
-    console.log(`\nTotal Offers: 280 (14 per user x 20 users)`);
-    console.log(`  - 140 buying offers`);
-    console.log(`  - 140 selling offers`);
+    console.log(`\nTotal Offers: 140 (7 buying ads per user x 20 users)`);
     console.log(`\nAll user accounts have password: Password123!`);
     console.log("\nSeed completed successfully!");
     
