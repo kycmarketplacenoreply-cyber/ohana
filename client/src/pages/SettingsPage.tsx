@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import Layout from "@/components/Layout";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -9,8 +9,9 @@ import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { fetchWithAuth, getUser } from "@/lib/auth";
+import { fetchWithAuth, getUser, getToken } from "@/lib/auth";
 import {
   Settings,
   Shield,
@@ -21,6 +22,9 @@ import {
   AlertCircle,
   Copy,
   QrCode,
+  Upload,
+  FileText,
+  Camera,
 } from "lucide-react";
 
 export default function SettingsPage() {
@@ -29,6 +33,13 @@ export default function SettingsPage() {
   const user = getUser();
   const [setup2FAOpen, setSetup2FAOpen] = useState(false);
   const [verifyToken, setVerifyToken] = useState("");
+  const [kycDialogOpen, setKycDialogOpen] = useState(false);
+  const [idType, setIdType] = useState("passport");
+  const [idNumber, setIdNumber] = useState("");
+  const [idDocument, setIdDocument] = useState<File | null>(null);
+  const [selfie, setSelfie] = useState<File | null>(null);
+  const idDocumentRef = useRef<HTMLInputElement>(null);
+  const selfieRef = useRef<HTMLInputElement>(null);
 
   const { data: me, isLoading } = useQuery({
     queryKey: ["me"],
@@ -96,6 +107,46 @@ export default function SettingsPage() {
     navigator.clipboard.writeText(codes.join("\n"));
     toast({ title: "Copied!", description: "Recovery codes copied to clipboard" });
   };
+
+  const submitKycMutation = useMutation({
+    mutationFn: async () => {
+      if (!idDocument || !selfie || !idNumber) {
+        throw new Error("Please fill in all required fields");
+      }
+      const formData = new FormData();
+      formData.append("idType", idType);
+      formData.append("idNumber", idNumber);
+      formData.append("idDocument", idDocument);
+      formData.append("selfie", selfie);
+
+      const token = getToken();
+      const res = await fetch("/api/kyc/submit", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+        body: formData,
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.message || "Failed to submit KYC");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["kyc-status"] });
+      setKycDialogOpen(false);
+      setIdNumber("");
+      setIdDocument(null);
+      setSelfie(null);
+      if (idDocumentRef.current) idDocumentRef.current.value = "";
+      if (selfieRef.current) selfieRef.current.value = "";
+      toast({ title: "KYC Submitted", description: "Your documents are being reviewed" });
+    },
+    onError: (error: Error) => {
+      toast({ variant: "destructive", title: "Submission Failed", description: error.message });
+    },
+  });
 
   return (
     <Layout>
@@ -312,9 +363,111 @@ export default function SettingsPage() {
                     <p className="text-white font-medium">Not Verified</p>
                     <p className="text-gray-400 text-sm">Complete KYC to increase your limits</p>
                   </div>
-                  <Button className="bg-purple-600 hover:bg-purple-700" data-testid="button-start-kyc">
-                    Start Verification
-                  </Button>
+                  <Dialog open={kycDialogOpen} onOpenChange={setKycDialogOpen}>
+                    <DialogTrigger asChild>
+                      <Button className="bg-purple-600 hover:bg-purple-700" data-testid="button-start-kyc">
+                        Start Verification
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent className="bg-gray-900 border-gray-800 max-w-md">
+                      <DialogHeader>
+                        <DialogTitle className="text-white">KYC Verification</DialogTitle>
+                      </DialogHeader>
+                      <div className="space-y-4 pt-4">
+                        <div className="space-y-2">
+                          <Label className="text-gray-300">ID Type</Label>
+                          <Select value={idType} onValueChange={setIdType}>
+                            <SelectTrigger className="bg-gray-800 border-gray-700 text-white" data-testid="select-id-type">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="passport">Passport</SelectItem>
+                              <SelectItem value="national_id">National ID</SelectItem>
+                              <SelectItem value="drivers_license">Driver's License</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label className="text-gray-300">ID Number</Label>
+                          <Input
+                            placeholder="Enter your ID number"
+                            value={idNumber}
+                            onChange={(e) => setIdNumber(e.target.value)}
+                            className="bg-gray-800 border-gray-700 text-white"
+                            data-testid="input-id-number"
+                          />
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label className="text-gray-300">ID Document (front)</Label>
+                          <input
+                            type="file"
+                            ref={idDocumentRef}
+                            accept="image/*,.pdf"
+                            className="hidden"
+                            onChange={(e) => setIdDocument(e.target.files?.[0] || null)}
+                          />
+                          <div
+                            onClick={() => idDocumentRef.current?.click()}
+                            className="border-2 border-dashed border-gray-600 rounded-lg p-6 text-center cursor-pointer hover:border-purple-500 transition-colors"
+                            data-testid="upload-id-document"
+                          >
+                            {idDocument ? (
+                              <div className="flex items-center justify-center gap-2 text-green-400">
+                                <FileText className="h-5 w-5" />
+                                <span>{idDocument.name}</span>
+                              </div>
+                            ) : (
+                              <div className="text-gray-400">
+                                <Upload className="h-8 w-8 mx-auto mb-2" />
+                                <p>Click to upload ID document</p>
+                                <p className="text-xs">JPG, PNG or PDF (max 5MB)</p>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label className="text-gray-300">Selfie with ID</Label>
+                          <input
+                            type="file"
+                            ref={selfieRef}
+                            accept="image/*"
+                            className="hidden"
+                            onChange={(e) => setSelfie(e.target.files?.[0] || null)}
+                          />
+                          <div
+                            onClick={() => selfieRef.current?.click()}
+                            className="border-2 border-dashed border-gray-600 rounded-lg p-6 text-center cursor-pointer hover:border-purple-500 transition-colors"
+                            data-testid="upload-selfie"
+                          >
+                            {selfie ? (
+                              <div className="flex items-center justify-center gap-2 text-green-400">
+                                <Camera className="h-5 w-5" />
+                                <span>{selfie.name}</span>
+                              </div>
+                            ) : (
+                              <div className="text-gray-400">
+                                <Camera className="h-8 w-8 mx-auto mb-2" />
+                                <p>Click to upload selfie holding your ID</p>
+                                <p className="text-xs">JPG or PNG (max 5MB)</p>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        <Button
+                          className="w-full bg-purple-600 hover:bg-purple-700"
+                          disabled={!idDocument || !selfie || !idNumber || submitKycMutation.isPending}
+                          onClick={() => submitKycMutation.mutate()}
+                          data-testid="button-submit-kyc"
+                        >
+                          {submitKycMutation.isPending ? "Submitting..." : "Submit Verification"}
+                        </Button>
+                      </div>
+                    </DialogContent>
+                  </Dialog>
                 </div>
               )}
             </div>

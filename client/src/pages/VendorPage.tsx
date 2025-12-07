@@ -14,6 +14,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Skeleton } from "@/components/ui/skeleton";
 import { fetchWithAuth, isAuthenticated } from "@/lib/auth";
 import { RatingStars, PaymentMethodChips } from "@/components/marketplace/VendorCard";
+import { useToast } from "@/hooks/use-toast";
 import {
   Plus,
   TrendingUp,
@@ -71,6 +72,7 @@ const paymentOptions = ["Bank Transfer", "PayPal", "Venmo", "Cash App", "Zelle",
 export default function VendorPage() {
   const [, setLocation] = useLocation();
   const queryClient = useQueryClient();
+  const { toast } = useToast();
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [newOffer, setNewOffer] = useState({
     type: "sell",
@@ -149,12 +151,16 @@ export default function VendorPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
-      if (!res.ok) throw new Error("Failed to create offer");
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.message || "Failed to create offer");
+      }
       return res.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["vendorOffers"] });
       setCreateDialogOpen(false);
+      toast({ title: "Offer Created", description: "Your offer is now live on the marketplace" });
       setNewOffer({
         type: "sell",
         currency: "USDT",
@@ -173,6 +179,9 @@ export default function VendorPage() {
           emailPassword: "",
         },
       });
+    },
+    onError: (error: Error) => {
+      toast({ variant: "destructive", title: "Failed to Create Offer", description: error.message });
     },
   });
 
