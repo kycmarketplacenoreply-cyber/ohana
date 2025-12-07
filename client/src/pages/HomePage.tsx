@@ -123,9 +123,7 @@ export default function HomePage() {
               <ChevronLeft className="h-6 w-6 text-foreground" />
             </button>
             <div className="flex items-center gap-6">
-              <span className="text-muted-foreground font-medium">Express</span>
-              <span className="text-foreground font-semibold border-b-2 border-foreground pb-1">KYC</span>
-              <span className="text-muted-foreground font-medium">Block Trade</span>
+              <span className="text-foreground font-semibold border-b-2 border-foreground pb-1">P2P</span>
             </div>
           </div>
           <div className="flex items-center gap-2">
