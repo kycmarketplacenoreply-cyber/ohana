@@ -356,7 +356,13 @@ export default function SettingsPage() {
                       <p className="text-gray-400 text-sm">{kycStatus.rejectionReason || "Please resubmit"}</p>
                     </div>
                   </div>
-                  <Button className="bg-purple-600 hover:bg-purple-700">Resubmit</Button>
+                  <Button 
+                    className="bg-purple-600 hover:bg-purple-700"
+                    onClick={() => setKycDialogOpen(true)}
+                    data-testid="button-resubmit-kyc"
+                  >
+                    Resubmit
+                  </Button>
                 </div>
               ) : (
                 <div className="flex items-center justify-between">
@@ -364,12 +370,17 @@ export default function SettingsPage() {
                     <p className="text-white font-medium">Not Verified</p>
                     <p className="text-gray-400 text-sm">Complete KYC to increase your limits</p>
                   </div>
-                  <Dialog open={kycDialogOpen} onOpenChange={setKycDialogOpen}>
-                    <DialogTrigger asChild>
-                      <Button className="bg-purple-600 hover:bg-purple-700" data-testid="button-start-kyc">
-                        Start Verification
-                      </Button>
-                    </DialogTrigger>
+                  <Button 
+                    className="bg-purple-600 hover:bg-purple-700"
+                    onClick={() => setKycDialogOpen(true)}
+                    data-testid="button-start-kyc"
+                  >
+                    Start Verification
+                  </Button>
+                </div>
+              )}
+
+              <Dialog open={kycDialogOpen} onOpenChange={setKycDialogOpen}>
                     <DialogContent className="bg-gray-900 border-gray-800 max-w-md max-h-[90vh]">
                       <DialogHeader>
                         <DialogTitle className="text-white">KYC Verification</DialogTitle>
@@ -470,9 +481,7 @@ export default function SettingsPage() {
                       </div>
                       </ScrollArea>
                     </DialogContent>
-                  </Dialog>
-                </div>
-              )}
+              </Dialog>
             </div>
           </CardContent>
         </Card>
