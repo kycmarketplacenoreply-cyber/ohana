@@ -11,7 +11,7 @@ import bcrypt from "bcrypt";
 
 const exchangeList = [
   { name: "OKX", symbol: "OKX", description: "OKX Crypto Exchange Account" },
-  { name: "Binance", symbol: "BNB", description: "Binance Exchange Account" },
+  { name: "Binance", symbol: "BINANCE", description: "Binance Exchange Account" },
   { name: "Bybit", symbol: "BYBIT", description: "Bybit Exchange Account" },
   { name: "KuCoin", symbol: "KUCOIN", description: "KuCoin Exchange Account" },
   { name: "Huobi", symbol: "HTX", description: "Huobi/HTX Exchange Account" },
@@ -20,19 +20,8 @@ const exchangeList = [
   { name: "Kraken", symbol: "KRAKEN", description: "Kraken Exchange Account" },
   { name: "Coinbase", symbol: "COINBASE", description: "Coinbase Exchange Account" },
   { name: "Bitstamp", symbol: "BITSTAMP", description: "Bitstamp Exchange Account" },
-  { name: "Gemini", symbol: "GEMINI", description: "Gemini Exchange Account" },
-  { name: "Crypto.com", symbol: "CRO", description: "Crypto.com Exchange Account" },
-  { name: "MEXC", symbol: "MEXC", description: "MEXC Global Exchange Account" },
-  { name: "Bitget", symbol: "BITGET", description: "Bitget Exchange Account" },
-  { name: "WhiteBIT", symbol: "WHITEBIT", description: "WhiteBIT Exchange Account" },
-  { name: "Phemex", symbol: "PHEMEX", description: "Phemex Exchange Account" },
-  { name: "Deribit", symbol: "DERIBIT", description: "Deribit Exchange Account" },
-  { name: "BingX", symbol: "BINGX", description: "BingX Exchange Account" },
-  { name: "LBank", symbol: "LBANK", description: "LBank Exchange Account" },
-  { name: "Bitmart", symbol: "BITMART", description: "BitMart Exchange Account" },
 ];
 
-const currencies = ["USD", "EUR", "GBP", "NGN", "KES", "TZS", "GHS", "ZAR"];
 const paymentMethods = ["Bank Transfer", "M-Pesa", "PayPal", "Wise", "Western Union", "Skrill", "Cash Deposit", "Zelle"];
 const countries = ["Nigeria", "Kenya", "Tanzania", "Ghana", "South Africa", "United States", "United Kingdom", "Germany"];
 
@@ -171,19 +160,18 @@ async function seed() {
       
       for (let j = 0; j < 10; j++) {
         const exchange = exchangeList[j % exchangeList.length];
-        const currency = currencies[j % currencies.length];
-        const basePrice = 0.98 + Math.random() * 0.04;
+        const basePrice = 120 + Math.random() * 30;
         
         await db.insert(offers).values({
           vendorId,
           type: "sell",
-          currency,
-          pricePerUnit: basePrice.toFixed(8),
-          minLimit: (50 + Math.random() * 50).toFixed(2),
-          maxLimit: (500 + Math.random() * 2000).toFixed(2),
-          availableAmount: (100 + Math.random() * 500).toFixed(8),
+          currency: exchange.symbol,
+          pricePerUnit: basePrice.toFixed(2),
+          minLimit: (1000 + Math.random() * 2000).toFixed(2),
+          maxLimit: (50000 + Math.random() * 150000).toFixed(2),
+          availableAmount: (1 + Math.random() * 5).toFixed(0),
           paymentMethods: [paymentMethods[j % paymentMethods.length], paymentMethods[(j + 1) % paymentMethods.length]],
-          terms: `${exchange.name} account for sale. Verified and ready to transfer. Payment via ${paymentMethods[j % paymentMethods.length]}.`,
+          terms: `${exchange.name} verified account for sale. Level 2 KYC completed. Instant transfer. Payment via ${paymentMethods[j % paymentMethods.length]}.`,
           isActive: true,
           isPriority: j < 2,
         });
@@ -191,20 +179,19 @@ async function seed() {
       }
       
       for (let j = 0; j < 10; j++) {
-        const exchange = exchangeList[(j + 10) % exchangeList.length];
-        const currency = currencies[(j + 4) % currencies.length];
-        const basePrice = 0.96 + Math.random() * 0.04;
+        const exchange = exchangeList[j % exchangeList.length];
+        const basePrice = 100 + Math.random() * 25;
         
         await db.insert(offers).values({
           vendorId,
           type: "buy",
-          currency,
-          pricePerUnit: basePrice.toFixed(8),
-          minLimit: (30 + Math.random() * 70).toFixed(2),
-          maxLimit: (300 + Math.random() * 1500).toFixed(2),
-          availableAmount: (50 + Math.random() * 300).toFixed(8),
+          currency: exchange.symbol,
+          pricePerUnit: basePrice.toFixed(2),
+          minLimit: (500 + Math.random() * 1500).toFixed(2),
+          maxLimit: (30000 + Math.random() * 100000).toFixed(2),
+          availableAmount: (2 + Math.random() * 8).toFixed(0),
           paymentMethods: [paymentMethods[(j + 3) % paymentMethods.length], paymentMethods[(j + 4) % paymentMethods.length]],
-          terms: `Looking to buy ${exchange.name} account. Willing to pay via ${paymentMethods[(j + 3) % paymentMethods.length]}.`,
+          terms: `Looking to buy verified ${exchange.name} account. Will pay premium for accounts with trading history. Payment via ${paymentMethods[(j + 3) % paymentMethods.length]}.`,
           isActive: true,
           isPriority: false,
         });
