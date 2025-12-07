@@ -10,7 +10,7 @@ import {
 import bcrypt from "bcrypt";
 
 const exchangeNames = ["OKX", "Binance", "Bybit", "KuCoin", "Huobi", "Gate.io", "MEXC"];
-const paymentMethods = ["Binance UID", "OKX UID", "Bybit UID", "MEXC UID", "KuCoin UID", "Wallet Address", "Bank Transfer"];
+const paymentMethods = ["Binance UID", "OKX UID", "MEXC UID", "Bybit UID", "Bitget UID", "Wallet Address"];
 const countries = ["Nigeria", "Kenya", "Tanzania", "Ghana", "South Africa", "United States", "United Kingdom", "Germany"];
 
 const usernames = [

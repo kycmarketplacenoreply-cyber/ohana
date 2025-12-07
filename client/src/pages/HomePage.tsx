@@ -204,9 +204,9 @@ export default function HomePage() {
                 <SelectItem value="all">All Accounts</SelectItem>
                 <SelectItem value="Binance UID">Binance</SelectItem>
                 <SelectItem value="OKX UID">OKX</SelectItem>
-                <SelectItem value="Bybit UID">Bybit</SelectItem>
                 <SelectItem value="MEXC UID">MEXC</SelectItem>
-                <SelectItem value="KuCoin UID">KuCoin</SelectItem>
+                <SelectItem value="Bybit UID">Bybit</SelectItem>
+                <SelectItem value="Bitget UID">Bitget</SelectItem>
                 <SelectItem value="Wallet Address">Wallet</SelectItem>
               </SelectContent>
             </Select>
@@ -220,10 +220,12 @@ export default function HomePage() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Payments</SelectItem>
-                <SelectItem value="mpesa">M-PESA Kenya</SelectItem>
-                <SelectItem value="bank_transfer">Bank Transfer</SelectItem>
-                <SelectItem value="equity_bank">Equity Bank</SelectItem>
-                <SelectItem value="paybill">M-pesa Paybill</SelectItem>
+                <SelectItem value="Binance UID">Binance UID</SelectItem>
+                <SelectItem value="OKX UID">OKX UID</SelectItem>
+                <SelectItem value="MEXC UID">MEXC UID</SelectItem>
+                <SelectItem value="Bybit UID">Bybit UID</SelectItem>
+                <SelectItem value="Bitget UID">Bitget UID</SelectItem>
+                <SelectItem value="Wallet Address">Wallet Address</SelectItem>
               </SelectContent>
             </Select>
           </div>
