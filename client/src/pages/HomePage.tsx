@@ -76,11 +76,10 @@ export default function HomePage() {
   const currentCurrency = selectedCurrency || defaultExchange;
 
   const { data: offers, isLoading } = useQuery<Offer[]>({
-    queryKey: ["offers", activeTab === "buy" ? "sell" : "buy", currentCurrency],
+    queryKey: ["offers", activeTab === "buy" ? "sell" : "buy"],
     queryFn: async () => {
       const params = new URLSearchParams();
       params.append("type", activeTab === "buy" ? "sell" : "buy");
-      if (currentCurrency && currentCurrency !== "all") params.append("currency", currentCurrency);
       const res = await fetch(`/api/marketplace/offers?${params}`);
       return res.json();
     },
