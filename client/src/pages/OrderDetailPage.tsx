@@ -141,6 +141,16 @@ export default function OrderDetailPage() {
     },
   });
 
+  const { data: accountDetails } = useQuery<{ accountDetails: Record<string, string> | null }>({
+    queryKey: ["account-details", orderId],
+    queryFn: async () => {
+      const res = await fetchWithAuth(`/api/orders/${orderId}/account-details`);
+      if (!res.ok) return { accountDetails: null };
+      return res.json();
+    },
+    enabled: !!orderId && order?.status === "completed" && order?.buyerId === user?.id,
+  });
+
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
@@ -318,6 +328,32 @@ export default function OrderDetailPage() {
             )}
           </CardContent>
         </Card>
+
+        {order.status === "completed" && isBuyer && accountDetails?.accountDetails && (
+          <Card className="bg-gray-900/50 border-gray-800 border-green-500/50" data-testid="card-account-details">
+            <CardHeader>
+              <CardTitle className="text-white flex items-center gap-2">
+                <Unlock className="h-5 w-5 text-green-400" />
+                Account Details (Revealed)
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="p-4 bg-green-900/20 border border-green-700 rounded-lg">
+                <p className="text-green-300 text-sm mb-3">
+                  Your order is complete! Here are the account details from the vendor:
+                </p>
+                <div className="space-y-2">
+                  {Object.entries(accountDetails.accountDetails).map(([key, value]) => (
+                    <div key={key} className="flex justify-between items-center p-2 bg-gray-800 rounded">
+                      <span className="text-gray-400 capitalize">{key.replace(/([A-Z])/g, ' $1').trim()}:</span>
+                      <span className="text-white font-mono select-all" data-testid={`text-account-${key}`}>{value}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         <Card className="bg-gray-900/50 border-gray-800">
           <CardHeader>
