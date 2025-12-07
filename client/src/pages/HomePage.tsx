@@ -191,7 +191,7 @@ export default function HomePage() {
                 {exchanges && exchanges.length > 0 ? (
                   exchanges.map((exchange) => (
                     <SelectItem key={exchange.id} value={exchange.symbol}>
-                      {exchange.name} ({exchange.symbol})
+                      {exchange.name}
                     </SelectItem>
                   ))
                 ) : (
@@ -268,7 +268,7 @@ export default function HomePage() {
                     </div>
 
                     <div className="flex items-center gap-3 text-xs text-muted-foreground mb-3">
-                      <span>Trade: {offer.vendorTrades ?? 0} Trades ({offer.vendorCompletionRate ?? "100.00"}%)</span>
+                      <span>{offer.vendorTrades ?? 0} Trades</span>
                       <span className="flex items-center gap-1">
                         <ThumbsUp className="h-3 w-3" />
                         {offer.vendorRating ?? "99.00"}%
@@ -282,7 +282,7 @@ export default function HomePage() {
 
                     <div className="text-xs text-muted-foreground space-y-0.5">
                       <p>Limit <span className="text-foreground">{parseFloat(offer.minLimit).toLocaleString()} - {parseFloat(offer.maxLimit).toLocaleString()} USDT</span></p>
-                      <p>Available <span className="text-foreground">{parseFloat(offer.availableAmount).toFixed(2)} {offer.currency}</span></p>
+                      <p>Available <span className="text-foreground">{parseFloat(offer.availableAmount).toFixed(2)}</span></p>
                     </div>
                   </div>
 
