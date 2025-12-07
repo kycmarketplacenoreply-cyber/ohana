@@ -200,21 +200,17 @@ export default function HomePage() {
                 )}
               </SelectContent>
             </Select>
-            <Select value={selectedAmount} onValueChange={setSelectedAmount}>
-              <SelectTrigger className="w-auto border-0 shadow-none p-0 h-auto bg-transparent" data-testid="filter-amount">
-                <div className="flex items-center gap-1 text-muted-foreground">
-                  <SelectValue placeholder="Amount" />
-                  <ChevronDown className="h-4 w-4 text-muted-foreground" />
-                </div>
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Amounts</SelectItem>
-                <SelectItem value="1000">Up to 1,000 USDT</SelectItem>
-                <SelectItem value="10000">Up to 10,000 USDT</SelectItem>
-                <SelectItem value="50000">Up to 50,000 USDT</SelectItem>
-                <SelectItem value="100000">Up to 100,000 USDT</SelectItem>
-              </SelectContent>
-            </Select>
+            <div className="flex items-center gap-1">
+              <input
+                type="number"
+                placeholder="Amount"
+                value={selectedAmount === "all" ? "" : selectedAmount}
+                onChange={(e) => setSelectedAmount(e.target.value || "all")}
+                className="w-20 bg-transparent border-b border-muted-foreground/30 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary"
+                data-testid="filter-amount"
+              />
+              <span className="text-xs text-muted-foreground">USDT</span>
+            </div>
             <Select value={selectedPayment} onValueChange={setSelectedPayment}>
               <SelectTrigger className="w-auto border-0 shadow-none p-0 h-auto bg-transparent" data-testid="filter-payment">
                 <div className="flex items-center gap-1 text-muted-foreground">
@@ -224,9 +220,12 @@ export default function HomePage() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Methods</SelectItem>
-                <SelectItem value="mpesa">M-PESA</SelectItem>
-                <SelectItem value="bank_transfer">Bank Transfer</SelectItem>
-                <SelectItem value="paybill">Paybill</SelectItem>
+                <SelectItem value="Binance UID">Binance UID</SelectItem>
+                <SelectItem value="OKX UID">OKX UID</SelectItem>
+                <SelectItem value="Bybit UID">Bybit UID</SelectItem>
+                <SelectItem value="MEXC UID">MEXC UID</SelectItem>
+                <SelectItem value="KuCoin UID">KuCoin UID</SelectItem>
+                <SelectItem value="Wallet Address">Wallet Address</SelectItem>
               </SelectContent>
             </Select>
           </div>

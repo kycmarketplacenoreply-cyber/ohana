@@ -11,7 +11,7 @@ import bcrypt from "bcrypt";
 
 const exchangeNames = ["OKX", "Binance", "Bybit", "KuCoin", "Huobi", "Gate.io", "Bitfinex", "Kraken", "Coinbase", "Bitstamp"];
 
-const paymentMethods = ["Bank Transfer", "M-Pesa", "PayPal", "Wise", "Western Union", "Skrill", "Cash Deposit", "Zelle"];
+const paymentMethods = ["Binance UID", "OKX UID", "Bybit UID", "MEXC UID", "KuCoin UID", "Wallet Address"];
 const countries = ["Nigeria", "Kenya", "Tanzania", "Ghana", "South Africa", "United States", "United Kingdom", "Germany"];
 
 async function seed() {
