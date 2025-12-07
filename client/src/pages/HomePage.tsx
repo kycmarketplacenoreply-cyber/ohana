@@ -60,7 +60,7 @@ export default function HomePage() {
   const [location, setLocation] = useLocation();
   const [activeTab, setActiveTab] = useState<"buy" | "sell">("buy");
   const [selectedCurrency, setSelectedCurrency] = useState("");
-  const [selectedFiat, setSelectedFiat] = useState("KES");
+  const [selectedFiat, setSelectedFiat] = useState("USDT");
   const [selectedAmount, setSelectedAmount] = useState("all");
   const [selectedPayment, setSelectedPayment] = useState("all");
 
@@ -209,10 +209,10 @@ export default function HomePage() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Amounts</SelectItem>
-                <SelectItem value="1000">Up to 1,000 KES</SelectItem>
-                <SelectItem value="10000">Up to 10,000 KES</SelectItem>
-                <SelectItem value="50000">Up to 50,000 KES</SelectItem>
-                <SelectItem value="100000">Up to 100,000 KES</SelectItem>
+                <SelectItem value="1000">Up to 1,000 USDT</SelectItem>
+                <SelectItem value="10000">Up to 10,000 USDT</SelectItem>
+                <SelectItem value="50000">Up to 50,000 USDT</SelectItem>
+                <SelectItem value="100000">Up to 100,000 USDT</SelectItem>
               </SelectContent>
             </Select>
             <Select value={selectedPayment} onValueChange={setSelectedPayment}>
@@ -278,13 +278,12 @@ export default function HomePage() {
                     </div>
 
                     <div className="mb-2">
-                      <span className="text-muted-foreground text-sm">KSh </span>
                       <span className="text-2xl font-bold text-foreground">{parseFloat(offer.pricePerUnit).toFixed(2)}</span>
-                      <span className="text-muted-foreground text-sm">/{offer.currency}</span>
+                      <span className="text-muted-foreground text-sm"> USDT</span>
                     </div>
 
                     <div className="text-xs text-muted-foreground space-y-0.5">
-                      <p>Limit <span className="text-foreground">{parseFloat(offer.minLimit).toLocaleString()} - {parseFloat(offer.maxLimit).toLocaleString()} KES</span></p>
+                      <p>Limit <span className="text-foreground">{parseFloat(offer.minLimit).toLocaleString()} - {parseFloat(offer.maxLimit).toLocaleString()} USDT</span></p>
                       <p>Available <span className="text-foreground">{parseFloat(offer.availableAmount).toFixed(2)} {offer.currency}</span></p>
                     </div>
                   </div>
