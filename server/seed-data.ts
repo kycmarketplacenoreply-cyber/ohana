@@ -9,18 +9,7 @@ import {
 } from "@shared/schema";
 import bcrypt from "bcrypt";
 
-const exchangeList = [
-  { name: "OKX", symbol: "OKX", description: "OKX Crypto Exchange Account" },
-  { name: "Binance", symbol: "BINANCE", description: "Binance Exchange Account" },
-  { name: "Bybit", symbol: "BYBIT", description: "Bybit Exchange Account" },
-  { name: "KuCoin", symbol: "KUCOIN", description: "KuCoin Exchange Account" },
-  { name: "Huobi", symbol: "HTX", description: "Huobi/HTX Exchange Account" },
-  { name: "Gate.io", symbol: "GATE", description: "Gate.io Exchange Account" },
-  { name: "Bitfinex", symbol: "BFX", description: "Bitfinex Exchange Account" },
-  { name: "Kraken", symbol: "KRAKEN", description: "Kraken Exchange Account" },
-  { name: "Coinbase", symbol: "COINBASE", description: "Coinbase Exchange Account" },
-  { name: "Bitstamp", symbol: "BITSTAMP", description: "Bitstamp Exchange Account" },
-];
+const exchangeNames = ["OKX", "Binance", "Bybit", "KuCoin", "Huobi", "Gate.io", "Bitfinex", "Kraken", "Coinbase", "Bitstamp"];
 
 const paymentMethods = ["Bank Transfer", "M-Pesa", "PayPal", "Wise", "Western Union", "Skrill", "Cash Deposit", "Zelle"];
 const countries = ["Nigeria", "Kenya", "Tanzania", "Ghana", "South Africa", "United States", "United Kingdom", "Germany"];
@@ -31,17 +20,15 @@ async function seed() {
   try {
     const hashedPassword = await bcrypt.hash("Password123!", 10);
     
-    console.log("Creating exchanges...");
-    const createdExchanges = await db.insert(exchanges).values(
-      exchangeList.map((ex, i) => ({
-        name: ex.name,
-        symbol: ex.symbol,
-        description: ex.description,
-        isActive: true,
-        sortOrder: i,
-      }))
-    ).returning();
-    console.log(`Created ${createdExchanges.length} exchanges`);
+    console.log("Creating USDT exchange...");
+    const createdExchanges = await db.insert(exchanges).values({
+      name: "USDT",
+      symbol: "USDT",
+      description: "Tether USD Stablecoin",
+      isActive: true,
+      sortOrder: 0,
+    }).returning();
+    console.log(`Created USDT exchange`);
     
     console.log("Creating 20 users...");
     const createdUsers: any[] = [];
@@ -159,19 +146,19 @@ async function seed() {
       }
       
       for (let j = 0; j < 10; j++) {
-        const exchange = exchangeList[j % exchangeList.length];
+        const exchangeName = exchangeNames[j % exchangeNames.length];
         const basePrice = 120 + Math.random() * 30;
         
         await db.insert(offers).values({
           vendorId,
           type: "sell",
-          currency: exchange.symbol,
+          currency: "USDT",
           pricePerUnit: basePrice.toFixed(2),
           minLimit: (1000 + Math.random() * 2000).toFixed(2),
           maxLimit: (50000 + Math.random() * 150000).toFixed(2),
-          availableAmount: (1 + Math.random() * 5).toFixed(0),
+          availableAmount: (100 + Math.random() * 500).toFixed(2),
           paymentMethods: [paymentMethods[j % paymentMethods.length], paymentMethods[(j + 1) % paymentMethods.length]],
-          terms: `${exchange.name} verified account for sale. Level 2 KYC completed. Instant transfer. Payment via ${paymentMethods[j % paymentMethods.length]}.`,
+          terms: `${exchangeName} verified account for sale. Level 2 KYC completed. Instant transfer. Payment via ${paymentMethods[j % paymentMethods.length]}.`,
           isActive: true,
           isPriority: j < 2,
         });
@@ -179,19 +166,19 @@ async function seed() {
       }
       
       for (let j = 0; j < 10; j++) {
-        const exchange = exchangeList[j % exchangeList.length];
+        const exchangeName = exchangeNames[j % exchangeNames.length];
         const basePrice = 100 + Math.random() * 25;
         
         await db.insert(offers).values({
           vendorId,
           type: "buy",
-          currency: exchange.symbol,
+          currency: "USDT",
           pricePerUnit: basePrice.toFixed(2),
           minLimit: (500 + Math.random() * 1500).toFixed(2),
           maxLimit: (30000 + Math.random() * 100000).toFixed(2),
-          availableAmount: (2 + Math.random() * 8).toFixed(0),
+          availableAmount: (50 + Math.random() * 300).toFixed(2),
           paymentMethods: [paymentMethods[(j + 3) % paymentMethods.length], paymentMethods[(j + 4) % paymentMethods.length]],
-          terms: `Looking to buy verified ${exchange.name} account. Will pay premium for accounts with trading history. Payment via ${paymentMethods[(j + 3) % paymentMethods.length]}.`,
+          terms: `Looking to buy verified ${exchangeName} account. Will pay premium for accounts with trading history. Payment via ${paymentMethods[(j + 3) % paymentMethods.length]}.`,
           isActive: true,
           isPriority: false,
         });
