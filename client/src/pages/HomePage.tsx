@@ -46,20 +46,41 @@ interface Offer {
   responseTime?: number;
 }
 
+interface Exchange {
+  id: string;
+  name: string;
+  symbol: string;
+  description: string | null;
+  iconUrl: string | null;
+  isActive: boolean;
+  sortOrder: number;
+}
+
 export default function HomePage() {
   const [location, setLocation] = useLocation();
   const [activeTab, setActiveTab] = useState<"buy" | "sell">("buy");
-  const [selectedCurrency, setSelectedCurrency] = useState("USDT");
+  const [selectedCurrency, setSelectedCurrency] = useState("");
   const [selectedFiat, setSelectedFiat] = useState("KES");
   const [selectedAmount, setSelectedAmount] = useState("all");
   const [selectedPayment, setSelectedPayment] = useState("all");
 
+  const { data: exchanges } = useQuery<Exchange[]>({
+    queryKey: ["exchanges"],
+    queryFn: async () => {
+      const res = await fetch("/api/exchanges");
+      return res.json();
+    },
+  });
+
+  const defaultExchange = exchanges?.[0]?.symbol || "USDT";
+  const currentCurrency = selectedCurrency || defaultExchange;
+
   const { data: offers, isLoading } = useQuery<Offer[]>({
-    queryKey: ["offers", activeTab === "buy" ? "sell" : "buy", selectedCurrency],
+    queryKey: ["offers", activeTab === "buy" ? "sell" : "buy", currentCurrency],
     queryFn: async () => {
       const params = new URLSearchParams();
       params.append("type", activeTab === "buy" ? "sell" : "buy");
-      if (selectedCurrency !== "all") params.append("currency", selectedCurrency);
+      if (currentCurrency && currentCurrency !== "all") params.append("currency", currentCurrency);
       const res = await fetch(`/api/marketplace/offers?${params}`);
       return res.json();
     },
@@ -155,20 +176,28 @@ export default function HomePage() {
 
         <div className="flex items-center justify-between px-4 pb-3">
           <div className="flex items-center gap-3">
-            <Select value={selectedCurrency} onValueChange={setSelectedCurrency}>
+            <Select value={currentCurrency} onValueChange={setSelectedCurrency}>
               <SelectTrigger className="w-auto border-0 shadow-none p-0 h-auto bg-transparent" data-testid="filter-currency">
                 <div className="flex items-center gap-1 text-foreground font-medium">
                   <div className="w-5 h-5 bg-primary rounded-full flex items-center justify-center">
-                    <span className="text-primary-foreground text-xs font-bold">₮</span>
+                    <span className="text-primary-foreground text-xs font-bold">
+                      {exchanges?.find(e => e.symbol === currentCurrency)?.symbol?.charAt(0) || "₮"}
+                    </span>
                   </div>
                   <SelectValue />
                   <ChevronDown className="h-4 w-4 text-muted-foreground" />
                 </div>
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="USDT">USDT</SelectItem>
-                <SelectItem value="BTC">BTC</SelectItem>
-                <SelectItem value="ETH">ETH</SelectItem>
+                {exchanges && exchanges.length > 0 ? (
+                  exchanges.map((exchange) => (
+                    <SelectItem key={exchange.id} value={exchange.symbol}>
+                      {exchange.name} ({exchange.symbol})
+                    </SelectItem>
+                  ))
+                ) : (
+                  <SelectItem value="USDT">USDT</SelectItem>
+                )}
               </SelectContent>
             </Select>
             <Select value={selectedAmount} onValueChange={setSelectedAmount}>

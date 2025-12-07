@@ -102,13 +102,20 @@ export function RatingStars({
   );
 }
 
+interface ExchangeOption {
+  symbol: string;
+  name?: string;
+}
+
 export function CurrencySelector({
   value,
   onChange,
-  currencies = ["USDT", "BTC", "ETH", "BNB", "SOL"],
+  exchanges = [],
+  currencies = [],
 }: {
   value: string;
   onChange: (currency: string) => void;
+  exchanges?: ExchangeOption[];
   currencies?: string[];
 }) {
   const currencyIcons: Record<string, string> = {
@@ -119,9 +126,15 @@ export function CurrencySelector({
     SOL: "◎",
   };
 
+  const options = exchanges.length > 0 
+    ? exchanges.map(e => e.symbol) 
+    : currencies.length > 0 
+      ? currencies 
+      : ["USDT", "BTC", "ETH", "BNB", "SOL"];
+
   return (
     <div className="flex flex-wrap gap-2" data-testid="currency-selector">
-      {currencies.map((currency) => (
+      {options.map((currency) => (
         <button
           key={currency}
           onClick={() => onChange(currency)}
@@ -132,7 +145,7 @@ export function CurrencySelector({
           }`}
           data-testid={`currency-${currency}`}
         >
-          <span className="mr-1">{currencyIcons[currency] || "$"}</span>
+          <span className="mr-1">{currencyIcons[currency] || currency.charAt(0)}</span>
           {currency}
         </button>
       ))}

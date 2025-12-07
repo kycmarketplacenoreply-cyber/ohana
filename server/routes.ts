@@ -15,7 +15,7 @@ import {
   notifyOrderCompleted,
   notifyDisputeOpened 
 } from "./services/notifications";
-import { insertUserSchema, insertKycSchema, insertVendorProfileSchema, insertOfferSchema, insertOrderSchema, insertRatingSchema } from "@shared/schema";
+import { insertUserSchema, insertKycSchema, insertVendorProfileSchema, insertOfferSchema, insertOrderSchema, insertRatingSchema, insertExchangeSchema } from "@shared/schema";
 
 export async function registerRoutes(
   httpServer: Server,
@@ -1103,6 +1103,119 @@ export async function registerRoutes(
       });
 
       res.json(updated);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  // ==================== EXCHANGE ROUTES ====================
+
+  // Get all active exchanges (public)
+  app.get("/api/exchanges", async (req, res) => {
+    try {
+      const exchanges = await storage.getActiveExchanges();
+      res.json(exchanges);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Get all exchanges (admin)
+  app.get("/api/admin/exchanges", requireAuth, requireAdmin, async (req: AuthRequest, res) => {
+    try {
+      const exchanges = await storage.getAllExchanges();
+      res.json(exchanges);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Create exchange (admin)
+  app.post("/api/admin/exchanges", requireAuth, requireAdmin, async (req: AuthRequest, res) => {
+    try {
+      const validatedData = insertExchangeSchema.parse({
+        ...req.body,
+        createdBy: req.user!.userId,
+      });
+
+      const exchange = await storage.createExchange(validatedData);
+
+      await storage.createAuditLog({
+        userId: req.user!.userId,
+        action: "exchange_created",
+        resource: "exchanges",
+        resourceId: exchange.id,
+        changes: { name: exchange.name, symbol: exchange.symbol },
+        ipAddress: req.ip,
+        userAgent: req.headers["user-agent"],
+      });
+
+      res.json(exchange);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  // Update exchange (admin)
+  app.patch("/api/admin/exchanges/:id", requireAuth, requireAdmin, async (req: AuthRequest, res) => {
+    try {
+      const exchange = await storage.getExchange(req.params.id);
+      if (!exchange) {
+        return res.status(404).json({ message: "Exchange not found" });
+      }
+
+      const allowedFields = ["name", "symbol", "description", "iconUrl", "isActive", "sortOrder"];
+      const updateData: Record<string, any> = {};
+      
+      for (const field of allowedFields) {
+        if (req.body[field] !== undefined) {
+          updateData[field] = req.body[field];
+        }
+      }
+
+      if (Object.keys(updateData).length === 0) {
+        return res.status(400).json({ message: "No valid fields to update" });
+      }
+
+      const updated = await storage.updateExchange(req.params.id, updateData);
+
+      await storage.createAuditLog({
+        userId: req.user!.userId,
+        action: "exchange_updated",
+        resource: "exchanges",
+        resourceId: req.params.id,
+        changes: updateData,
+        ipAddress: req.ip,
+        userAgent: req.headers["user-agent"],
+      });
+
+      res.json(updated);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  // Delete exchange (admin)
+  app.delete("/api/admin/exchanges/:id", requireAuth, requireAdmin, async (req: AuthRequest, res) => {
+    try {
+      const exchange = await storage.getExchange(req.params.id);
+      if (!exchange) {
+        return res.status(404).json({ message: "Exchange not found" });
+      }
+
+      await storage.deleteExchange(req.params.id);
+
+      await storage.createAuditLog({
+        userId: req.user!.userId,
+        action: "exchange_deleted",
+        resource: "exchanges",
+        resourceId: req.params.id,
+        changes: { name: exchange.name, symbol: exchange.symbol },
+        ipAddress: req.ip,
+        userAgent: req.headers["user-agent"],
+      });
+
+      res.json({ message: "Exchange deleted" });
     } catch (error: any) {
       res.status(400).json({ message: error.message });
     }
