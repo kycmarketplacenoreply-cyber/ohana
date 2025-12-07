@@ -140,7 +140,7 @@ export default function VendorPage() {
       toast({ title: "Offer Created", description: "Your offer is now live on the marketplace" });
       setNewOffer({
         type: "sell",
-        currency: "USDT",
+        currency: "USD",
         pricePerUnit: "",
         minLimit: "",
         maxLimit: "",
