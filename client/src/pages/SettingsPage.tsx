@@ -10,6 +10,7 @@ import { Switch } from "@/components/ui/switch";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
 import { fetchWithAuth, getUser, getToken } from "@/lib/auth";
 import {
@@ -369,10 +370,11 @@ export default function SettingsPage() {
                         Start Verification
                       </Button>
                     </DialogTrigger>
-                    <DialogContent className="bg-gray-900 border-gray-800 max-w-md">
+                    <DialogContent className="bg-gray-900 border-gray-800 max-w-md max-h-[90vh]">
                       <DialogHeader>
                         <DialogTitle className="text-white">KYC Verification</DialogTitle>
                       </DialogHeader>
+                      <ScrollArea className="max-h-[70vh] pr-4">
                       <div className="space-y-4 pt-4">
                         <div className="space-y-2">
                           <Label className="text-gray-300">ID Type</Label>
@@ -466,6 +468,7 @@ export default function SettingsPage() {
                           {submitKycMutation.isPending ? "Submitting..." : "Submit Verification"}
                         </Button>
                       </div>
+                      </ScrollArea>
                     </DialogContent>
                   </Dialog>
                 </div>
