@@ -151,7 +151,19 @@ export default function AdminPage() {
     },
   });
 
+  const canApproveKyc = (kyc: KycApplication) => {
+    return kyc.idFrontUrl && kyc.idBackUrl && kyc.selfieUrl;
+  };
+
   const handleApprove = (kyc: KycApplication) => {
+    if (!canApproveKyc(kyc)) {
+      toast({ 
+        variant: "destructive", 
+        title: "Cannot Approve", 
+        description: "User must upload ID front, ID back, and selfie before approval" 
+      });
+      return;
+    }
     approveKycMutation.mutate({
       id: kyc.id,
       status: "approved",
@@ -305,12 +317,22 @@ export default function AdminPage() {
                       </div>
                     </div>
 
+                    {!canApproveKyc(kyc) && (
+                      <div className="p-3 bg-yellow-900/30 border border-yellow-700 rounded-lg mb-4">
+                        <p className="text-yellow-400 text-sm flex items-center gap-2">
+                          <AlertTriangle className="h-4 w-4" />
+                          Cannot approve: User must upload all required documents (ID front, ID back, and selfie)
+                        </p>
+                      </div>
+                    )}
+
                     <div className="flex flex-wrap gap-2 pt-4 border-t border-gray-800">
                       <Dialog>
                         <DialogTrigger asChild>
                           <Button 
-                            className="bg-green-600 hover:bg-green-700" 
+                            className={canApproveKyc(kyc) ? "bg-green-600 hover:bg-green-700" : "bg-gray-600 cursor-not-allowed"} 
                             onClick={() => setSelectedKyc(kyc)}
+                            disabled={!canApproveKyc(kyc)}
                             data-testid={`button-approve-kyc-${kyc.id}`}
                           >
                             <Check className="h-4 w-4 mr-2" />
@@ -349,9 +371,9 @@ export default function AdminPage() {
                               <Button variant="outline" className="border-gray-700">Cancel</Button>
                             </DialogClose>
                             <Button 
-                              className="bg-green-600 hover:bg-green-700"
+                              className={canApproveKyc(kyc) ? "bg-green-600 hover:bg-green-700" : "bg-gray-600 cursor-not-allowed"}
                               onClick={() => handleApprove(kyc)}
-                              disabled={approveKycMutation.isPending}
+                              disabled={approveKycMutation.isPending || !canApproveKyc(kyc)}
                               data-testid="button-confirm-approve"
                             >
                               Confirm Approval

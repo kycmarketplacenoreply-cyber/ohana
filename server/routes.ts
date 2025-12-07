@@ -909,6 +909,19 @@ export async function registerRoutes(
     try {
       const { status, tier, adminNotes, rejectionReason } = req.body;
 
+      const kycRecord = await storage.getKyc(req.params.id);
+      if (!kycRecord) {
+        return res.status(404).json({ message: "KYC record not found" });
+      }
+
+      if (status === "approved") {
+        if (!kycRecord.idFrontUrl || !kycRecord.idBackUrl || !kycRecord.selfieUrl) {
+          return res.status(400).json({ 
+            message: "Cannot approve KYC: User must upload ID front, ID back, and selfie before approval" 
+          });
+        }
+      }
+
       const updated = await storage.updateKyc(req.params.id, {
         status,
         tier,
