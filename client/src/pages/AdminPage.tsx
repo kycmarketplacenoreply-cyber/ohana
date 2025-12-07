@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose, DialogDescription } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
@@ -22,6 +22,9 @@ import {
   Image,
   Store,
   AlertTriangle,
+  ZoomIn,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 
 interface KycApplication {
@@ -52,6 +55,11 @@ interface VendorProfile {
   createdAt: string;
 }
 
+interface DocumentImage {
+  url: string;
+  label: string;
+}
+
 export default function AdminPage() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -60,6 +68,44 @@ export default function AdminPage() {
   const [reviewNotes, setReviewNotes] = useState("");
   const [rejectionReason, setRejectionReason] = useState("");
   const [selectedTier, setSelectedTier] = useState("tier1");
+  const [viewingDocuments, setViewingDocuments] = useState<KycApplication | null>(null);
+  const [currentDocIndex, setCurrentDocIndex] = useState(0);
+
+  const getDocuments = (kyc: KycApplication): DocumentImage[] => {
+    const docs: DocumentImage[] = [];
+    if (kyc.idFrontUrl) docs.push({ url: kyc.idFrontUrl, label: "ID Front" });
+    if (kyc.idBackUrl) docs.push({ url: kyc.idBackUrl, label: "ID Back" });
+    if (kyc.selfieUrl) docs.push({ url: kyc.selfieUrl, label: "Selfie" });
+    return docs;
+  };
+
+  const openDocumentViewer = (kyc: KycApplication, startIndex: number = 0) => {
+    setViewingDocuments(kyc);
+    setCurrentDocIndex(startIndex);
+  };
+
+  const closeDocumentViewer = () => {
+    setViewingDocuments(null);
+    setCurrentDocIndex(0);
+  };
+
+  const nextDocument = () => {
+    if (viewingDocuments) {
+      const docs = getDocuments(viewingDocuments);
+      if (docs.length > 0) {
+        setCurrentDocIndex((prev) => (prev + 1) % docs.length);
+      }
+    }
+  };
+
+  const prevDocument = () => {
+    if (viewingDocuments) {
+      const docs = getDocuments(viewingDocuments);
+      if (docs.length > 0) {
+        setCurrentDocIndex((prev) => (prev - 1 + docs.length) % docs.length);
+      }
+    }
+  };
 
   if (user?.role !== "admin") {
     return (
@@ -267,12 +313,22 @@ export default function AdminPage() {
                           ID Front
                         </p>
                         {kyc.idFrontUrl ? (
-                          <img 
-                            src={kyc.idFrontUrl} 
-                            alt="ID Front" 
-                            className="w-full h-40 object-cover rounded-lg border border-gray-700"
-                            data-testid={`kyc-id-front-${kyc.id}`}
-                          />
+                          <div 
+                            className="relative group cursor-pointer"
+                            onClick={() => openDocumentViewer(kyc, 0)}
+                          >
+                            <img 
+                              src={kyc.idFrontUrl} 
+                              alt="ID Front" 
+                              className="w-full h-40 object-cover rounded-lg border border-gray-700 transition-all group-hover:opacity-80"
+                              data-testid={`kyc-id-front-${kyc.id}`}
+                            />
+                            <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                              <div className="bg-black/60 rounded-full p-3">
+                                <ZoomIn className="h-6 w-6 text-white" />
+                              </div>
+                            </div>
+                          </div>
                         ) : (
                           <div className="w-full h-40 bg-gray-800 rounded-lg flex items-center justify-center border border-gray-700">
                             <p className="text-gray-500 text-sm">Not uploaded</p>
@@ -285,12 +341,22 @@ export default function AdminPage() {
                           ID Back
                         </p>
                         {kyc.idBackUrl ? (
-                          <img 
-                            src={kyc.idBackUrl} 
-                            alt="ID Back" 
-                            className="w-full h-40 object-cover rounded-lg border border-gray-700"
-                            data-testid={`kyc-id-back-${kyc.id}`}
-                          />
+                          <div 
+                            className="relative group cursor-pointer"
+                            onClick={() => openDocumentViewer(kyc, kyc.idFrontUrl ? 1 : 0)}
+                          >
+                            <img 
+                              src={kyc.idBackUrl} 
+                              alt="ID Back" 
+                              className="w-full h-40 object-cover rounded-lg border border-gray-700 transition-all group-hover:opacity-80"
+                              data-testid={`kyc-id-back-${kyc.id}`}
+                            />
+                            <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                              <div className="bg-black/60 rounded-full p-3">
+                                <ZoomIn className="h-6 w-6 text-white" />
+                              </div>
+                            </div>
+                          </div>
                         ) : (
                           <div className="w-full h-40 bg-gray-800 rounded-lg flex items-center justify-center border border-gray-700">
                             <p className="text-gray-500 text-sm">Not uploaded</p>
@@ -303,12 +369,27 @@ export default function AdminPage() {
                           Selfie
                         </p>
                         {kyc.selfieUrl ? (
-                          <img 
-                            src={kyc.selfieUrl} 
-                            alt="Selfie" 
-                            className="w-full h-40 object-cover rounded-lg border border-gray-700"
-                            data-testid={`kyc-selfie-${kyc.id}`}
-                          />
+                          <div 
+                            className="relative group cursor-pointer"
+                            onClick={() => {
+                              let idx = 0;
+                              if (kyc.idFrontUrl) idx++;
+                              if (kyc.idBackUrl) idx++;
+                              openDocumentViewer(kyc, idx);
+                            }}
+                          >
+                            <img 
+                              src={kyc.selfieUrl} 
+                              alt="Selfie" 
+                              className="w-full h-40 object-cover rounded-lg border border-gray-700 transition-all group-hover:opacity-80"
+                              data-testid={`kyc-selfie-${kyc.id}`}
+                            />
+                            <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                              <div className="bg-black/60 rounded-full p-3">
+                                <ZoomIn className="h-6 w-6 text-white" />
+                              </div>
+                            </div>
+                          </div>
                         ) : (
                           <div className="w-full h-40 bg-gray-800 rounded-lg flex items-center justify-center border border-gray-700">
                             <p className="text-gray-500 text-sm">Not uploaded</p>
@@ -316,6 +397,17 @@ export default function AdminPage() {
                         )}
                       </div>
                     </div>
+
+                    <Button 
+                      variant="outline" 
+                      className="w-full border-gray-700 mt-2"
+                      onClick={() => openDocumentViewer(kyc)}
+                      disabled={!canApproveKyc(kyc)}
+                      data-testid={`button-view-documents-${kyc.id}`}
+                    >
+                      <ZoomIn className="h-4 w-4 mr-2" />
+                      View All Documents
+                    </Button>
 
                     {!canApproveKyc(kyc) && (
                       <div className="p-3 bg-yellow-900/30 border border-yellow-700 rounded-lg mb-4">
@@ -511,6 +603,125 @@ export default function AdminPage() {
             )}
           </TabsContent>
         </Tabs>
+
+        <Dialog open={!!viewingDocuments} onOpenChange={() => closeDocumentViewer()}>
+          <DialogContent className="bg-gray-900 border-gray-800 max-w-4xl max-h-[90vh]">
+            <DialogHeader>
+              <DialogTitle className="text-white flex items-center gap-2">
+                <FileText className="h-5 w-5" />
+                KYC Documents Review
+              </DialogTitle>
+              <DialogDescription className="text-gray-400">
+                Review all uploaded verification documents
+              </DialogDescription>
+            </DialogHeader>
+            {viewingDocuments && (
+              <div className="space-y-4">
+                <div className="relative">
+                  {(() => {
+                    const docs = getDocuments(viewingDocuments);
+                    const currentDoc = docs[currentDocIndex];
+                    return (
+                      <>
+                        <div className="flex items-center justify-between mb-4">
+                          <Badge className="bg-blue-600">
+                            {currentDoc?.label} ({currentDocIndex + 1}/{docs.length})
+                          </Badge>
+                          <div className="flex gap-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="border-gray-700"
+                              onClick={prevDocument}
+                              disabled={docs.length <= 1}
+                            >
+                              <ChevronLeft className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="border-gray-700"
+                              onClick={nextDocument}
+                              disabled={docs.length <= 1}
+                            >
+                              <ChevronRight className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </div>
+                        {currentDoc && (
+                          <div className="flex justify-center bg-gray-800 rounded-lg p-4">
+                            <img
+                              src={currentDoc.url}
+                              alt={currentDoc.label}
+                              className="max-h-[60vh] max-w-full object-contain rounded-lg"
+                              data-testid="document-viewer-image"
+                            />
+                          </div>
+                        )}
+                        <div className="flex gap-2 mt-4 justify-center">
+                          {docs.map((doc, idx) => (
+                            <button
+                              key={idx}
+                              onClick={() => setCurrentDocIndex(idx)}
+                              className={`w-20 h-14 rounded-lg overflow-hidden border-2 transition-all ${
+                                idx === currentDocIndex 
+                                  ? 'border-blue-500' 
+                                  : 'border-gray-700 opacity-60 hover:opacity-100'
+                              }`}
+                            >
+                              <img
+                                src={doc.url}
+                                alt={doc.label}
+                                className="w-full h-full object-cover"
+                              />
+                            </button>
+                          ))}
+                        </div>
+                      </>
+                    );
+                  })()}
+                </div>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm p-4 bg-gray-800/50 rounded-lg">
+                  <div>
+                    <p className="text-gray-400">ID Type</p>
+                    <p className="text-white">{viewingDocuments.idType || "Not provided"}</p>
+                  </div>
+                  <div>
+                    <p className="text-gray-400">ID Number</p>
+                    <p className="text-white">{viewingDocuments.idNumber || "Not provided"}</p>
+                  </div>
+                  <div>
+                    <p className="text-gray-400">Face Match</p>
+                    <p className="text-white">{viewingDocuments.faceMatchScore ? `${viewingDocuments.faceMatchScore}%` : "N/A"}</p>
+                  </div>
+                  <div>
+                    <p className="text-gray-400">Status</p>
+                    <Badge variant="outline" className="bg-yellow-500/10 text-yellow-500 border-yellow-500">
+                      {viewingDocuments.status}
+                    </Badge>
+                  </div>
+                </div>
+              </div>
+            )}
+            <DialogFooter>
+              <Button variant="outline" className="border-gray-700" onClick={closeDocumentViewer}>
+                Close
+              </Button>
+              {viewingDocuments && canApproveKyc(viewingDocuments) && (
+                <Button 
+                  className="bg-green-600 hover:bg-green-700"
+                  onClick={() => {
+                    handleApprove(viewingDocuments);
+                    closeDocumentViewer();
+                  }}
+                >
+                  <Check className="h-4 w-4 mr-2" />
+                  Approve KYC
+                </Button>
+              )}
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </Layout>
   );
