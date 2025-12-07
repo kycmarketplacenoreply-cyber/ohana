@@ -927,9 +927,11 @@ export async function registerRoutes(
       }
 
       if (status === "approved") {
-        if (!kycRecord.idFrontUrl || !kycRecord.idBackUrl || !kycRecord.selfieUrl) {
+        const hasAllThree = kycRecord.idFrontUrl && kycRecord.idBackUrl && kycRecord.selfieUrl;
+        const hasDocAndSelfie = kycRecord.idDocumentUrl && kycRecord.selfieUrl;
+        if (!hasAllThree && !hasDocAndSelfie) {
           return res.status(400).json({ 
-            message: "Cannot approve KYC: User must upload ID front, ID back, and selfie before approval" 
+            message: "Cannot approve KYC: User must upload required documents (ID document + selfie) before approval" 
           });
         }
       }
