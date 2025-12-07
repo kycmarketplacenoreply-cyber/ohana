@@ -9,34 +9,31 @@ import {
 } from "@shared/schema";
 import bcrypt from "bcrypt";
 
-const exchangeNames = ["OKX", "Binance", "Bybit", "KuCoin", "Huobi", "Gate.io", "Bitfinex"];
+const exchangeNames = ["OKX", "Binance", "Bybit", "KuCoin", "Huobi", "Gate.io", "MEXC"];
 const paymentMethods = ["Binance UID", "OKX UID", "Bybit UID", "MEXC UID", "KuCoin UID", "Wallet Address", "Bank Transfer"];
 const countries = ["Nigeria", "Kenya", "Tanzania", "Ghana", "South Africa", "United States", "United Kingdom", "Germany"];
 
-const verifiedVendorUsernames = [
-  "CryptoKing",
-  "FastTrader",
-  "TrustVault",
-  "SafeExchange",
-  "PrimeDeals"
-];
-
-const regularUsernames = [
-  "alex_trader",
-  "maria_crypto",
-  "john_deals",
-  "sarah_buys",
-  "mike_seller",
-  "emma_trades",
-  "david_coins",
-  "lisa_exchange",
-  "chris_p2p",
-  "anna_markets",
-  "james_wallet",
-  "kate_trading",
-  "tom_holder",
-  "nina_crypto",
-  "paul_deals"
+const usernames = [
+  "TraderOne",
+  "CryptoMax",
+  "FastExchange",
+  "TrustDeals",
+  "SecureTrader",
+  "PrimeVault",
+  "SwiftCrypto",
+  "SafeHolder",
+  "TopExchange",
+  "EliteTrader",
+  "QuickSwap",
+  "CoinMaster",
+  "TradeKing",
+  "P2PMaster",
+  "CryptoWave",
+  "TradePro",
+  "ExchangeHub",
+  "CoinVault",
+  "FastDeals",
+  "TrustExchange"
 ];
 
 async function seed() {
@@ -56,9 +53,9 @@ async function seed() {
     }).onConflictDoNothing();
     console.log("Created USDT exchange");
     
-    console.log("\n=== Creating Admin Account ===");
+    console.log("\n=== Creating Root Admin Account ===");
     const [adminUser] = await db.insert(users).values({
-      username: "kai",
+      username: "Kai",
       email: "kai@admin.com",
       password: adminPassword,
       role: "admin",
@@ -68,22 +65,22 @@ async function seed() {
       twoFactorEnabled: false,
       loginAttempts: 0,
     }).returning();
-    console.log(`Created root admin: kai (password: #487530Turbo)`);
+    console.log(`Created root admin: Kai (password: #487530Turbo)`);
     
     await db.insert(wallets).values({
       userId: adminUser.id,
       currency: "USDT",
     });
     
-    console.log("\n=== Creating 5 Verified Vendors with Tick Badges ===");
-    const verifiedVendorIds: string[] = [];
+    console.log("\n=== Creating 20 User Accounts ===");
+    const vendorIds: string[] = [];
     
-    for (let i = 0; i < 5; i++) {
-      const username = verifiedVendorUsernames[i];
+    for (let i = 0; i < 20; i++) {
+      const username = usernames[i];
       
       const [vendorUser] = await db.insert(users).values({
         username,
-        email: `${username.toLowerCase()}@vendor.com`,
+        email: `${username.toLowerCase()}@user.com`,
         password: userPassword,
         role: "vendor",
         emailVerified: true,
@@ -110,7 +107,7 @@ async function seed() {
         businessName: null,
         bio: `Verified trusted vendor - ${username}. Fast trades and secure transactions.`,
         country: countries[i % countries.length],
-        subscriptionPlan: i < 2 ? "featured" : i < 4 ? "pro" : "basic",
+        subscriptionPlan: i < 5 ? "featured" : i < 10 ? "pro" : "basic",
         isApproved: true,
         totalTrades: 100 + Math.floor(Math.random() * 300),
         completedTrades: 95 + Math.floor(Math.random() * 250),
@@ -120,7 +117,7 @@ async function seed() {
         suspiciousActivityScore: 0,
       }).returning();
       
-      verifiedVendorIds.push(vendorProfile.id);
+      vendorIds.push(vendorProfile.id);
       
       await db.insert(wallets).values({
         userId: vendorUser.id,
@@ -129,13 +126,13 @@ async function seed() {
         escrowBalance: (100 + Math.random() * 200).toFixed(8),
       });
       
-      console.log(`Created verified vendor: ${username} (tick badge approved by admin)`);
+      console.log(`Created user ${i + 1}/20: ${username}`);
     }
     
-    console.log("\n=== Creating 7 Offers for Each Verified Vendor ===");
-    for (let i = 0; i < 5; i++) {
-      const vendorId = verifiedVendorIds[i];
-      const username = verifiedVendorUsernames[i];
+    console.log("\n=== Creating 7 Offers for Each User (Buy & Sell) ===");
+    for (let i = 0; i < 20; i++) {
+      const vendorId = vendorIds[i];
+      const username = usernames[i];
       
       for (let j = 0; j < 7; j++) {
         const isSellOffer = j % 2 === 0;
@@ -158,53 +155,22 @@ async function seed() {
           isPriority: j < 2,
         });
       }
-      console.log(`Created 7 offers for verified vendor: ${username}`);
-    }
-    
-    console.log("\n=== Creating 15 Regular Users ===");
-    const regularUserIds: { id: string; username: string }[] = [];
-    
-    for (let i = 0; i < 15; i++) {
-      const username = regularUsernames[i];
-      
-      const [regularUser] = await db.insert(users).values({
-        username,
-        email: `${username.toLowerCase().replace('_', '')}@user.com`,
-        password: userPassword,
-        role: "customer",
-        emailVerified: true,
-        isActive: true,
-        isFrozen: false,
-        twoFactorEnabled: false,
-        loginAttempts: 0,
-      }).returning();
-      
-      regularUserIds.push({ id: regularUser.id, username });
-      
-      await db.insert(wallets).values({
-        userId: regularUser.id,
-        currency: "USDT",
-        availableBalance: (50 + Math.random() * 200).toFixed(8),
-        escrowBalance: "0.00000000",
-      });
-      
-      console.log(`Created regular user: ${username}`);
+      console.log(`Created 7 offers for user: ${username}`);
     }
     
     console.log("\n=== Seed Summary ===");
-    console.log(`Total Users: 21 (1 admin + 5 verified vendors + 15 regular users)`);
+    console.log(`Total Users: 21 (1 admin + 20 verified users)`);
     console.log(`\nRoot Admin Account:`);
-    console.log(`  Username: kai`);
+    console.log(`  Username: Kai`);
     console.log(`  Password: #487530Turbo`);
     console.log(`  Role: admin`);
-    console.log(`\n5 Verified Vendors (with tick badges):`);
-    verifiedVendorUsernames.forEach((name, i) => {
-      console.log(`  ${i + 1}. ${name} - Approved by admin, tick badge enabled`);
+    console.log(`\n20 Verified Users:`);
+    usernames.forEach((name, i) => {
+      console.log(`  ${i + 1}. ${name} - 7 buy/sell offers`);
     });
-    console.log(`\nTotal Offers: 35 (7 per verified vendor)`);
+    console.log(`\nTotal Offers: 140 (7 per user x 20 users)`);
     console.log(`  - Mix of buying and selling offers`);
-    console.log(`  - Vendor usernames displayed on P2P marketplace`);
-    console.log(`\nAll vendor/user accounts have password: Password123!`);
+    console.log(`\nAll user accounts have password: Password123!`);
     console.log("\nSeed completed successfully!");
     
   } catch (error) {
