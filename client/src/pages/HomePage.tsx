@@ -206,7 +206,7 @@ export default function HomePage() {
                 className="w-20 bg-transparent border-b border-muted-foreground/30 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary"
                 data-testid="filter-amount"
               />
-              <span className="text-xs text-muted-foreground">USDT</span>
+              <span className="text-xs text-muted-foreground">Accounts</span>
             </div>
             <Select value={selectedPayment} onValueChange={setSelectedPayment}>
               <SelectTrigger className="w-auto border-0 shadow-none p-0 h-auto bg-transparent" data-testid="filter-payment">
@@ -276,7 +276,7 @@ export default function HomePage() {
 
                     <div className="mb-2">
                       <span className="text-2xl font-bold text-foreground">{parseFloat(offer.pricePerUnit).toFixed(2)}</span>
-                      <span className="text-muted-foreground text-sm"> USDT</span>
+                      <span className="text-muted-foreground text-xs"> USDT/{selectedPayment !== "all" ? selectedPayment.replace(" UID", "") : offer.paymentMethods[0]?.replace(" UID", "") || "Account"}</span>
                     </div>
 
                     <div className="text-xs text-muted-foreground space-y-0.5">
