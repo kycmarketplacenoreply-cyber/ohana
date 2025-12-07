@@ -33,6 +33,7 @@ interface Offer {
   vendorTrades?: number;
   vendorCompletionRate?: number;
   vendorRating?: number;
+  vendorVerified?: boolean;
   type: string;
   currency: string;
   pricePerUnit: string;
@@ -262,9 +263,11 @@ export default function HomePage() {
                         {(offer.vendorName || "V")[0].toUpperCase()}
                       </div>
                       <span className="font-medium text-foreground">{offer.vendorName || `Vendor_${offer.vendorId.slice(0, 6)}`}</span>
-                      <div className="w-4 h-4 bg-primary rounded-full flex items-center justify-center">
-                        <span className="text-primary-foreground text-xs">✓</span>
-                      </div>
+                      {offer.vendorVerified && (
+                        <div className="w-4 h-4 bg-primary rounded-full flex items-center justify-center">
+                          <span className="text-primary-foreground text-xs">✓</span>
+                        </div>
+                      )}
                     </div>
 
                     <div className="flex items-center gap-3 text-xs text-muted-foreground mb-3">

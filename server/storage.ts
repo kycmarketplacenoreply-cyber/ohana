@@ -328,6 +328,7 @@ export class DatabaseStorage implements IStorage {
       vendorRating: parseFloat(r.vendor.averageRating || "0") > 0 
         ? (parseFloat(r.vendor.averageRating || "0") * 20).toFixed(2)
         : "99.00",
+      vendorVerified: r.user.emailVerified,
       responseTime: 15,
     }));
   }
