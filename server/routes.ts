@@ -7,7 +7,7 @@ import { requireAuth, requireAdmin, requireRole, type AuthRequest } from "./midd
 import { loginLimiter, registerLimiter, apiLimiter } from "./middleware/rateLimiter";
 import { upload } from "./middleware/upload";
 import { generateTotpSecret, verifyTotp, generateRecoveryCodes } from "./utils/totp";
-import { holdEscrow, releaseEscrow, refundEscrow, holdBuyerEscrow, releaseEscrowWithFee, refundBuyerEscrow } from "./services/escrow";
+import { holdEscrow, releaseEscrow, refundEscrow, holdBuyerEscrow, releaseEscrowWithFee, refundBuyerEscrow, holdOfferEscrow, releaseOfferEscrow } from "./services/escrow";
 import { 
   createNotification, 
   notifyOrderCreated, 
@@ -426,6 +426,32 @@ export async function registerRoutes(
       // type "buy" = vendor is buying (buy_ad)
       const tradeIntent = req.body.type === "buy" ? "buy_ad" : "sell_ad";
 
+      // For buy ads, check buyer's balance and hold escrow immediately
+      let escrowHeldAmount = "0";
+      if (tradeIntent === "buy_ad") {
+        // Calculate the total escrow required based on available amount and price per unit
+        const availableAmount = parseFloat(req.body.availableAmount || "0");
+        const pricePerUnit = parseFloat(req.body.pricePerUnit || "0");
+        const requiredEscrow = (availableAmount * pricePerUnit).toFixed(8);
+        
+        // Check buyer's wallet balance
+        const buyerWallet = await storage.getWalletByUserId(req.user!.userId, "USDT");
+        if (!buyerWallet) {
+          return res.status(400).json({ message: "Wallet not found. Please contact support." });
+        }
+
+        const availableBalance = parseFloat(buyerWallet.availableBalance);
+        const escrowRequired = parseFloat(requiredEscrow);
+
+        if (availableBalance < escrowRequired) {
+          return res.status(400).json({ 
+            message: `Insufficient balance to post this buy ad. You need ${escrowRequired.toFixed(2)} USDT but only have ${availableBalance.toFixed(2)} USDT available. Please deposit more funds first.` 
+          });
+        }
+
+        escrowHeldAmount = requiredEscrow;
+      }
+
       const validatedData = insertOfferSchema.parse({
         ...req.body,
         vendorId: profile.id,
@@ -434,7 +460,20 @@ export async function registerRoutes(
 
       const offer = await storage.createOffer(validatedData);
 
-      res.json(offer);
+      // For buy ads, hold the escrow after creating the offer
+      if (tradeIntent === "buy_ad" && parseFloat(escrowHeldAmount) > 0) {
+        try {
+          await holdOfferEscrow(req.user!.userId, escrowHeldAmount, offer.id);
+          await storage.updateOffer(offer.id, { escrowHeldAmount });
+        } catch (escrowError: any) {
+          // If escrow hold fails, deactivate the offer
+          await storage.deactivateOffer(offer.id);
+          return res.status(400).json({ message: escrowError.message });
+        }
+      }
+
+      const updatedOffer = await storage.getOffer(offer.id);
+      res.json(updatedOffer);
     } catch (error: any) {
       res.status(400).json({ message: error.message });
     }
@@ -466,6 +505,23 @@ export async function registerRoutes(
       const profile = await storage.getVendorProfileByUserId(req.user!.userId);
       if (!profile || offer.vendorId !== profile.id) {
         return res.status(403).json({ message: "Not authorized" });
+      }
+
+      // If deactivating a buy_ad, check for active orders and release only unassigned escrow
+      if (req.body.isActive === false && offer.tradeIntent === "buy_ad") {
+        // Check for active orders - warn user but don't block
+        const activeOrders = await storage.getActiveOrdersByOffer(offer.id);
+        if (activeOrders.length > 0) {
+          // There are active orders - only release the unassigned escrow
+          // The escrow for active orders stays in place and will be handled when orders complete
+        }
+        
+        // Release only the unassigned escrow (escrowHeldAmount tracks only unassigned funds)
+        const remainingEscrow = parseFloat(offer.escrowHeldAmount || "0");
+        if (remainingEscrow > 0) {
+          await releaseOfferEscrow(profile.userId, remainingEscrow.toString(), offer.id);
+          req.body.escrowHeldAmount = "0";
+        }
       }
 
       const updated = await storage.updateOffer(req.params.id, req.body);
@@ -512,11 +568,10 @@ export async function registerRoutes(
       const sellerReceives = escrowAmount - platformFee;
 
       let orderBuyerId: string;
-      let initialStatus: "escrowed" | "awaiting_deposit";
+      const initialStatus: "escrowed" = "escrowed";
 
       if (tradeIntent === "sell_ad") {
         orderBuyerId = req.user!.userId;
-        initialStatus = "escrowed";
 
         const buyerWallet = await storage.getWalletByUserId(req.user!.userId, "USDT");
         if (!buyerWallet) {
@@ -528,11 +583,20 @@ export async function registerRoutes(
           return res.status(400).json({ message: `Insufficient balance. You need ${escrowAmount} USDT but have ${buyerBalance.toFixed(2)} USDT. Please deposit funds to your wallet first.` });
         }
       } else {
-        if (!buyerId) {
-          return res.status(400).json({ message: "Buyer ID is required for buy ads" });
+        // For buy_ad, the buyer is the offer creator (vendor)
+        // The person accepting (seller) is the current user
+        // Funds are already held in escrow from when the buy ad was posted
+        const vendorProfile = await storage.getVendorProfile(offer.vendorId);
+        if (!vendorProfile) {
+          return res.status(400).json({ message: "Offer vendor not found" });
         }
-        orderBuyerId = buyerId;
-        initialStatus = "awaiting_deposit";
+        orderBuyerId = vendorProfile.userId;
+
+        // Verify offer has sufficient escrow held
+        const offerEscrowHeld = parseFloat(offer.escrowHeldAmount || "0");
+        if (offerEscrowHeld < escrowAmount) {
+          return res.status(400).json({ message: "Offer does not have sufficient escrow held for this order." });
+        }
       }
 
       const validatedData = insertOrderSchema.parse({
@@ -555,13 +619,11 @@ export async function registerRoutes(
         sellerReceives: sellerReceives.toString(),
       });
 
-      await storage.updateOrder(order.id, { status: initialStatus });
+      // All orders now start as escrowed immediately
+      await storage.updateOrder(order.id, { status: initialStatus, escrowHeldAt: new Date() });
 
       if (tradeIntent === "sell_ad") {
         await holdBuyerEscrow(req.user!.userId, fiatAmount, order.id);
-        await storage.updateOrder(order.id, {
-          escrowHeldAt: new Date(),
-        });
         await notifyOrderCreated(order.id, req.user!.userId, offer.vendorId);
         await storage.createChatMessage({
           orderId: order.id,
@@ -569,18 +631,45 @@ export async function registerRoutes(
           message: "Order created. Funds are in escrow. Seller, please proceed with delivery.",
         });
       } else {
+        // For buy_ad orders, funds are already in buyer's wallet escrow from when the offer was posted
+        // No need to hold again - just track that this portion is now assigned to an order
         const vendorProfile = await storage.getVendorProfile(offer.vendorId);
-        await notifyOrderCreated(order.id, vendorProfile?.userId || "", offer.vendorId);
+        if (!vendorProfile) {
+          return res.status(400).json({ message: "Vendor profile not found" });
+        }
+
+        // Update offer's escrow held amount (reduce by order amount - this tracks unassigned escrow)
+        const remainingOfferEscrow = (parseFloat(offer.escrowHeldAmount || "0") - escrowAmount).toFixed(8);
+        await storage.updateOffer(offer.id, { escrowHeldAmount: remainingOfferEscrow });
+
+        // Reduce the available amount on the offer
+        const remainingAmount = (parseFloat(offer.availableAmount) - parseFloat(amount)).toFixed(8);
+        await storage.updateOffer(offer.id, { availableAmount: remainingAmount });
+
+        // If offer is depleted, deactivate it
+        // Note: We only release offer.escrowHeldAmount (unassigned escrow), not order escrow
+        if (parseFloat(remainingAmount) <= 0) {
+          // If there's still unassigned escrow, release it (this happens if there's rounding)
+          if (parseFloat(remainingOfferEscrow) > 0) {
+            await releaseOfferEscrow(orderBuyerId, remainingOfferEscrow, offer.id);
+            await storage.updateOffer(offer.id, { escrowHeldAmount: "0" });
+          }
+          await storage.deactivateOffer(offer.id);
+        }
+
+        await notifyOrderCreated(order.id, req.user!.userId, offer.vendorId);
         await storage.createChatMessage({
           orderId: order.id,
           senderId: req.user!.userId,
-          message: `Seller accepted your buy request. Please deposit ${escrowAmount} USDT to proceed.`,
+          message: `Order accepted. Buyer's funds (${escrowAmount} USDT) are already in escrow. Please proceed with delivery.`,
         });
+        
+        // Notify the buyer (offer creator) that their buy order has been accepted
         await createNotification(
-          orderBuyerId,
+          vendorProfile.userId,
           "order",
-          "Deposit Required",
-          `Your buy order was accepted. Please deposit ${escrowAmount} USDT to continue.`,
+          "Buy Order Accepted",
+          `A seller has accepted your buy offer. ${escrowAmount} USDT is held in escrow. Order #${order.id.slice(0, 8)}`,
           `/order/${order.id}`
         );
       }
@@ -592,7 +681,8 @@ export async function registerRoutes(
     }
   });
 
-  // Deposit funds for buy_ad orders (buyer deposits after seller accepts)
+  // Deposit funds for buy_ad orders - DEPRECATED: Funds are now held when posting buy ads
+  // This endpoint is kept for backward compatibility but will return an error
   app.post("/api/orders/:id/deposit", requireAuth, async (req: AuthRequest, res) => {
     try {
       const order = await storage.getOrder(req.params.id);
@@ -600,58 +690,76 @@ export async function registerRoutes(
         return res.status(404).json({ message: "Order not found" });
       }
 
-      if (order.buyerId !== req.user!.userId) {
-        return res.status(403).json({ message: "Only the buyer can deposit for this order" });
+      // For buy_ad orders, funds are automatically held when the ad is posted
+      // No separate deposit step is needed
+      if (order.tradeIntent === "buy_ad") {
+        if (order.status === "escrowed") {
+          return res.status(400).json({ message: "Funds are already in escrow. No deposit needed - funds were held when the buy ad was posted." });
+        }
+        return res.status(400).json({ message: "Deposit is no longer required. Funds are held automatically when posting buy ads." });
       }
 
-      if (order.tradeIntent !== "buy_ad") {
-        return res.status(400).json({ message: "Deposits are only for buy ads" });
-      }
-
-      if (order.status !== "awaiting_deposit") {
-        return res.status(400).json({ message: "Order is not awaiting deposit" });
-      }
-
-      const buyerWallet = await storage.getWalletByUserId(req.user!.userId, "USDT");
-      if (!buyerWallet) {
-        return res.status(400).json({ message: "Wallet not found" });
-      }
-
-      const escrowAmount = parseFloat(order.fiatAmount);
-      const buyerBalance = parseFloat(buyerWallet.availableBalance);
-      if (buyerBalance < escrowAmount) {
-        return res.status(400).json({ message: `Insufficient balance. You need ${escrowAmount} USDT but have ${buyerBalance.toFixed(2)} USDT.` });
-      }
-
-      await holdBuyerEscrow(req.user!.userId, order.fiatAmount, order.id);
-
-      const updated = await storage.updateOrder(req.params.id, {
-        status: "escrowed",
-        escrowHeldAt: new Date(),
-      });
-
-      const vendorProfile = await storage.getVendorProfile(order.vendorId);
-      if (vendorProfile) {
-        await createNotification(
-          vendorProfile.userId,
-          "escrow",
-          "Funds Deposited",
-          `Buyer has deposited ${escrowAmount} USDT into escrow. You can now deliver the product.`,
-          `/order/${order.id}`
-        );
-      }
-
-      await storage.createChatMessage({
-        orderId: req.params.id,
-        senderId: req.user!.userId,
-        message: `Buyer deposited ${escrowAmount} USDT into escrow. Seller, please proceed with delivery.`,
-      });
-
-      res.json(updated);
+      // For sell_ad orders, this endpoint shouldn't be used
+      return res.status(400).json({ message: "This endpoint is not applicable for this order type." });
     } catch (error: any) {
       res.status(400).json({ message: error.message });
     }
   });
+
+  // Legacy deposit confirmation route (placeholder for old clients) - DEPRECATED
+  app.post("/api/orders/:id/confirm-deposit", requireAuth, async (req: AuthRequest, res) => {
+    try {
+      const order = await storage.getOrder(req.params.id);
+      if (!order) {
+        return res.status(404).json({ message: "Order not found" });
+      }
+
+      // Deposits are automatic now - return success if already escrowed
+      if (order.status === "escrowed") {
+        res.json({ message: "Funds already confirmed in escrow", order });
+      } else {
+        res.status(400).json({ message: "Deposit confirmation is no longer needed. Funds are held automatically." });
+      }
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  // Placeholder to clean up old deposit chat message pattern
+  app.get("/api/orders/:id/deposit-status", requireAuth, async (req: AuthRequest, res) => {
+    try {
+      const order = await storage.getOrder(req.params.id);
+      if (!order) {
+        return res.status(404).json({ message: "Order not found" });
+      }
+
+      // For buy_ad, funds are always already in escrow since we hold them when posting the ad
+      const isDepositRequired = false;
+      const isDeposited = order.status === "escrowed" || order.status === "paid" || order.status === "completed";
+
+      res.json({
+        isDepositRequired,
+        isDeposited,
+        message: "Funds are held automatically when buy ads are posted. No separate deposit step required."
+      });
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  // Keep the rest of the original deposit handler structure for potential legacy code
+  // Original deposit flow was here - now simplified above
+  /*
+  The old flow was:
+  1. Buyer posts buy ad - no escrow held
+  2. Seller accepts - order created with "awaiting_deposit" status
+  3. Buyer had to manually deposit
+  
+  New flow:
+  1. Buyer posts buy ad - escrow is held immediately
+  2. Seller accepts - order starts as "escrowed" automatically
+  No manual deposit step needed!
+  */
 
   // Get order details
   app.get("/api/orders/:id", requireAuth, async (req: AuthRequest, res) => {

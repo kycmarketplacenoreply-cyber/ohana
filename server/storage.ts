@@ -90,6 +90,8 @@ export interface IStorage {
   getOrder(id: string): Promise<Order | undefined>;
   getOrdersByBuyer(buyerId: string): Promise<Order[]>;
   getOrdersByVendor(vendorId: string): Promise<Order[]>;
+  getOrdersByOffer(offerId: string): Promise<Order[]>;
+  getActiveOrdersByOffer(offerId: string): Promise<Order[]>;
   createOrder(order: InsertOrder): Promise<Order>;
   updateOrder(id: string, updates: Partial<Order>): Promise<Order | undefined>;
   getOrdersForAutoRelease(): Promise<Order[]>;
@@ -369,6 +371,29 @@ export class DatabaseStorage implements IStorage {
 
   async getOrdersByVendor(vendorId: string): Promise<Order[]> {
     return await db.select().from(orders).where(eq(orders.vendorId, vendorId)).orderBy(desc(orders.createdAt));
+  }
+
+  async getOrdersByOffer(offerId: string): Promise<Order[]> {
+    return await db.select().from(orders).where(eq(orders.offerId, offerId)).orderBy(desc(orders.createdAt));
+  }
+
+  async getActiveOrdersByOffer(offerId: string): Promise<Order[]> {
+    return await db
+      .select()
+      .from(orders)
+      .where(
+        and(
+          eq(orders.offerId, offerId),
+          or(
+            eq(orders.status, "created"),
+            eq(orders.status, "escrowed"),
+            eq(orders.status, "paid"),
+            eq(orders.status, "confirmed"),
+            eq(orders.status, "disputed")
+          )
+        )
+      )
+      .orderBy(desc(orders.createdAt));
   }
 
   async createOrder(order: InsertOrder): Promise<Order> {

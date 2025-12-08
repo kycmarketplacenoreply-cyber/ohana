@@ -2,6 +2,67 @@ import { storage } from "../storage";
 
 const PLATFORM_FEE_PERCENT = 20;
 
+export async function holdOfferEscrow(
+  userId: string,
+  amount: string,
+  offerId: string
+): Promise<void> {
+  const wallet = await storage.getWalletByUserId(userId, "USDT");
+  if (!wallet) {
+    throw new Error("Wallet not found");
+  }
+
+  const availableBalance = parseFloat(wallet.availableBalance);
+  const holdAmount = parseFloat(amount);
+
+  if (availableBalance < holdAmount) {
+    throw new Error(`Insufficient balance. You need ${holdAmount} USDT but have ${availableBalance.toFixed(2)} USDT available.`);
+  }
+
+  await storage.holdEscrow(wallet.id, amount);
+
+  await storage.createTransaction({
+    userId,
+    walletId: wallet.id,
+    type: "escrow_hold",
+    amount,
+    currency: "USDT",
+    description: `Funds reserved for buy offer ${offerId}`,
+  });
+}
+
+export async function releaseOfferEscrow(
+  userId: string,
+  amount: string,
+  offerId: string
+): Promise<void> {
+  const wallet = await storage.getWalletByUserId(userId, "USDT");
+  if (!wallet) {
+    throw new Error("Wallet not found");
+  }
+
+  const currentEscrow = parseFloat(wallet.escrowBalance);
+  const releaseAmount = parseFloat(amount);
+
+  if (currentEscrow < releaseAmount) {
+    throw new Error("Insufficient escrow balance to release");
+  }
+
+  const newEscrow = (currentEscrow - releaseAmount).toFixed(8);
+  const newAvailable = (parseFloat(wallet.availableBalance) + releaseAmount).toFixed(8);
+  
+  await storage.updateWalletBalance(wallet.id, newAvailable, newEscrow);
+
+  await storage.createTransaction({
+    userId,
+    walletId: wallet.id,
+    type: "escrow_release",
+    amount,
+    currency: "USDT",
+    description: `Funds released from cancelled buy offer ${offerId}`,
+  });
+}
+
 export async function holdBuyerEscrow(
   buyerId: string,
   amount: string,
