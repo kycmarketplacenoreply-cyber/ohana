@@ -63,9 +63,14 @@ export default function OrderDetailPage() {
     queryKey: ["order", orderId],
     queryFn: async () => {
       const res = await fetchWithAuth(`/api/orders/${orderId}`);
+      if (!res.ok) {
+        throw new Error("Failed to fetch order");
+      }
       return res.json();
     },
     enabled: !!orderId,
+    retry: 3,
+    retryDelay: 1000,
   });
 
   const { data: messages, isLoading: messagesLoading } = useQuery<ChatMessage[]>({

@@ -41,8 +41,13 @@ export default function OrdersPage() {
     queryKey: ["orders"],
     queryFn: async () => {
       const res = await fetchWithAuth("/api/orders");
+      if (!res.ok) {
+        throw new Error("Failed to fetch orders");
+      }
       return res.json();
     },
+    retry: 3,
+    retryDelay: 1000,
   });
 
   const getStatusBadge = (status: string) => {
