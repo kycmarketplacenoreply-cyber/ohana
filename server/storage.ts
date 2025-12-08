@@ -339,6 +339,7 @@ export class DatabaseStorage implements IStorage {
     const results = await query.orderBy(desc(offers.isPriority), desc(offers.createdAt));
     return results.map((r) => ({
       ...r.offer,
+      vendorUserId: r.vendor.userId,
       vendorName: r.vendor.businessName || r.user.username,
       vendorTrades: r.vendor.totalTrades,
       vendorCompletionRate: r.vendor.totalTrades > 0 

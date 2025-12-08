@@ -18,7 +18,8 @@ import { z } from "zod";
 export const userRoleEnum = pgEnum("user_role", ["admin", "vendor", "customer", "support"]);
 export const kycStatusEnum = pgEnum("kyc_status", ["pending", "approved", "rejected", "resubmit"]);
 export const kycTierEnum = pgEnum("kyc_tier", ["tier0", "tier1", "tier2"]);
-export const orderStatusEnum = pgEnum("order_status", ["created", "paid", "confirmed", "completed", "cancelled", "disputed"]);
+export const tradeIntentEnum = pgEnum("trade_intent", ["sell_ad", "buy_ad"]);
+export const orderStatusEnum = pgEnum("order_status", ["created", "awaiting_deposit", "escrowed", "paid", "confirmed", "completed", "cancelled", "disputed"]);
 export const disputeStatusEnum = pgEnum("dispute_status", ["open", "in_review", "resolved_refund", "resolved_release"]);
 export const transactionTypeEnum = pgEnum("transaction_type", ["deposit", "withdraw", "escrow_hold", "escrow_release", "fee", "refund"]);
 export const subscriptionPlanEnum = pgEnum("subscription_plan", ["free", "basic", "pro", "featured"]);
@@ -91,6 +92,7 @@ export const offers = pgTable("offers", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   vendorId: varchar("vendor_id").notNull().references(() => vendorProfiles.id, { onDelete: "cascade" }),
   type: text("type").notNull(),
+  tradeIntent: tradeIntentEnum("trade_intent").notNull().default("sell_ad"),
   currency: text("currency").notNull(),
   pricePerUnit: numeric("price_per_unit", { precision: 18, scale: 8 }).notNull(),
   minLimit: numeric("min_limit", { precision: 18, scale: 2 }).notNull(),
@@ -111,12 +113,16 @@ export const orders = pgTable("orders", {
   offerId: varchar("offer_id").notNull().references(() => offers.id),
   buyerId: varchar("buyer_id").notNull().references(() => users.id),
   vendorId: varchar("vendor_id").notNull().references(() => vendorProfiles.id),
+  tradeIntent: tradeIntentEnum("trade_intent").notNull().default("sell_ad"),
   amount: numeric("amount", { precision: 18, scale: 8 }).notNull(),
   fiatAmount: numeric("fiat_amount", { precision: 18, scale: 2 }).notNull(),
   pricePerUnit: numeric("price_per_unit", { precision: 18, scale: 8 }).notNull(),
   currency: text("currency").notNull(),
   paymentMethod: text("payment_method").notNull(),
   status: orderStatusEnum("status").notNull().default("created"),
+  escrowAmount: numeric("escrow_amount", { precision: 18, scale: 8 }),
+  platformFee: numeric("platform_fee", { precision: 18, scale: 8 }),
+  sellerReceives: numeric("seller_receives", { precision: 18, scale: 8 }),
   buyerPaidAt: timestamp("buyer_paid_at"),
   vendorConfirmedAt: timestamp("vendor_confirmed_at"),
   completedAt: timestamp("completed_at"),

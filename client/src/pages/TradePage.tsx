@@ -21,7 +21,9 @@ import {
 interface Offer {
   id: string;
   vendorId: string;
+  vendorUserId: string;
   type: string;
+  tradeIntent: "sell_ad" | "buy_ad";
   currency: string;
   pricePerUnit: string;
   minLimit: string;
@@ -53,21 +55,31 @@ export default function TradePage() {
 
   const createOrderMutation = useMutation({
     mutationFn: async () => {
+      const orderData: any = {
+        offerId,
+        amount,
+        fiatAmount,
+        paymentMethod: selectedPaymentMethod,
+      };
+
+      if (offer?.tradeIntent === "buy_ad") {
+        orderData.buyerId = offer.vendorUserId;
+      }
+
       const res = await fetchWithAuth("/api/orders", {
         method: "POST",
-        body: JSON.stringify({
-          offerId,
-          amount,
-          fiatAmount,
-          paymentMethod: selectedPaymentMethod,
-        }),
+        body: JSON.stringify(orderData),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.message);
       return data;
     },
     onSuccess: (data) => {
-      toast({ title: "Order created!", description: "Proceed to payment" });
+      const isBuyAd = offer?.tradeIntent === "buy_ad";
+      toast({ 
+        title: "Order created!", 
+        description: isBuyAd ? "Waiting for buyer to deposit funds" : "Proceed with the transaction" 
+      });
       setLocation(`/order/${data.id}`);
     },
     onError: (error: Error) => {
@@ -232,10 +244,24 @@ export default function TradePage() {
               <div>
                 <p className="text-purple-300 font-medium">Escrow Protection</p>
                 <p className="text-purple-400 text-sm">
-                  Funds are held securely until both parties confirm the transaction
+                  {offer.tradeIntent === "sell_ad" 
+                    ? "Your funds will be held in escrow immediately. Seller delivers, then you confirm to release payment."
+                    : "After seller accepts, you'll need to deposit funds. Once escrowed, seller delivers and you confirm."}
                 </p>
               </div>
             </div>
+
+            {offer.tradeIntent === "buy_ad" && (
+              <div className="p-4 bg-yellow-900/30 border border-yellow-700 rounded-lg flex items-start gap-3">
+                <AlertCircle className="h-5 w-5 text-yellow-400 mt-0.5" />
+                <div>
+                  <p className="text-yellow-300 font-medium">This is a Buy Request</p>
+                  <p className="text-yellow-400 text-sm">
+                    The buyer is looking for sellers. If you accept, you'll deliver the product after the buyer deposits funds.
+                  </p>
+                </div>
+              </div>
+            )}
 
             <Button
               className="w-full bg-purple-600 hover:bg-purple-700 h-12 text-lg"

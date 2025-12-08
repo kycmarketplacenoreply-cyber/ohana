@@ -492,52 +492,155 @@ export async function registerRoutes(
   // Create order
   app.post("/api/orders", requireAuth, async (req: AuthRequest, res) => {
     try {
-      const { offerId, amount, fiatAmount, paymentMethod } = req.body;
+      const { offerId, amount, fiatAmount, paymentMethod, buyerId } = req.body;
 
       const offer = await storage.getOffer(offerId);
       if (!offer || !offer.isActive) {
         return res.status(404).json({ message: "Offer not found or inactive" });
       }
 
+      const tradeIntent = offer.tradeIntent || "sell_ad";
+      const platformFeeRate = 0.10;
+      const escrowAmount = parseFloat(fiatAmount);
+      const platformFee = escrowAmount * platformFeeRate;
+      const sellerReceives = escrowAmount - platformFee;
+
+      let orderBuyerId: string;
+      let initialStatus: "escrowed" | "awaiting_deposit";
+
+      if (tradeIntent === "sell_ad") {
+        orderBuyerId = req.user!.userId;
+        initialStatus = "escrowed";
+
+        const buyerWallet = await storage.getWalletByUserId(req.user!.userId, "USDT");
+        if (!buyerWallet) {
+          return res.status(400).json({ message: "Wallet not found" });
+        }
+
+        const buyerBalance = parseFloat(buyerWallet.availableBalance);
+        if (buyerBalance < escrowAmount) {
+          return res.status(400).json({ message: `Insufficient balance. You need ${escrowAmount} USDT but have ${buyerBalance.toFixed(2)} USDT. Please deposit funds to your wallet first.` });
+        }
+      } else {
+        if (!buyerId) {
+          return res.status(400).json({ message: "Buyer ID is required for buy ads" });
+        }
+        orderBuyerId = buyerId;
+        initialStatus = "awaiting_deposit";
+      }
+
       const validatedData = insertOrderSchema.parse({
         offerId,
-        buyerId: req.user!.userId,
+        buyerId: orderBuyerId,
         vendorId: offer.vendorId,
         amount,
         fiatAmount,
         pricePerUnit: offer.pricePerUnit,
         currency: offer.currency,
         paymentMethod,
+        tradeIntent,
       });
+
+      const order = await storage.createOrder({
+        ...validatedData,
+        escrowAmount: escrowAmount.toString(),
+        platformFee: platformFee.toString(),
+        sellerReceives: sellerReceives.toString(),
+      });
+
+      await storage.updateOrder(order.id, { status: initialStatus });
+
+      if (tradeIntent === "sell_ad") {
+        await holdBuyerEscrow(req.user!.userId, fiatAmount, order.id);
+        await storage.updateOrder(order.id, {
+          escrowHeldAt: new Date(),
+        });
+        await notifyOrderCreated(order.id, req.user!.userId, offer.vendorId);
+        await storage.createChatMessage({
+          orderId: order.id,
+          senderId: req.user!.userId,
+          message: "Order created. Funds are in escrow. Seller, please proceed with delivery.",
+        });
+      } else {
+        const vendorProfile = await storage.getVendorProfile(offer.vendorId);
+        await notifyOrderCreated(order.id, vendorProfile?.userId || "", offer.vendorId);
+        await storage.createChatMessage({
+          orderId: order.id,
+          senderId: req.user!.userId,
+          message: `Seller accepted your buy request. Please deposit ${escrowAmount} USDT to proceed.`,
+        });
+        await createNotification(
+          orderBuyerId,
+          "order",
+          "Deposit Required",
+          `Your buy order was accepted. Please deposit ${escrowAmount} USDT to continue.`,
+          `/order/${order.id}`
+        );
+      }
+
+      const updatedOrder = await storage.getOrder(order.id);
+      res.json(updatedOrder);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  // Deposit funds for buy_ad orders (buyer deposits after seller accepts)
+  app.post("/api/orders/:id/deposit", requireAuth, async (req: AuthRequest, res) => {
+    try {
+      const order = await storage.getOrder(req.params.id);
+      if (!order) {
+        return res.status(404).json({ message: "Order not found" });
+      }
+
+      if (order.buyerId !== req.user!.userId) {
+        return res.status(403).json({ message: "Only the buyer can deposit for this order" });
+      }
+
+      if (order.tradeIntent !== "buy_ad") {
+        return res.status(400).json({ message: "Deposits are only for buy ads" });
+      }
+
+      if (order.status !== "awaiting_deposit") {
+        return res.status(400).json({ message: "Order is not awaiting deposit" });
+      }
 
       const buyerWallet = await storage.getWalletByUserId(req.user!.userId, "USDT");
       if (!buyerWallet) {
         return res.status(400).json({ message: "Wallet not found" });
       }
 
+      const escrowAmount = parseFloat(order.fiatAmount);
       const buyerBalance = parseFloat(buyerWallet.availableBalance);
-      const escrowAmount = parseFloat(fiatAmount);
       if (buyerBalance < escrowAmount) {
-        return res.status(400).json({ message: `Insufficient balance. You need ${escrowAmount} USDT but have ${buyerBalance.toFixed(2)} USDT. Please deposit funds to your wallet first.` });
+        return res.status(400).json({ message: `Insufficient balance. You need ${escrowAmount} USDT but have ${buyerBalance.toFixed(2)} USDT.` });
       }
 
-      const order = await storage.createOrder(validatedData);
+      await holdBuyerEscrow(req.user!.userId, order.fiatAmount, order.id);
 
-      await holdBuyerEscrow(req.user!.userId, fiatAmount, order.id);
-
-      await storage.updateOrder(order.id, {
+      const updated = await storage.updateOrder(req.params.id, {
+        status: "escrowed",
         escrowHeldAt: new Date(),
       });
 
-      await notifyOrderCreated(order.id, req.user!.userId, offer.vendorId);
+      const vendorProfile = await storage.getVendorProfile(order.vendorId);
+      if (vendorProfile) {
+        await createNotification(
+          vendorProfile.userId,
+          "escrow",
+          "Funds Deposited",
+          `Buyer has deposited ${escrowAmount} USDT into escrow. You can now deliver the product.`,
+          `/order/${order.id}`
+        );
+      }
 
       await storage.createChatMessage({
-        orderId: order.id,
+        orderId: req.params.id,
         senderId: req.user!.userId,
-        message: "Order created. Please proceed with payment.",
+        message: `Buyer deposited ${escrowAmount} USDT into escrow. Seller, please proceed with delivery.`,
       });
 
-      res.json(order);
+      res.json(updated);
     } catch (error: any) {
       res.status(400).json({ message: error.message });
     }
@@ -562,7 +665,7 @@ export async function registerRoutes(
     }
   });
 
-  // Mark order as paid
+  // Mark order as paid (for external fiat payments if applicable)
   app.post("/api/orders/:id/paid", requireAuth, async (req: AuthRequest, res) => {
     try {
       const order = await storage.getOrder(req.params.id);
@@ -574,8 +677,8 @@ export async function registerRoutes(
         return res.status(403).json({ message: "Not authorized" });
       }
 
-      if (order.status !== "created") {
-        return res.status(400).json({ message: "Order cannot be marked as paid" });
+      if (order.status !== "escrowed" && order.status !== "created") {
+        return res.status(400).json({ message: "Order cannot be marked as paid in current status" });
       }
 
       const updated = await storage.updateOrder(req.params.id, {
@@ -676,8 +779,8 @@ export async function registerRoutes(
         return res.status(403).json({ message: "Only the seller or admin can mark as delivered" });
       }
 
-      if (order.status !== "paid") {
-        return res.status(400).json({ message: "Buyer must pay first" });
+      if (order.status !== "paid" && order.status !== "escrowed") {
+        return res.status(400).json({ message: "Funds must be in escrow before delivery" });
       }
 
       const { deliveryDetails } = req.body;

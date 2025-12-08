@@ -27,12 +27,16 @@ interface Order {
   offerId: string;
   buyerId: string;
   vendorId: string;
+  tradeIntent: "sell_ad" | "buy_ad";
   amount: string;
   fiatAmount: string;
   pricePerUnit: string;
   currency: string;
   paymentMethod: string;
   status: string;
+  escrowAmount: string | null;
+  platformFee: string | null;
+  sellerReceives: string | null;
   createdAt: string;
   autoReleaseAt: string | null;
 }
@@ -163,6 +167,27 @@ export default function OrderDetailPage() {
     },
   });
 
+  const depositMutation = useMutation({
+    mutationFn: async () => {
+      const res = await fetchWithAuth(`/api/orders/${orderId}/deposit`, {
+        method: "POST",
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.message || "Failed to deposit");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["order", orderId] });
+      queryClient.invalidateQueries({ queryKey: ["wallet"] });
+      toast({ title: "Funds Deposited!", description: "Funds are now in escrow. Waiting for seller to deliver." });
+    },
+    onError: (error: Error) => {
+      toast({ variant: "destructive", title: "Failed to deposit", description: error.message });
+    },
+  });
+
   const { data: accountDetails } = useQuery<{ accountDetails: Record<string, string> | null }>({
     queryKey: ["account-details", orderId],
     queryFn: async () => {
@@ -185,9 +210,12 @@ export default function OrderDetailPage() {
   };
 
   const isBuyer = order?.buyerId === user?.id;
+  const isBuyAd = order?.tradeIntent === "buy_ad";
 
   const getStatusStep = (status: string) => {
     switch (status) {
+      case "awaiting_deposit": return 0;
+      case "escrowed": return 1;
       case "created": return 1;
       case "paid": return 2;
       case "confirmed": return 3;
@@ -196,8 +224,13 @@ export default function OrderDetailPage() {
     }
   };
 
-  const steps = [
-    { label: "Funds Locked", icon: Lock },
+  const steps = isBuyAd ? [
+    { label: "Deposit Required", icon: DollarSign },
+    { label: "Funds in Escrow", icon: Lock },
+    { label: "Product Delivered", icon: ArrowRight },
+    { label: "Completed", icon: Unlock },
+  ] : [
+    { label: "Funds in Escrow", icon: Lock },
     { label: "Payment Sent", icon: DollarSign },
     { label: "Product Delivered", icon: ArrowRight },
     { label: "Completed", icon: Unlock },
@@ -239,9 +272,13 @@ export default function OrderDetailPage() {
             order.status === "completed" ? "bg-green-600" :
             order.status === "disputed" ? "bg-orange-600" :
             order.status === "cancelled" ? "bg-red-600" :
+            order.status === "awaiting_deposit" ? "bg-yellow-600" :
+            order.status === "escrowed" ? "bg-purple-600" :
             "bg-blue-600"
           }>
-            {order.status.charAt(0).toUpperCase() + order.status.slice(1)}
+            {order.status === "awaiting_deposit" ? "Awaiting Deposit" :
+             order.status === "escrowed" ? "Funds Escrowed" :
+             order.status.charAt(0).toUpperCase() + order.status.slice(1)}
           </Badge>
         </div>
 
@@ -302,6 +339,30 @@ export default function OrderDetailPage() {
             </div>
 
             <div className="flex flex-wrap gap-3">
+              {isBuyer && isBuyAd && order.status === "awaiting_deposit" && (
+                <Button
+                  className="bg-green-600 hover:bg-green-700"
+                  onClick={() => depositMutation.mutate()}
+                  disabled={depositMutation.isPending}
+                  data-testid="button-deposit-funds"
+                >
+                  <DollarSign className="h-4 w-4 mr-2" />
+                  Deposit ${parseFloat(order.fiatAmount).toFixed(2)} to Escrow
+                </Button>
+              )}
+
+              {isBuyer && !isBuyAd && order.status === "escrowed" && (
+                <Button
+                  className="bg-green-600 hover:bg-green-700"
+                  onClick={() => markPaidMutation.mutate()}
+                  disabled={markPaidMutation.isPending}
+                  data-testid="button-mark-paid"
+                >
+                  <DollarSign className="h-4 w-4 mr-2" />
+                  I've Sent Payment
+                </Button>
+              )}
+
               {isBuyer && order.status === "created" && (
                 <Button
                   className="bg-green-600 hover:bg-green-700"
@@ -314,7 +375,7 @@ export default function OrderDetailPage() {
                 </Button>
               )}
 
-              {!isBuyer && order.status === "paid" && (
+              {!isBuyer && (order.status === "paid" || order.status === "escrowed") && (
                 <Button
                   className="bg-green-600 hover:bg-green-700"
                   onClick={() => deliverProductMutation.mutate(undefined)}
@@ -338,7 +399,7 @@ export default function OrderDetailPage() {
                 </Button>
               )}
 
-              {(order.status === "created" || order.status === "paid" || order.status === "confirmed") && (
+              {(order.status === "created" || order.status === "escrowed" || order.status === "paid" || order.status === "confirmed") && (
                 <Button
                   variant="outline"
                   className="border-orange-600 text-orange-400 hover:bg-orange-600/20"
@@ -351,6 +412,15 @@ export default function OrderDetailPage() {
                 </Button>
               )}
             </div>
+
+            {order.status === "awaiting_deposit" && isBuyer && (
+              <div className="mt-4 p-3 bg-yellow-900/30 border border-yellow-700 rounded-lg flex items-center gap-2">
+                <AlertTriangle className="h-4 w-4 text-yellow-400" />
+                <p className="text-yellow-300 text-sm">
+                  Please deposit ${parseFloat(order.fiatAmount).toFixed(2)} USDT to proceed with this order.
+                </p>
+              </div>
+            )}
 
             {order.autoReleaseAt && order.status === "paid" && (
               <div className="mt-4 p-3 bg-yellow-900/30 border border-yellow-700 rounded-lg flex items-center gap-2">

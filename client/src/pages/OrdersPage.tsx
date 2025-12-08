@@ -47,6 +47,10 @@ export default function OrdersPage() {
 
   const getStatusBadge = (status: string) => {
     switch (status) {
+      case "awaiting_deposit":
+        return <Badge className="bg-yellow-600">Awaiting Deposit</Badge>;
+      case "escrowed":
+        return <Badge className="bg-purple-600">Funds Escrowed</Badge>;
       case "created":
         return <Badge className="bg-blue-600">Pending Payment</Badge>;
       case "paid":
@@ -66,6 +70,10 @@ export default function OrdersPage() {
 
   const getStatusIcon = (status: string) => {
     switch (status) {
+      case "awaiting_deposit":
+        return <Clock className="h-5 w-5 text-yellow-400" />;
+      case "escrowed":
+        return <Clock className="h-5 w-5 text-purple-400" />;
       case "created":
         return <Clock className="h-5 w-5 text-blue-400" />;
       case "paid":
