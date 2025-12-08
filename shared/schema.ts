@@ -113,6 +113,7 @@ export const orders = pgTable("orders", {
   offerId: varchar("offer_id").notNull().references(() => offers.id),
   buyerId: varchar("buyer_id").notNull().references(() => users.id),
   vendorId: varchar("vendor_id").notNull().references(() => vendorProfiles.id),
+  createdBy: varchar("created_by").references(() => users.id),
   tradeIntent: tradeIntentEnum("trade_intent").notNull().default("sell_ad"),
   amount: numeric("amount", { precision: 18, scale: 8 }).notNull(),
   fiatAmount: numeric("fiat_amount", { precision: 18, scale: 2 }).notNull(),

@@ -34,7 +34,7 @@ export async function holdBuyerEscrow(
 
 export async function releaseEscrowWithFee(
   buyerId: string,
-  vendorId: string,
+  sellerId: string,
   amount: string,
   orderId: string
 ): Promise<{ sellerAmount: string; platformFee: string }> {
@@ -43,12 +43,7 @@ export async function releaseEscrowWithFee(
     throw new Error("Buyer wallet not found");
   }
 
-  const vendorProfile = await storage.getVendorProfile(vendorId);
-  if (!vendorProfile) {
-    throw new Error("Vendor not found");
-  }
-
-  const sellerWallet = await storage.getWalletByUserId(vendorProfile.userId, "USDT");
+  const sellerWallet = await storage.getWalletByUserId(sellerId, "USDT");
   if (!sellerWallet) {
     throw new Error("Seller wallet not found");
   }
@@ -90,7 +85,7 @@ export async function releaseEscrowWithFee(
   await storage.updateWalletBalance(sellerWallet.id, newSellerBalance, sellerWallet.escrowBalance);
 
   await storage.createTransaction({
-    userId: vendorProfile.userId,
+    userId: sellerId,
     walletId: sellerWallet.id,
     type: "escrow_release",
     amount: sellerAmount.toFixed(8),

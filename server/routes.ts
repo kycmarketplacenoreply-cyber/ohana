@@ -549,6 +549,7 @@ export async function registerRoutes(
 
       const order = await storage.createOrder({
         ...validatedData,
+        createdBy: req.user!.userId,
         escrowAmount: escrowAmount.toString(),
         platformFee: platformFee.toString(),
         sellerReceives: sellerReceives.toString(),
@@ -661,7 +662,8 @@ export async function registerRoutes(
       }
 
       const vendorProfile = await storage.getVendorProfile(order.vendorId);
-      if (order.buyerId !== req.user!.userId && vendorProfile?.userId !== req.user!.userId && req.user!.role !== "admin") {
+      const isCreator = order.createdBy === req.user!.userId;
+      if (order.buyerId !== req.user!.userId && vendorProfile?.userId !== req.user!.userId && !isCreator && req.user!.role !== "admin") {
         return res.status(403).json({ message: "Not authorized" });
       }
 
@@ -726,9 +728,17 @@ export async function registerRoutes(
         return res.status(400).json({ message: "Seller must deliver the product first" });
       }
 
+      const sellerId = order.tradeIntent === "buy_ad" && order.createdBy 
+        ? order.createdBy 
+        : vendorProfile?.userId;
+      
+      if (!sellerId) {
+        return res.status(400).json({ message: "Seller not found" });
+      }
+
       const { sellerAmount, platformFee } = await releaseEscrowWithFee(
         order.buyerId,
-        order.vendorId,
+        sellerId,
         order.fiatAmount,
         order.id
       );
@@ -741,20 +751,20 @@ export async function registerRoutes(
 
       await notifyOrderCompleted(req.params.id, order.buyerId);
 
-      if (vendorProfile) {
+      if (vendorProfile && order.tradeIntent === "sell_ad") {
         await storage.updateVendorStats(order.vendorId, {
           completedTrades: (vendorProfile.completedTrades || 0) + 1,
           totalTrades: (vendorProfile.totalTrades || 0) + 1,
         });
-        
-        await createNotification(
-          vendorProfile.userId,
-          "payment",
-          "Payment Received",
-          `You received ${sellerAmount} USDT for order ${order.id} (20% platform fee: ${platformFee} USDT)`,
-          `/order/${order.id}`
-        );
       }
+      
+      await createNotification(
+        sellerId,
+        "payment",
+        "Payment Received",
+        `You received ${sellerAmount} USDT for order ${order.id.slice(0, 8)} (20% platform fee: ${platformFee} USDT)`,
+        `/order/${order.id}`
+      );
 
       const confirmedBy = isAdmin ? "admin" : "buyer";
       await storage.createChatMessage({
@@ -779,9 +789,11 @@ export async function registerRoutes(
 
       const vendorProfile = await storage.getVendorProfile(order.vendorId);
       const isVendor = vendorProfile && vendorProfile.userId === req.user!.userId;
+      const isCreator = order.createdBy === req.user!.userId;
+      const isSeller = order.tradeIntent === "buy_ad" ? isCreator : isVendor;
       const isAdmin = req.user!.role === "admin";
       
-      if (!isVendor && !isAdmin) {
+      if (!isSeller && !isAdmin) {
         return res.status(403).json({ message: "Only the seller or admin can mark as delivered" });
       }
 
@@ -874,7 +886,8 @@ export async function registerRoutes(
       }
 
       const vendorProfile = await storage.getVendorProfile(order.vendorId);
-      if (order.buyerId !== req.user!.userId && vendorProfile?.userId !== req.user!.userId && req.user!.role !== "admin") {
+      const isCreator = order.createdBy === req.user!.userId;
+      if (order.buyerId !== req.user!.userId && vendorProfile?.userId !== req.user!.userId && !isCreator && req.user!.role !== "admin") {
         return res.status(403).json({ message: "Not authorized" });
       }
 
@@ -894,7 +907,8 @@ export async function registerRoutes(
       }
 
       const vendorProfile = await storage.getVendorProfile(order.vendorId);
-      if (order.buyerId !== req.user!.userId && vendorProfile?.userId !== req.user!.userId) {
+      const isCreator = order.createdBy === req.user!.userId;
+      if (order.buyerId !== req.user!.userId && vendorProfile?.userId !== req.user!.userId && !isCreator) {
         return res.status(403).json({ message: "Not authorized" });
       }
 
@@ -971,7 +985,8 @@ export async function registerRoutes(
       }
 
       const vendorProfile = await storage.getVendorProfile(order.vendorId);
-      if (order.buyerId !== req.user!.userId && vendorProfile?.userId !== req.user!.userId) {
+      const isCreator = order.createdBy === req.user!.userId;
+      if (order.buyerId !== req.user!.userId && vendorProfile?.userId !== req.user!.userId && !isCreator) {
         return res.status(403).json({ message: "Not authorized" });
       }
 
