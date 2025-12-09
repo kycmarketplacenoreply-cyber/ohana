@@ -15,7 +15,8 @@ import {
   notifyOrderCompleted,
   notifyDisputeOpened 
 } from "./services/notifications";
-import { insertUserSchema, insertKycSchema, insertVendorProfileSchema, insertOfferSchema, insertOrderSchema, insertRatingSchema, insertExchangeSchema } from "@shared/schema";
+import { insertUserSchema, insertKycSchema, insertVendorProfileSchema, insertOfferSchema, insertOrderSchema, insertRatingSchema, insertExchangeSchema, disputes } from "@shared/schema";
+import { db } from "./db";
 
 export async function registerRoutes(
   httpServer: Server,
@@ -1606,8 +1607,8 @@ export async function registerRoutes(
     }
   });
 
-  // Freeze user
-  app.post("/api/admin/users/:id/freeze", requireAuth, requireAdmin, async (req: AuthRequest, res) => {
+  // Freeze user (both admin and dispute_admin can freeze)
+  app.post("/api/admin/users/:id/freeze", requireAuth, requireDisputeAdmin, async (req: AuthRequest, res) => {
     try {
       const { reason } = req.body;
       await storage.freezeUser(req.params.id, reason);
@@ -1628,8 +1629,8 @@ export async function registerRoutes(
     }
   });
 
-  // Unfreeze user
-  app.post("/api/admin/users/:id/unfreeze", requireAuth, requireAdmin, async (req: AuthRequest, res) => {
+  // Unfreeze user (both admin and dispute_admin can unfreeze)
+  app.post("/api/admin/users/:id/unfreeze", requireAuth, requireDisputeAdmin, async (req: AuthRequest, res) => {
     try {
       await storage.unfreezeUser(req.params.id);
 
@@ -1645,6 +1646,51 @@ export async function registerRoutes(
       res.json({ message: "User unfrozen" });
     } catch (error: any) {
       res.status(400).json({ message: error.message });
+    }
+  });
+
+  // Dispute admin sends message to disputed order chat
+  app.post("/api/admin/disputes/:id/message", requireAuth, requireDisputeAdmin, async (req: AuthRequest, res) => {
+    try {
+      const { message } = req.body;
+      
+      if (!message?.trim()) {
+        return res.status(400).json({ message: "Message is required" });
+      }
+
+      const dispute = await storage.getDispute(req.params.id);
+      if (!dispute) {
+        return res.status(404).json({ message: "Dispute not found" });
+      }
+
+      const chatMessage = await storage.createChatMessage({
+        orderId: dispute.orderId,
+        senderId: req.user!.userId,
+        message: `[Dispute Admin] ${message}`,
+      });
+
+      res.json(chatMessage);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  // Get dispute stats for dispute admin dashboard
+  app.get("/api/admin/disputes/stats", requireAuth, requireDisputeAdmin, async (req: AuthRequest, res) => {
+    try {
+      const openDisputes = await storage.getOpenDisputes();
+      const allDisputes = await db.select().from(disputes);
+      
+      const stats = {
+        openCount: openDisputes.length,
+        totalCount: allDisputes.length,
+        resolvedCount: allDisputes.filter(d => d.status === "resolved_refund" || d.status === "resolved_release").length,
+        inReviewCount: allDisputes.filter(d => d.status === "in_review").length,
+      };
+
+      res.json(stats);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
     }
   });
 

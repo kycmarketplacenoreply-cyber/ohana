@@ -24,6 +24,7 @@ import {
   Menu,
   X,
   Store,
+  Gavel,
 } from "lucide-react";
 
 interface LayoutProps {
@@ -61,18 +62,23 @@ export default function Layout({ children }: LayoutProps) {
     setLocation("/auth");
   };
 
-  const navItems = [
-    { href: "/", icon: Home, label: "Marketplace" },
-    { href: "/orders", icon: ShoppingCart, label: "Orders" },
-    { href: "/wallet", icon: Wallet, label: "Wallet" },
-  ];
+  const isDisputeAdmin = user?.role === "dispute_admin";
+  
+  const navItems = isDisputeAdmin
+    ? [{ href: "/disputes", icon: Gavel, label: "Disputes" }]
+    : [
+        { href: "/", icon: Home, label: "Marketplace" },
+        { href: "/orders", icon: ShoppingCart, label: "Orders" },
+        { href: "/wallet", icon: Wallet, label: "Wallet" },
+      ];
 
-  if (user?.role === "vendor" || user?.role === "admin") {
+  if (!isDisputeAdmin && (user?.role === "vendor" || user?.role === "admin")) {
     navItems.push({ href: "/vendor", icon: Store, label: "Vendor" });
   }
 
   if (user?.role === "admin") {
     navItems.push({ href: "/admin", icon: Shield, label: "Admin" });
+    navItems.push({ href: "/disputes", icon: Gavel, label: "Disputes" });
   }
 
   return (
@@ -111,7 +117,7 @@ export default function Layout({ children }: LayoutProps) {
               <ThemeToggle />
               {authenticated ? (
                 <>
-                  {wallet && (
+                  {wallet && !isDisputeAdmin && (
                     <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 bg-gray-800 rounded-lg">
                       <Wallet className="h-4 w-4 text-green-400" />
                       <span className="text-white font-medium">
