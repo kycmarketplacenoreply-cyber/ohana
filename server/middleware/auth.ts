@@ -51,3 +51,11 @@ export function requireAdmin(
 ): void {
   return requireRole("admin", "support")(req, res, next);
 }
+
+export function requireDisputeAdmin(
+  req: AuthRequest,
+  res: Response,
+  next: NextFunction
+): void {
+  return requireRole("admin", "dispute_admin")(req, res, next);
+}

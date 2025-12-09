@@ -27,6 +27,7 @@ interface Transaction {
   currency: string;
   description: string | null;
   createdAt: string;
+  isNegative?: boolean;
 }
 
 interface WalletData {
@@ -240,8 +241,8 @@ export default function WalletPage() {
                       </div>
                     </div>
                     <div className="text-right">
-                      <p className={`font-bold ${getTransactionColor(tx.type)}`}>
-                        {tx.type === "withdraw" || tx.type === "escrow_hold" ? "-" : "+"}
+                      <p className={`font-bold ${tx.isNegative ? "text-red-400" : getTransactionColor(tx.type)}`}>
+                        {tx.isNegative ? "-" : "+"}
                         {parseFloat(tx.amount).toFixed(4)} {tx.currency}
                       </p>
                       <p className="text-xs text-gray-500">

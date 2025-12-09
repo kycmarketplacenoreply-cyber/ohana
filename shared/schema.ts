@@ -15,7 +15,7 @@ import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
 // Enums
-export const userRoleEnum = pgEnum("user_role", ["admin", "vendor", "customer", "support"]);
+export const userRoleEnum = pgEnum("user_role", ["admin", "vendor", "customer", "support", "dispute_admin"]);
 export const kycStatusEnum = pgEnum("kyc_status", ["pending", "approved", "rejected", "resubmit"]);
 export const kycTierEnum = pgEnum("kyc_tier", ["tier0", "tier1", "tier2"]);
 export const tradeIntentEnum = pgEnum("trade_intent", ["sell_ad", "buy_ad"]);

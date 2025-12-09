@@ -3,7 +3,7 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { hashPassword, comparePassword } from "./utils/bcrypt";
 import { generateToken } from "./utils/jwt";
-import { requireAuth, requireAdmin, requireRole, type AuthRequest } from "./middleware/auth";
+import { requireAuth, requireAdmin, requireRole, requireDisputeAdmin, type AuthRequest } from "./middleware/auth";
 import { loginLimiter, registerLimiter, apiLimiter } from "./middleware/rateLimiter";
 import { upload } from "./middleware/upload";
 import { generateTotpSecret, verifyTotp, generateRecoveryCodes } from "./utils/totp";
@@ -392,13 +392,19 @@ export async function registerRoutes(
     }
   });
 
-  // Create offer - allows any KYC verified user to post ads
+  // Create offer - allows any KYC verified user with 2FA enabled to post ads
   app.post("/api/vendor/offers", requireAuth, async (req: AuthRequest, res) => {
     try {
       // Check KYC status first
       const kyc = await storage.getKycByUserId(req.user!.userId);
       if (!kyc || kyc.status !== "approved") {
         return res.status(403).json({ message: "KYC verification required before posting ads. Please complete your KYC verification." });
+      }
+
+      // Check 2FA is enabled
+      const user = await storage.getUser(req.user!.userId);
+      if (!user?.twoFactorEnabled) {
+        return res.status(403).json({ message: "Two-factor authentication (2FA) must be enabled before posting ads. Please enable 2FA in your security settings." });
       }
 
       // Auto-create vendor profile if user doesn't have one
@@ -531,6 +537,41 @@ export async function registerRoutes(
     }
   });
 
+  // Delete offer
+  app.delete("/api/vendor/offers/:id", requireAuth, async (req: AuthRequest, res) => {
+    try {
+      const offer = await storage.getOffer(req.params.id);
+      if (!offer) {
+        return res.status(404).json({ message: "Offer not found" });
+      }
+
+      const profile = await storage.getVendorProfileByUserId(req.user!.userId);
+      if (!profile || offer.vendorId !== profile.id) {
+        return res.status(403).json({ message: "Not authorized" });
+      }
+
+      // Check for active orders
+      const activeOrders = await storage.getActiveOrdersByOffer(offer.id);
+      if (activeOrders.length > 0) {
+        return res.status(400).json({ message: "Cannot delete offer with active orders. Please wait for orders to complete or cancel them first." });
+      }
+
+      // For buy_ad, release any held escrow
+      if (offer.tradeIntent === "buy_ad") {
+        const remainingEscrow = parseFloat(offer.escrowHeldAmount || "0");
+        if (remainingEscrow > 0) {
+          await releaseOfferEscrow(profile.userId, remainingEscrow.toString(), offer.id);
+        }
+      }
+
+      // Deactivate instead of delete to preserve history
+      await storage.deactivateOffer(offer.id);
+      res.json({ message: "Offer deleted successfully" });
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
   // ==================== MARKETPLACE ROUTES ====================
   
   // Get active offers
@@ -582,6 +623,13 @@ export async function registerRoutes(
         if (buyerBalance < escrowAmount) {
           return res.status(400).json({ message: `Insufficient balance. You need ${escrowAmount} USDT but have ${buyerBalance.toFixed(2)} USDT. Please deposit funds to your wallet first.` });
         }
+
+        // Validate that order amount doesn't exceed available amount
+        const requestedAmount = parseFloat(amount);
+        const offerAvailable = parseFloat(offer.availableAmount);
+        if (requestedAmount > offerAvailable) {
+          return res.status(400).json({ message: `Order amount (${requestedAmount}) exceeds available amount (${offerAvailable}). Please reduce your order size.` });
+        }
       } else {
         // For buy_ad, the buyer is the offer creator (vendor)
         // The person accepting (seller) is the current user
@@ -596,6 +644,13 @@ export async function registerRoutes(
         const offerEscrowHeld = parseFloat(offer.escrowHeldAmount || "0");
         if (offerEscrowHeld < escrowAmount) {
           return res.status(400).json({ message: "Offer does not have sufficient escrow held for this order." });
+        }
+
+        // Validate that order amount doesn't exceed available amount
+        const requestedAmount = parseFloat(amount);
+        const offerAvailable = parseFloat(offer.availableAmount);
+        if (requestedAmount > offerAvailable) {
+          return res.status(400).json({ message: `Order amount (${requestedAmount}) exceeds available amount (${offerAvailable}). Please reduce your order size.` });
         }
       }
 
@@ -624,6 +679,16 @@ export async function registerRoutes(
 
       if (tradeIntent === "sell_ad") {
         await holdBuyerEscrow(req.user!.userId, fiatAmount, order.id);
+        
+        // Reduce the available amount on the offer
+        const remainingAmount = (parseFloat(offer.availableAmount) - parseFloat(amount)).toFixed(8);
+        await storage.updateOffer(offer.id, { availableAmount: remainingAmount });
+        
+        // If offer is depleted, deactivate it
+        if (parseFloat(remainingAmount) <= 0) {
+          await storage.deactivateOffer(offer.id);
+        }
+        
         await notifyOrderCreated(order.id, req.user!.userId, offer.vendorId);
         await storage.createChatMessage({
           orderId: order.id,
@@ -819,6 +884,8 @@ export async function registerRoutes(
   // Confirm delivery - Buyer confirms they received the product (or Admin can confirm)
   app.post("/api/orders/:id/confirm", requireAuth, async (req: AuthRequest, res) => {
     try {
+      const { twoFactorToken } = req.body;
+      
       const order = await storage.getOrder(req.params.id);
       if (!order) {
         return res.status(404).json({ message: "Order not found" });
@@ -826,10 +893,24 @@ export async function registerRoutes(
 
       const vendorProfile = await storage.getVendorProfile(order.vendorId);
       const isBuyer = order.buyerId === req.user!.userId;
-      const isAdmin = req.user!.role === "admin";
+      const isAdmin = req.user!.role === "admin" || req.user!.role === "dispute_admin";
       
       if (!isBuyer && !isAdmin) {
         return res.status(403).json({ message: "Only the buyer or admin can confirm delivery" });
+      }
+
+      // Require 2FA for non-admin users when releasing funds
+      if (!isAdmin) {
+        const user = await storage.getUser(req.user!.userId);
+        if (user?.twoFactorEnabled) {
+          if (!twoFactorToken) {
+            return res.status(400).json({ message: "2FA token required to release funds", requires2FA: true });
+          }
+          const isValid = verifyTotp(twoFactorToken, user.twoFactorSecret!);
+          if (!isValid) {
+            return res.status(401).json({ message: "Invalid 2FA token" });
+          }
+        }
       }
 
       if (order.status !== "confirmed") {
@@ -1060,8 +1141,42 @@ export async function registerRoutes(
   // Get transactions
   app.get("/api/wallet/transactions", requireAuth, async (req: AuthRequest, res) => {
     try {
-      const transactions = await storage.getTransactionsByUser(req.user!.userId);
-      res.json(transactions);
+      const user = await storage.getUser(req.user!.userId);
+      const isAdmin = user?.role === "admin" || user?.role === "dispute_admin";
+      
+      let transactions = await storage.getTransactionsByUser(req.user!.userId);
+      
+      // Hide fee transactions from non-admin users
+      if (!isAdmin) {
+        transactions = transactions.filter(tx => tx.type !== "fee");
+      }
+      
+      // Add displayAmount for proper sign display
+      // For escrow_release where user is buyer (funds going to seller), show as negative
+      const transactionsWithDisplay = await Promise.all(transactions.map(async (tx) => {
+        let isNegative = false;
+        
+        if (tx.type === "escrow_release" && tx.relatedOrderId) {
+          // Check if this user was the buyer in this order
+          const order = await storage.getOrder(tx.relatedOrderId);
+          if (order && order.buyerId === req.user!.userId) {
+            // Buyer's escrow is being released to seller - show as negative
+            isNegative = true;
+          }
+        }
+        
+        // escrow_hold and withdraw are always negative
+        if (tx.type === "escrow_hold" || tx.type === "withdraw") {
+          isNegative = true;
+        }
+        
+        return {
+          ...tx,
+          isNegative,
+        };
+      }));
+      
+      res.json(transactionsWithDisplay);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
@@ -1343,7 +1458,7 @@ export async function registerRoutes(
   });
 
   // Get open disputes
-  app.get("/api/admin/disputes", requireAuth, requireAdmin, async (req: AuthRequest, res) => {
+  app.get("/api/admin/disputes", requireAuth, requireDisputeAdmin, async (req: AuthRequest, res) => {
     try {
       const disputes = await storage.getOpenDisputes();
       res.json(disputes);
@@ -1352,8 +1467,69 @@ export async function registerRoutes(
     }
   });
 
+  // Get dispute details with order info, chat messages, and wallet info
+  app.get("/api/admin/disputes/:id/details", requireAuth, requireDisputeAdmin, async (req: AuthRequest, res) => {
+    try {
+      const dispute = await storage.getDispute(req.params.id);
+      if (!dispute) {
+        return res.status(404).json({ message: "Dispute not found" });
+      }
+
+      const order = await storage.getOrder(dispute.orderId);
+      if (!order) {
+        return res.status(404).json({ message: "Order not found" });
+      }
+
+      // Get order chat messages
+      const chatMessages = await storage.getChatMessagesByOrder(order.id);
+
+      // Get buyer info and wallet
+      const buyer = await storage.getUser(order.buyerId);
+      const buyerWallet = await storage.getWalletByUserId(order.buyerId, "USDT");
+
+      // Get seller info and wallet (via vendor profile)
+      const vendorProfile = await storage.getVendorProfile(order.vendorId);
+      let seller = null;
+      let sellerWallet = null;
+      if (vendorProfile) {
+        seller = await storage.getUser(vendorProfile.userId);
+        sellerWallet = await storage.getWalletByUserId(vendorProfile.userId, "USDT");
+      }
+
+      res.json({
+        dispute,
+        order,
+        chatMessages,
+        buyer: buyer ? {
+          id: buyer.id,
+          username: buyer.username,
+          isFrozen: buyer.isFrozen,
+          frozenReason: buyer.frozenReason,
+        } : null,
+        buyerWallet: buyerWallet ? {
+          availableBalance: buyerWallet.availableBalance,
+          escrowBalance: buyerWallet.escrowBalance,
+          currency: buyerWallet.currency,
+        } : null,
+        seller: seller ? {
+          id: seller.id,
+          username: seller.username,
+          isFrozen: seller.isFrozen,
+          frozenReason: seller.frozenReason,
+        } : null,
+        sellerWallet: sellerWallet ? {
+          availableBalance: sellerWallet.availableBalance,
+          escrowBalance: sellerWallet.escrowBalance,
+          currency: sellerWallet.currency,
+        } : null,
+      });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Resolve dispute
-  app.post("/api/admin/disputes/:id/resolve", requireAuth, requireAdmin, async (req: AuthRequest, res) => {
+  app.post("/api/admin/disputes/:id/resolve", requireAuth, requireDisputeAdmin, async (req: AuthRequest, res) => {
     try {
       const { resolution, status, adminNotes } = req.body;
 
@@ -1625,6 +1801,51 @@ export async function registerRoutes(
       res.json({ message: "Exchange deleted" });
     } catch (error: any) {
       res.status(400).json({ message: error.message });
+    }
+  });
+
+  // ==================== ADMIN INITIALIZATION ====================
+  
+  // Initialize admin users (creates Kai admin and Turbo dispute_admin if they don't exist)
+  app.post("/api/admin/init", async (req, res) => {
+    try {
+      const results: { user: string; status: string }[] = [];
+
+      // Create Kai admin user
+      const existingKai = await storage.getUserByUsername("Kai");
+      if (!existingKai) {
+        const kaiPassword = await hashPassword("#487530Turbo");
+        const kaiUser = await storage.createUser({
+          username: "Kai",
+          email: "kai@admin.local",
+          password: kaiPassword,
+          role: "admin",
+        });
+        await storage.createWallet({ userId: kaiUser.id, currency: "USDT" });
+        results.push({ user: "Kai", status: "created" });
+      } else {
+        results.push({ user: "Kai", status: "already exists" });
+      }
+
+      // Create Turbo dispute_admin user
+      const existingTurbo = await storage.getUserByUsername("Turbo");
+      if (!existingTurbo) {
+        const turboPassword = await hashPassword("icu14c");
+        const turboUser = await storage.createUser({
+          username: "Turbo",
+          email: "turbo@admin.local",
+          password: turboPassword,
+          role: "dispute_admin",
+        });
+        await storage.createWallet({ userId: turboUser.id, currency: "USDT" });
+        results.push({ user: "Turbo", status: "created" });
+      } else {
+        results.push({ user: "Turbo", status: "already exists" });
+      }
+
+      res.json({ message: "Admin initialization complete", results });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
     }
   });
 

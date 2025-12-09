@@ -333,7 +333,8 @@ export class DatabaseStorage implements IStorage {
         or(
           like(sql`LOWER(${users.username})`, searchTerm),
           like(sql`LOWER(${vendorProfiles.businessName})`, searchTerm),
-          like(sql`LOWER(${offers.terms})`, searchTerm)
+          like(sql`LOWER(${offers.terms})`, searchTerm),
+          sql`EXISTS (SELECT 1 FROM unnest(${offers.paymentMethods}) AS pm WHERE LOWER(pm) LIKE ${searchTerm})`
         )
       );
     }
