@@ -64,3 +64,23 @@ export async function notifyDisputeOpened(orderId: string, userId: string): Prom
     `/order/${orderId}`
   );
 }
+
+export async function notifyAccountFrozen(userId: string, reason: string): Promise<void> {
+  await createNotification(
+    userId,
+    "system",
+    "Account Frozen",
+    `Your account has been frozen. Reason: ${reason}. You cannot make transactions or post ads until your account is unfrozen. Please contact support for assistance.`,
+    "/settings"
+  );
+}
+
+export async function notifyAccountUnfrozen(userId: string): Promise<void> {
+  await createNotification(
+    userId,
+    "system",
+    "Account Unfrozen",
+    "Your account has been unfrozen. You can now resume normal activities.",
+    "/settings"
+  );
+}

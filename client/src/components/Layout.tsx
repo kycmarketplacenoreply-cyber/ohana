@@ -25,6 +25,7 @@ import {
   X,
   Store,
   Gavel,
+  AlertTriangle,
 } from "lucide-react";
 
 interface LayoutProps {
@@ -55,6 +56,16 @@ export default function Layout({ children }: LayoutProps) {
       return res.json();
     },
     enabled: authenticated,
+  });
+
+  const { data: userStatus } = useQuery({
+    queryKey: ["userStatus"],
+    queryFn: async () => {
+      const res = await fetchWithAuth("/api/auth/me");
+      return res.json();
+    },
+    enabled: authenticated,
+    refetchInterval: 30000,
   });
 
   const handleLogout = () => {
@@ -198,6 +209,22 @@ export default function Layout({ children }: LayoutProps) {
           )}
         </div>
       </nav>
+
+      {userStatus?.isFrozen && (
+        <div className="bg-red-900/90 border-b border-red-700">
+          <div className="max-w-7xl mx-auto px-4 py-3">
+            <div className="flex items-center gap-3 text-red-100">
+              <AlertTriangle className="h-5 w-5 text-red-300 flex-shrink-0" />
+              <div>
+                <p className="font-semibold">Account Frozen</p>
+                <p className="text-sm text-red-200">
+                  {userStatus.frozenReason || "Your account has been frozen. You cannot make transactions or post ads."} Please contact support for assistance.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       <main className="max-w-7xl mx-auto px-4 py-8">
         {children}

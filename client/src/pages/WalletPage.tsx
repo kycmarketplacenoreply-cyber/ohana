@@ -59,6 +59,14 @@ export default function WalletPage() {
     },
   });
 
+  const { data: userStatus } = useQuery({
+    queryKey: ["userStatus"],
+    queryFn: async () => {
+      const res = await fetchWithAuth("/api/auth/me");
+      return res.json();
+    },
+  });
+
   const depositMutation = useMutation({
     mutationFn: async (amount: string) => {
       const res = await fetchWithAuth("/api/wallet/deposit", {
@@ -199,7 +207,13 @@ export default function WalletPage() {
             </DialogContent>
           </Dialog>
 
-          <Button variant="outline" className="gap-2" data-testid="button-withdraw">
+          <Button 
+            variant="outline" 
+            className="gap-2" 
+            data-testid="button-withdraw"
+            disabled={userStatus?.isFrozen}
+            title={userStatus?.isFrozen ? "Withdrawals are disabled while your account is frozen" : undefined}
+          >
             <ArrowUpRight className="h-4 w-4" />
             Withdraw
           </Button>

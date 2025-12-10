@@ -13,7 +13,9 @@ import {
   notifyOrderCreated, 
   notifyOrderPaid, 
   notifyOrderCompleted,
-  notifyDisputeOpened 
+  notifyDisputeOpened,
+  notifyAccountFrozen,
+  notifyAccountUnfrozen
 } from "./services/notifications";
 import { insertUserSchema, insertKycSchema, insertVendorProfileSchema, insertOfferSchema, insertOrderSchema, insertRatingSchema, insertExchangeSchema, disputes } from "@shared/schema";
 import { db } from "./db";
@@ -184,6 +186,8 @@ export async function registerRoutes(
         role: user.role,
         emailVerified: user.emailVerified,
         twoFactorEnabled: user.twoFactorEnabled,
+        isFrozen: user.isFrozen,
+        frozenReason: user.frozenReason,
         createdAt: user.createdAt,
       });
     } catch (error: any) {
@@ -396,6 +400,12 @@ export async function registerRoutes(
   // Create offer - allows any KYC verified user with 2FA enabled to post ads
   app.post("/api/vendor/offers", requireAuth, async (req: AuthRequest, res) => {
     try {
+      // Check if user is frozen
+      const user = await storage.getUser(req.user!.userId);
+      if (user?.isFrozen) {
+        return res.status(403).json({ message: "Your account is frozen. You cannot post ads until your account is unfrozen." });
+      }
+
       // Check KYC status first
       const kyc = await storage.getKycByUserId(req.user!.userId);
       if (!kyc || kyc.status !== "approved") {
@@ -403,7 +413,6 @@ export async function registerRoutes(
       }
 
       // Check 2FA is enabled
-      const user = await storage.getUser(req.user!.userId);
       if (!user?.twoFactorEnabled) {
         return res.status(403).json({ message: "Two-factor authentication (2FA) must be enabled before posting ads. Please enable 2FA in your security settings." });
       }
@@ -596,6 +605,12 @@ export async function registerRoutes(
   // Create order
   app.post("/api/orders", requireAuth, async (req: AuthRequest, res) => {
     try {
+      // Check if user is frozen
+      const user = await storage.getUser(req.user!.userId);
+      if (user?.isFrozen) {
+        return res.status(403).json({ message: "Your account is frozen. You cannot create orders until your account is unfrozen." });
+      }
+
       const { offerId, amount, fiatAmount, paymentMethod, buyerId } = req.body;
 
       const offer = await storage.getOffer(offerId);
@@ -1689,6 +1704,9 @@ export async function registerRoutes(
         userAgent: req.headers["user-agent"],
       });
 
+      // Notify the frozen user
+      await notifyAccountFrozen(req.params.id, reason);
+
       res.json({ message: "User frozen" });
     } catch (error: any) {
       res.status(400).json({ message: error.message });
@@ -1708,6 +1726,9 @@ export async function registerRoutes(
         ipAddress: req.ip,
         userAgent: req.headers["user-agent"],
       });
+
+      // Notify the unfrozen user
+      await notifyAccountUnfrozen(req.params.id);
 
       res.json({ message: "User unfrozen" });
     } catch (error: any) {
