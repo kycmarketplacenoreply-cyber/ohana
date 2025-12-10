@@ -69,7 +69,7 @@ function Router() {
         <Route path="/trade/:id" component={TradePage} />
         <Route path="/notifications" component={NotificationsPage} />
         <Route path="/settings" component={SettingsPage} />
-        <Route path="/vendor" component={() => <ProtectedRoute component={VendorPage} allowedRoles={["vendor", "admin"]} />} />
+        <Route path="/vendor" component={() => <ProtectedRoute component={VendorPage} allowedRoles={["customer", "vendor", "admin"]} />} />
         <Route path="/admin" component={() => <ProtectedRoute component={AdminPage} allowedRoles={["admin"]} />} />
         <Route path="/disputes" component={() => <ProtectedRoute component={DisputeAdminPage} allowedRoles={["admin", "dispute_admin"]} />} />
         <Route component={NotFound} />
