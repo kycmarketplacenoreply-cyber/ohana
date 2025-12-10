@@ -6,6 +6,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { isAuthenticated, getUser, fetchWithAuth } from "@/lib/auth";
 import { ThemeToggle } from "@/components/marketplace/ThemeToggle";
 import SocialFeed from "@/components/social/SocialFeed";
+import LoadersZone from "@/components/loaders/LoadersZone";
 import {
   Select,
   SelectContent,
@@ -379,11 +380,7 @@ export default function HomePage() {
         )}
 
         {mainSection === "loaders" && (
-          <div className="flex flex-col items-center justify-center py-20 px-4">
-            <Loader2 className="h-16 w-16 text-muted-foreground/50 mb-4" />
-            <p className="text-muted-foreground text-lg text-center">Loaders Zone</p>
-            <p className="text-muted-foreground/70 text-sm text-center">Coming soon...</p>
-          </div>
+          <LoadersZone />
         )}
       </main>
 

@@ -145,6 +145,44 @@ Tables include:
 - Transaction history for audit trail
 - Multi-currency wallet support
 
+### Loaders Zone Feature (Added December 2025)
+
+**Overview**
+High-trust loading feature with escrow protection for P2P asset transfers.
+
+**Key Components**
+- `loaderAds`: Loading advertisements with 10% commitment deposits
+- `loaderOrders`: Order lifecycle with liability terms and messaging
+- `loaderOrderMessages`: In-order chat system with system messages
+
+**Business Logic**
+1. Loader posts ad with 10% commitment deposit frozen from their balance
+2. Receiver accepts deal and optionally provides upfront percentage
+3. Receiver selects liability terms (Full Payment, 50%, 25%, 10%, or Time-Bound)
+4. Loader confirms liability terms, funds are sent off-platform
+5. Receiver marks order complete, fees deducted, escrow released
+
+**Liability Options**
+- `full_payment`: Receiver pays full amount regardless of asset freeze
+- `partial_50/25/10`: Partial payment if assets frozen/unusable
+- `time_bound_24h/48h/72h/1week/1month`: Pay if usable before deadline, else close
+
+**Fee Structure**
+- 3% loader fee on deal amount
+- 2% receiver fee if upfront provided
+- 5% combined from loader if no receiver upfront
+
+**Order States**
+- `awaiting_liability_confirmation`: Initial state after acceptance
+- `funds_sent_by_loader`: After both parties confirm liability
+- `asset_frozen_waiting`: If assets are frozen (optional state)
+- `completed`: Deal finalized, fees deducted
+- `cancelled`: Order cancelled by either party
+
+**Frontend Pages**
+- LoadersZone component with tabs: Active Ads, Post Ad, My Orders
+- LoaderOrderPage for order detail with chat and liability selection
+
 ## External Dependencies
 
 **Frontend Libraries**

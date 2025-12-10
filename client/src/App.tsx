@@ -19,6 +19,7 @@ const SettingsPage = lazy(() => import("@/pages/SettingsPage"));
 const AdminPage = lazy(() => import("@/pages/AdminPage"));
 const VendorPage = lazy(() => import("@/pages/VendorPage"));
 const DisputeAdminPage = lazy(() => import("@/pages/DisputeAdminPage"));
+const LoaderOrderPage = lazy(() => import("@/pages/LoaderOrderPage"));
 const NotFound = lazy(() => import("@/pages/not-found"));
 
 function PageLoader() {
@@ -72,6 +73,7 @@ function Router() {
         <Route path="/vendor" component={() => <ProtectedRoute component={VendorPage} allowedRoles={["customer", "vendor", "admin"]} />} />
         <Route path="/admin" component={() => <ProtectedRoute component={AdminPage} allowedRoles={["admin"]} />} />
         <Route path="/disputes" component={() => <ProtectedRoute component={DisputeAdminPage} allowedRoles={["admin", "dispute_admin"]} />} />
+        <Route path="/loader-order/:id" component={() => <ProtectedRoute component={LoaderOrderPage} allowedRoles={["customer", "vendor", "admin"]} />} />
         <Route component={NotFound} />
       </Switch>
     </Suspense>

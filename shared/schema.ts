@@ -26,6 +26,30 @@ export const subscriptionPlanEnum = pgEnum("subscription_plan", ["free", "basic"
 export const notificationTypeEnum = pgEnum("notification_type", ["order", "payment", "escrow", "dispute", "kyc", "vendor", "wallet", "system"]);
 export const maintenanceModeEnum = pgEnum("maintenance_mode", ["none", "partial", "full"]);
 
+// Loader Zone Enums
+export const loaderOrderStatusEnum = pgEnum("loader_order_status", [
+  "created",
+  "awaiting_liability_confirmation",
+  "funds_sent_by_loader",
+  "asset_frozen_waiting",
+  "completed",
+  "closed_no_payment",
+  "dispute_resolved",
+  "cancelled"
+]);
+
+export const liabilityTypeEnum = pgEnum("liability_type", [
+  "full_payment",
+  "partial_10",
+  "partial_25",
+  "partial_50",
+  "time_bound_24h",
+  "time_bound_48h",
+  "time_bound_72h",
+  "time_bound_1week",
+  "time_bound_1month"
+]);
+
 // Users Table
 export const users = pgTable("users", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -731,3 +755,118 @@ export type SocialDislike = typeof socialDislikes.$inferSelect;
 
 export type InsertSocialMute = z.infer<typeof insertSocialMuteSchema>;
 export type SocialMute = typeof socialMutes.$inferSelect;
+
+// Loader Zone Tables
+export const loaderAds = pgTable("loader_ads", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  loaderId: varchar("loader_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  assetType: text("asset_type").notNull(),
+  dealAmount: numeric("deal_amount", { precision: 18, scale: 2 }).notNull(),
+  loadingTerms: text("loading_terms"),
+  upfrontPercentage: integer("upfront_percentage").default(0),
+  paymentMethods: text("payment_methods").array().notNull(),
+  frozenCommitment: numeric("frozen_commitment", { precision: 18, scale: 2 }).notNull(),
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+  updatedAt: timestamp("updated_at").notNull().default(sql`now()`),
+});
+
+export const loaderOrders = pgTable("loader_orders", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  adId: varchar("ad_id").notNull().references(() => loaderAds.id, { onDelete: "cascade" }),
+  loaderId: varchar("loader_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  receiverId: varchar("receiver_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  dealAmount: numeric("deal_amount", { precision: 18, scale: 2 }).notNull(),
+  loaderFrozenAmount: numeric("loader_frozen_amount", { precision: 18, scale: 2 }).notNull(),
+  receiverFrozenAmount: numeric("receiver_frozen_amount", { precision: 18, scale: 2 }).default("0"),
+  status: loaderOrderStatusEnum("status").notNull().default("created"),
+  liabilityType: liabilityTypeEnum("liability_type"),
+  liabilityDeadline: timestamp("liability_deadline"),
+  receiverConfirmed: boolean("receiver_confirmed").notNull().default(false),
+  loaderConfirmed: boolean("loader_confirmed").notNull().default(false),
+  loaderFeeDeducted: numeric("loader_fee_deducted", { precision: 18, scale: 2 }).default("0"),
+  receiverFeeDeducted: numeric("receiver_fee_deducted", { precision: 18, scale: 2 }).default("0"),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+  updatedAt: timestamp("updated_at").notNull().default(sql`now()`),
+  completedAt: timestamp("completed_at"),
+});
+
+export const loaderOrderMessages = pgTable("loader_order_messages", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orderId: varchar("order_id").notNull().references(() => loaderOrders.id, { onDelete: "cascade" }),
+  senderId: varchar("sender_id").references(() => users.id),
+  isSystem: boolean("is_system").notNull().default(false),
+  content: text("content").notNull(),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+});
+
+// Loader Zone Relations
+export const loaderAdsRelations = relations(loaderAds, ({ one, many }) => ({
+  loader: one(users, {
+    fields: [loaderAds.loaderId],
+    references: [users.id],
+  }),
+  orders: many(loaderOrders),
+}));
+
+export const loaderOrdersRelations = relations(loaderOrders, ({ one, many }) => ({
+  ad: one(loaderAds, {
+    fields: [loaderOrders.adId],
+    references: [loaderAds.id],
+  }),
+  loader: one(users, {
+    fields: [loaderOrders.loaderId],
+    references: [users.id],
+    relationName: "loaderOrders",
+  }),
+  receiver: one(users, {
+    fields: [loaderOrders.receiverId],
+    references: [users.id],
+    relationName: "receiverOrders",
+  }),
+  messages: many(loaderOrderMessages),
+}));
+
+export const loaderOrderMessagesRelations = relations(loaderOrderMessages, ({ one }) => ({
+  order: one(loaderOrders, {
+    fields: [loaderOrderMessages.orderId],
+    references: [loaderOrders.id],
+  }),
+  sender: one(users, {
+    fields: [loaderOrderMessages.senderId],
+    references: [users.id],
+  }),
+}));
+
+// Loader Zone Insert Schemas
+export const insertLoaderAdSchema = createInsertSchema(loaderAds).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+  frozenCommitment: true,
+  isActive: true,
+});
+
+export const insertLoaderOrderSchema = createInsertSchema(loaderOrders).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+  completedAt: true,
+  loaderFeeDeducted: true,
+  receiverFeeDeducted: true,
+});
+
+export const insertLoaderOrderMessageSchema = createInsertSchema(loaderOrderMessages).omit({
+  id: true,
+  createdAt: true,
+});
+
+// Loader Zone Type Exports
+export type InsertLoaderAd = z.infer<typeof insertLoaderAdSchema>;
+export type LoaderAd = typeof loaderAds.$inferSelect;
+
+export type InsertLoaderOrder = z.infer<typeof insertLoaderOrderSchema>;
+export type LoaderOrder = typeof loaderOrders.$inferSelect;
+
+export type InsertLoaderOrderMessage = z.infer<typeof insertLoaderOrderMessageSchema>;
+export type LoaderOrderMessage = typeof loaderOrderMessages.$inferSelect;

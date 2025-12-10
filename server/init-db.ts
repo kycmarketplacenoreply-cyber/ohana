@@ -15,6 +15,8 @@ async function createEnumsIfNotExist() {
     `DO $$ BEGIN CREATE TYPE subscription_plan AS ENUM ('free', 'basic', 'pro', 'featured'); EXCEPTION WHEN duplicate_object THEN null; END $$;`,
     `DO $$ BEGIN CREATE TYPE notification_type AS ENUM ('order', 'payment', 'escrow', 'dispute', 'kyc', 'vendor', 'wallet', 'system'); EXCEPTION WHEN duplicate_object THEN null; END $$;`,
     `DO $$ BEGIN CREATE TYPE maintenance_mode AS ENUM ('none', 'partial', 'full'); EXCEPTION WHEN duplicate_object THEN null; END $$;`,
+    `DO $$ BEGIN CREATE TYPE loader_order_status AS ENUM ('created', 'awaiting_liability_confirmation', 'funds_sent_by_loader', 'asset_frozen_waiting', 'completed', 'closed_no_payment', 'dispute_resolved', 'cancelled'); EXCEPTION WHEN duplicate_object THEN null; END $$;`,
+    `DO $$ BEGIN CREATE TYPE liability_type AS ENUM ('full_payment', 'partial_10', 'partial_25', 'partial_50', 'time_bound_24h', 'time_bound_48h', 'time_bound_72h', 'time_bound_1week', 'time_bound_1month'); EXCEPTION WHEN duplicate_object THEN null; END $$;`,
   ];
 
   for (const query of enumQueries) {
@@ -296,6 +298,49 @@ async function createTablesIfNotExist() {
       expires_at TIMESTAMP,
       created_at TIMESTAMP NOT NULL DEFAULT now()
     );
+
+    CREATE TABLE IF NOT EXISTS loader_ads (
+      id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid(),
+      loader_id VARCHAR NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      asset_type TEXT NOT NULL,
+      deal_amount NUMERIC(18, 2) NOT NULL,
+      loading_terms TEXT,
+      upfront_percentage INTEGER DEFAULT 0,
+      payment_methods TEXT[] NOT NULL,
+      frozen_commitment NUMERIC(18, 2) NOT NULL,
+      is_active BOOLEAN NOT NULL DEFAULT true,
+      created_at TIMESTAMP NOT NULL DEFAULT now(),
+      updated_at TIMESTAMP NOT NULL DEFAULT now()
+    );
+
+    CREATE TABLE IF NOT EXISTS loader_orders (
+      id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid(),
+      ad_id VARCHAR NOT NULL REFERENCES loader_ads(id) ON DELETE CASCADE,
+      loader_id VARCHAR NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      receiver_id VARCHAR NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      deal_amount NUMERIC(18, 2) NOT NULL,
+      loader_frozen_amount NUMERIC(18, 2) NOT NULL,
+      receiver_frozen_amount NUMERIC(18, 2) DEFAULT 0,
+      status loader_order_status NOT NULL DEFAULT 'created',
+      liability_type liability_type,
+      liability_deadline TIMESTAMP,
+      receiver_confirmed BOOLEAN NOT NULL DEFAULT false,
+      loader_confirmed BOOLEAN NOT NULL DEFAULT false,
+      loader_fee_deducted NUMERIC(18, 2) DEFAULT 0,
+      receiver_fee_deducted NUMERIC(18, 2) DEFAULT 0,
+      created_at TIMESTAMP NOT NULL DEFAULT now(),
+      updated_at TIMESTAMP NOT NULL DEFAULT now(),
+      completed_at TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS loader_order_messages (
+      id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid(),
+      order_id VARCHAR NOT NULL REFERENCES loader_orders(id) ON DELETE CASCADE,
+      sender_id VARCHAR REFERENCES users(id),
+      is_system BOOLEAN NOT NULL DEFAULT false,
+      content TEXT NOT NULL,
+      created_at TIMESTAMP NOT NULL DEFAULT now()
+    );
   `);
 }
 
@@ -349,6 +394,13 @@ async function createIndexesIfNotExist() {
     `CREATE INDEX IF NOT EXISTS idx_social_dislikes_post_id ON social_dislikes(post_id);`,
     `CREATE INDEX IF NOT EXISTS idx_social_dislikes_user_id ON social_dislikes(user_id);`,
     `CREATE INDEX IF NOT EXISTS idx_social_mutes_user_id ON social_mutes(user_id);`,
+    `CREATE INDEX IF NOT EXISTS idx_loader_ads_loader_id ON loader_ads(loader_id);`,
+    `CREATE INDEX IF NOT EXISTS idx_loader_ads_is_active ON loader_ads(is_active);`,
+    `CREATE INDEX IF NOT EXISTS idx_loader_orders_ad_id ON loader_orders(ad_id);`,
+    `CREATE INDEX IF NOT EXISTS idx_loader_orders_loader_id ON loader_orders(loader_id);`,
+    `CREATE INDEX IF NOT EXISTS idx_loader_orders_receiver_id ON loader_orders(receiver_id);`,
+    `CREATE INDEX IF NOT EXISTS idx_loader_orders_status ON loader_orders(status);`,
+    `CREATE INDEX IF NOT EXISTS idx_loader_order_messages_order_id ON loader_order_messages(order_id);`,
   ];
 
   for (const query of indexQueries) {

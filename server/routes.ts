@@ -2553,5 +2553,492 @@ export async function registerRoutes(
     }
   });
 
+  // ==================== LOADER ZONE ROUTES ====================
+
+  // Get active loader ads
+  app.get("/api/loaders/ads", async (req, res) => {
+    try {
+      const ads = await storage.getActiveLoaderAds();
+      res.json(ads);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Get my loader ads
+  app.get("/api/loaders/my-ads", requireAuth, async (req: AuthRequest, res) => {
+    try {
+      const ads = await storage.getLoaderAdsByLoader(req.user!.userId);
+      res.json(ads);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Create loader ad
+  app.post("/api/loaders/ads", requireAuth, async (req: AuthRequest, res) => {
+    try {
+      const { assetType, dealAmount, loadingTerms, upfrontPercentage, paymentMethods } = req.body;
+      
+      if (!assetType || !dealAmount || !paymentMethods || paymentMethods.length === 0) {
+        return res.status(400).json({ message: "Missing required fields" });
+      }
+
+      const amount = parseFloat(dealAmount);
+      if (amount <= 0) {
+        return res.status(400).json({ message: "Deal amount must be greater than 0" });
+      }
+
+      // Check wallet balance (need 10% commitment)
+      const wallet = await storage.getWalletByUserId(req.user!.userId);
+      if (!wallet) {
+        return res.status(400).json({ message: "Wallet not found" });
+      }
+
+      const commitment = amount * 0.1;
+      const availableBalance = parseFloat(wallet.availableBalance || "0");
+      
+      if (availableBalance < commitment) {
+        return res.status(400).json({ 
+          message: `Insufficient balance. You need at least ${commitment.toFixed(2)} (10% of deal) but have ${availableBalance.toFixed(2)}` 
+        });
+      }
+
+      // Freeze 10% commitment from wallet
+      await storage.holdEscrow(wallet.id, commitment.toString());
+
+      // Create the ad
+      const ad = await storage.createLoaderAd({
+        loaderId: req.user!.userId,
+        assetType,
+        dealAmount: amount.toString(),
+        loadingTerms: loadingTerms || null,
+        upfrontPercentage: upfrontPercentage || 0,
+        paymentMethods,
+        frozenCommitment: commitment.toString(),
+      });
+
+      // Log transaction
+      await storage.createTransaction({
+        userId: req.user!.userId,
+        walletId: wallet.id,
+        type: "escrow_hold",
+        amount: commitment.toString(),
+        currency: "USDT",
+        description: `Loader ad commitment for ${assetType} deal of ${amount}`,
+      });
+
+      res.json(ad);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Cancel loader ad (before acceptance)
+  app.delete("/api/loaders/ads/:id", requireAuth, async (req: AuthRequest, res) => {
+    try {
+      const ad = await storage.getLoaderAd(req.params.id);
+      if (!ad) {
+        return res.status(404).json({ message: "Ad not found" });
+      }
+
+      if (ad.loaderId !== req.user!.userId) {
+        return res.status(403).json({ message: "Not authorized" });
+      }
+
+      // Check if there are active orders
+      const orders = await storage.getLoaderOrdersByAd(ad.id);
+      const activeOrders = orders.filter(o => !["completed", "closed_no_payment", "cancelled"].includes(o.status));
+      
+      if (activeOrders.length > 0) {
+        return res.status(400).json({ message: "Cannot cancel ad with active orders" });
+      }
+
+      // Refund frozen commitment
+      const wallet = await storage.getWalletByUserId(req.user!.userId);
+      if (wallet) {
+        await storage.releaseEscrow(wallet.id, ad.frozenCommitment);
+        await storage.createTransaction({
+          userId: req.user!.userId,
+          walletId: wallet.id,
+          type: "escrow_release",
+          amount: ad.frozenCommitment,
+          currency: "USDT",
+          description: `Loader ad cancelled - commitment refunded`,
+        });
+      }
+
+      await storage.deactivateLoaderAd(ad.id);
+      res.json({ message: "Ad cancelled successfully" });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Accept loader deal (receiver side)
+  app.post("/api/loaders/ads/:id/accept", requireAuth, async (req: AuthRequest, res) => {
+    try {
+      const ad = await storage.getLoaderAd(req.params.id);
+      if (!ad) {
+        return res.status(404).json({ message: "Ad not found" });
+      }
+
+      if (!ad.isActive) {
+        return res.status(400).json({ message: "Ad is no longer active" });
+      }
+
+      if (ad.loaderId === req.user!.userId) {
+        return res.status(400).json({ message: "Cannot accept your own ad" });
+      }
+
+      // Check receiver balance if upfront is required
+      const upfrontRequired = (parseFloat(ad.dealAmount) * (ad.upfrontPercentage || 0)) / 100;
+      
+      if (upfrontRequired > 0) {
+        const receiverWallet = await storage.getWalletByUserId(req.user!.userId);
+        if (!receiverWallet) {
+          return res.status(400).json({ message: "Wallet not found" });
+        }
+        
+        const receiverBalance = parseFloat(receiverWallet.availableBalance || "0");
+        if (receiverBalance < upfrontRequired) {
+          return res.status(400).json({ 
+            message: `Insufficient balance. You need at least ${upfrontRequired.toFixed(2)} (${ad.upfrontPercentage}% upfront) but have ${receiverBalance.toFixed(2)}` 
+          });
+        }
+
+        // Freeze upfront from receiver
+        await storage.holdEscrow(receiverWallet.id, upfrontRequired.toString());
+        await storage.createTransaction({
+          userId: req.user!.userId,
+          walletId: receiverWallet.id,
+          type: "escrow_hold",
+          amount: upfrontRequired.toString(),
+          currency: "USDT",
+          description: `Loader order upfront for deal`,
+        });
+      }
+
+      // Create order
+      const order = await storage.createLoaderOrder({
+        adId: ad.id,
+        loaderId: ad.loaderId,
+        receiverId: req.user!.userId,
+        dealAmount: ad.dealAmount,
+        loaderFrozenAmount: ad.frozenCommitment,
+        receiverFrozenAmount: upfrontRequired.toString(),
+        status: "awaiting_liability_confirmation",
+        receiverConfirmed: false,
+        loaderConfirmed: false,
+      });
+
+      // Deactivate the ad
+      await storage.deactivateLoaderAd(ad.id);
+
+      // Create system message
+      await storage.createLoaderOrderMessage({
+        orderId: order.id,
+        senderId: null,
+        isSystem: true,
+        content: "Receiver must select liability terms before funds are sent.",
+      });
+
+      res.json(order);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Get loader order
+  app.get("/api/loaders/orders/:id", requireAuth, async (req: AuthRequest, res) => {
+    try {
+      const order = await storage.getLoaderOrder(req.params.id);
+      if (!order) {
+        return res.status(404).json({ message: "Order not found" });
+      }
+
+      if (order.loaderId !== req.user!.userId && order.receiverId !== req.user!.userId) {
+        return res.status(403).json({ message: "Not authorized" });
+      }
+
+      // Get loader and receiver info
+      const loader = await storage.getUser(order.loaderId);
+      const receiver = await storage.getUser(order.receiverId);
+      const ad = await storage.getLoaderAd(order.adId);
+
+      res.json({
+        ...order,
+        loaderUsername: loader?.username,
+        receiverUsername: receiver?.username,
+        ad,
+      });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Get my loader orders
+  app.get("/api/loaders/my-orders", requireAuth, async (req: AuthRequest, res) => {
+    try {
+      const loaderOrders = await storage.getLoaderOrdersByLoader(req.user!.userId);
+      const receiverOrders = await storage.getLoaderOrdersByReceiver(req.user!.userId);
+      
+      const allOrders = [...loaderOrders, ...receiverOrders].sort((a, b) => 
+        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      );
+
+      // Add user info to orders
+      const enrichedOrders = await Promise.all(allOrders.map(async (order) => {
+        const loader = await storage.getUser(order.loaderId);
+        const receiver = await storage.getUser(order.receiverId);
+        return {
+          ...order,
+          loaderUsername: loader?.username,
+          receiverUsername: receiver?.username,
+          role: order.loaderId === req.user!.userId ? "loader" : "receiver",
+        };
+      }));
+
+      res.json(enrichedOrders);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Select liability terms (receiver)
+  app.post("/api/loaders/orders/:id/liability", requireAuth, async (req: AuthRequest, res) => {
+    try {
+      const { liabilityType, confirmed } = req.body;
+      
+      // Validate liability type
+      const validLiabilityTypes = [
+        "full_payment", "partial_10", "partial_25", "partial_50",
+        "time_bound_24h", "time_bound_48h", "time_bound_72h", 
+        "time_bound_1week", "time_bound_1month"
+      ];
+      
+      if (!liabilityType || !validLiabilityTypes.includes(liabilityType)) {
+        return res.status(400).json({ 
+          message: "Invalid liability type. Must be one of: full_payment, partial_10, partial_25, partial_50, time_bound_24h, time_bound_48h, time_bound_72h, time_bound_1week, time_bound_1month" 
+        });
+      }
+      
+      const order = await storage.getLoaderOrder(req.params.id);
+      if (!order) {
+        return res.status(404).json({ message: "Order not found" });
+      }
+
+      if (order.receiverId !== req.user!.userId) {
+        return res.status(403).json({ message: "Only receiver can select liability terms" });
+      }
+
+      if (order.status !== "awaiting_liability_confirmation") {
+        return res.status(400).json({ message: "Order is not awaiting liability confirmation" });
+      }
+
+      if (!confirmed) {
+        return res.status(400).json({ message: "You must confirm the liability terms" });
+      }
+
+      // Calculate deadline for time-bound options
+      let deadline = null;
+      if (liabilityType.startsWith("time_bound_")) {
+        const now = new Date();
+        switch (liabilityType) {
+          case "time_bound_24h": deadline = new Date(now.getTime() + 24 * 60 * 60 * 1000); break;
+          case "time_bound_48h": deadline = new Date(now.getTime() + 48 * 60 * 60 * 1000); break;
+          case "time_bound_72h": deadline = new Date(now.getTime() + 72 * 60 * 60 * 1000); break;
+          case "time_bound_1week": deadline = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000); break;
+          case "time_bound_1month": deadline = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000); break;
+        }
+      }
+
+      await storage.updateLoaderOrder(order.id, {
+        liabilityType,
+        liabilityDeadline: deadline,
+        receiverConfirmed: true,
+      });
+
+      await storage.createLoaderOrderMessage({
+        orderId: order.id,
+        senderId: null,
+        isSystem: true,
+        content: `Receiver selected liability: ${liabilityType.replace(/_/g, " ")}. Waiting for loader confirmation.`,
+      });
+
+      res.json({ message: "Liability terms selected" });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Confirm liability terms (loader)
+  app.post("/api/loaders/orders/:id/confirm-liability", requireAuth, async (req: AuthRequest, res) => {
+    try {
+      const order = await storage.getLoaderOrder(req.params.id);
+      if (!order) {
+        return res.status(404).json({ message: "Order not found" });
+      }
+
+      if (order.loaderId !== req.user!.userId) {
+        return res.status(403).json({ message: "Only loader can confirm liability terms" });
+      }
+
+      if (!order.receiverConfirmed) {
+        return res.status(400).json({ message: "Receiver has not selected liability terms yet" });
+      }
+
+      await storage.updateLoaderOrder(order.id, {
+        loaderConfirmed: true,
+        status: "funds_sent_by_loader",
+      });
+
+      await storage.createLoaderOrderMessage({
+        orderId: order.id,
+        senderId: null,
+        isSystem: true,
+        content: "Both parties confirmed liability terms. Loader can now send funds.",
+      });
+
+      res.json({ message: "Liability terms confirmed" });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Complete order
+  app.post("/api/loaders/orders/:id/complete", requireAuth, async (req: AuthRequest, res) => {
+    try {
+      const order = await storage.getLoaderOrder(req.params.id);
+      if (!order) {
+        return res.status(404).json({ message: "Order not found" });
+      }
+
+      if (order.receiverId !== req.user!.userId) {
+        return res.status(403).json({ message: "Only receiver can mark as complete" });
+      }
+
+      if (!["funds_sent_by_loader", "asset_frozen_waiting"].includes(order.status)) {
+        return res.status(400).json({ message: "Order cannot be completed in current state" });
+      }
+
+      // Calculate and deduct fees
+      const dealAmount = parseFloat(order.dealAmount);
+      const loaderFee = dealAmount * 0.03; // 3% loader fee
+      const receiverFee = parseFloat(order.receiverFrozenAmount || "0") > 0 ? dealAmount * 0.02 : 0; // 2% receiver fee if upfront
+      const totalLoaderFee = parseFloat(order.receiverFrozenAmount || "0") > 0 ? loaderFee : dealAmount * 0.05; // 5% if no receiver upfront
+
+      // Release loader frozen funds minus fee
+      const loaderWallet = await storage.getWalletByUserId(order.loaderId);
+      if (loaderWallet) {
+        const loaderRefund = parseFloat(order.loaderFrozenAmount) - totalLoaderFee;
+        if (loaderRefund > 0) {
+          await storage.releaseEscrow(loaderWallet.id, loaderRefund.toString());
+        }
+        await storage.createTransaction({
+          userId: order.loaderId,
+          walletId: loaderWallet.id,
+          type: "fee",
+          amount: totalLoaderFee.toString(),
+          currency: "USDT",
+          description: `Loader fee for completed order`,
+        });
+      }
+
+      // Release receiver frozen funds minus fee
+      if (parseFloat(order.receiverFrozenAmount || "0") > 0) {
+        const receiverWallet = await storage.getWalletByUserId(order.receiverId);
+        if (receiverWallet) {
+          const receiverRefund = parseFloat(order.receiverFrozenAmount || "0") - receiverFee;
+          if (receiverRefund > 0) {
+            await storage.releaseEscrow(receiverWallet.id, receiverRefund.toString());
+          }
+          await storage.createTransaction({
+            userId: order.receiverId,
+            walletId: receiverWallet.id,
+            type: "fee",
+            amount: receiverFee.toString(),
+            currency: "USDT",
+            description: `Receiver fee for completed order`,
+          });
+        }
+      }
+
+      await storage.updateLoaderOrder(order.id, {
+        status: "completed",
+        completedAt: new Date(),
+        loaderFeeDeducted: totalLoaderFee.toString(),
+        receiverFeeDeducted: receiverFee.toString(),
+      });
+
+      await storage.createLoaderOrderMessage({
+        orderId: order.id,
+        senderId: null,
+        isSystem: true,
+        content: "Order completed successfully. Funds have been released.",
+      });
+
+      res.json({ message: "Order completed" });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Get order messages
+  app.get("/api/loaders/orders/:id/messages", requireAuth, async (req: AuthRequest, res) => {
+    try {
+      const order = await storage.getLoaderOrder(req.params.id);
+      if (!order) {
+        return res.status(404).json({ message: "Order not found" });
+      }
+
+      if (order.loaderId !== req.user!.userId && order.receiverId !== req.user!.userId) {
+        return res.status(403).json({ message: "Not authorized" });
+      }
+
+      const messages = await storage.getLoaderOrderMessages(order.id);
+      
+      // Enrich with sender info
+      const enrichedMessages = await Promise.all(messages.map(async (msg) => {
+        if (msg.senderId) {
+          const sender = await storage.getUser(msg.senderId);
+          return { ...msg, senderUsername: sender?.username };
+        }
+        return { ...msg, senderUsername: "System" };
+      }));
+
+      res.json(enrichedMessages);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Send message in order chat
+  app.post("/api/loaders/orders/:id/messages", requireAuth, async (req: AuthRequest, res) => {
+    try {
+      const { content } = req.body;
+      
+      const order = await storage.getLoaderOrder(req.params.id);
+      if (!order) {
+        return res.status(404).json({ message: "Order not found" });
+      }
+
+      if (order.loaderId !== req.user!.userId && order.receiverId !== req.user!.userId) {
+        return res.status(403).json({ message: "Not authorized" });
+      }
+
+      const message = await storage.createLoaderOrderMessage({
+        orderId: order.id,
+        senderId: req.user!.userId,
+        isSystem: false,
+        content,
+      });
+
+      res.json(message);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   return httpServer;
 }

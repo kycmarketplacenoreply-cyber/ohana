@@ -1,0 +1,250 @@
+ modife this 
+ 🔹 PAGE NAME
+
+Loaders Zone
+
+
+
+🔹 PURPOSE
+
+Allow loaders to:
+
+Post loading offers
+
+Lock 10% of the deal amount as commitment
+
+Trade under escrow with strict liability rules
+
+
+
+---
+
+🔹 CORE FEATURES TO IMPLEMENT
+
+1️⃣ Loader Zone Main Layout
+
+Create a clean, professional layout with:
+
+Header: Loaders Zone
+
+Subtitle: High-trust loading with escrow protection
+
+Tabs or sections:
+
+Active Loading Ads
+
+Post a Loading Ad
+
+My Loader Orders
+
+
+
+
+2️⃣ Post Loading Ad (FORM)
+
+Form fields:
+
+Asset Type 
+Example: USD
+
+Deal Amount (number input)
+
+Loading Rate / Terms (text input – max 200 chars)
+decides wheather the receiver must have upfront frozen in his account to accept the deal or not, must be the % of the deal total amount
+
+Receiver Payment Method (checkboxes)
+Example: Paypal, Bank Transfer, Cash, Crypto or custom set by loader
+
+Liability Rule (Preview-Only)
+Display text:
+
+> “Receiver will choose liability terms when accepting the order.”
+
+
+
+10% Commitment Notice (Read-only)
+
+> “10% of this deal amount will be frozen from your balance when this ad is published it will be refund after the deal is complted or cancle and platform fees apply.”
+
+
+
+
+Buttons:
+
+Post Ad
+
+Cancel
+
+
+Validation rules:
+
+Deal amount > 0
+
+Loader balance ≥ 10% of deal amount
+
+Disable “Post Ad” if balance is insufficient
+
+
+On submit:
+
+Freeze 10% of deal amount
+
+Save ad as Active
+
+Show success message
+
+
+
+---
+
+3️⃣ Active Loading Ads (PUBLIC LIST)
+
+Each ad card should show:
+
+Loader Username
+
+Loader Rating / Trust Score
+
+Asset Type
+
+Deal Amount
+
+Loading Terms
+
+Accepted Payment Methods
+
+10% Locked Badge ✅
+
+Button: Accept Deal
+
+
+
+---
+
+4️⃣ Accept Deal Flow (Receiver Side)
+
+When receiver clicks Accept Deal:
+if the loader set upfront % of the deal and the receiver balace is < the % upfront he should not click accept deal button unles his plaftorm balance is sufficent to be frozen as deal upfront
+
+Open order chat page
+
+System message:
+
+> “Receiver must select liability terms before funds are sent.”
+
+
+
+
+Receiver must choose ONE:
+
+🔘 Option 1 — Full Payment
+
+> ✅ I will pay the full deal amount even if the assets are frozen, delayed, or unusable.
+
+
+
+
+---
+
+🔘 Option 2 — Partial Payment
+
+> ✅ If the assets are frozen or unusable, I agree to pay:
+🔘 10% 🔘 25% 🔘 50% of the deal amount.
+
+
+
+
+---
+
+🔘 Option 3 — Time-Bound Temporary Freeze (Final)
+
+> ✅ If the assets are temporarily frozen, I agree to wait:
+🔘 24 hours 🔘 48 hours 🔘 72 hours 🔘 1 week 🔘 1 month
+
+• If assets are usable before the deadline, I will pay in full.
+• If assets are still frozen at the deadline, the deal closes with no payment, even if assets unlock later.
+
+
+
+
+---
+
+☑️ Mandatory Confirmation
+
+> ⛔ I understand this decision is final and cannot be changed later.
+
+
+
+[ ✅ I Agree ]
+
+
+Require:
+
+Receiver confirmation checkbox
+
+Loader acceptance checkbox
+
+
+Lock agreement after both confirm.
+
+
+---
+
+5️⃣ Escrow & Order State Logic
+
+Order states:
+
+CREATED
+
+AWAITING_LIABILITY_CONFIRMATION
+
+FUNDS_SENT_BY_LOADER
+
+ASSET_FROZEN_WAITING
+
+COMPLETED
+
+CLOSED_NO_PAYMENT
+
+DISPUTE_RESOLVED
+
+
+Rules:
+
+Loader sends funds only after liability agreement is locked
+
+Asset status evaluated only at agreed deadline
+
+No reopening after closure
+
+
+
+---
+
+6️⃣ Loader Protections
+
+Enforce:
+
+Loader can cancel ad before acceptance
+
+Loader’s 10% remains frozen until:
+
+Order completes ✅
+
+Order closes per agreed liability ✅
+
+
+WHERE TO DEDUCT FEES ( platform fee)
+
+Loader
+
+Deduct 3% from:
+
+The frozen 10% commitment
+Or at deal completion if cancle no deduction 
+Receiver
+Deduct 2% from:
+• The fozen upfront
+• after deal completation if cancle no fee deduction
+
+in a case where loader does not require the receiver to put upfront total 5% fee will be deducted from the loader frozen 10%

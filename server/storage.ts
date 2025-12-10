@@ -22,6 +22,9 @@ import {
   socialLikes,
   socialDislikes,
   socialMutes,
+  loaderAds,
+  loaderOrders,
+  loaderOrderMessages,
   type User,
   type InsertUser,
   type Kyc,
@@ -62,6 +65,12 @@ import {
   type InsertSocialDislike,
   type SocialMute,
   type InsertSocialMute,
+  type LoaderAd,
+  type InsertLoaderAd,
+  type LoaderOrder,
+  type InsertLoaderOrder,
+  type LoaderOrderMessage,
+  type InsertLoaderOrderMessage,
 } from "@shared/schema";
 
 export interface IStorage {
@@ -203,6 +212,26 @@ export interface IStorage {
   createSocialMute(mute: InsertSocialMute): Promise<SocialMute>;
   deleteSocialMute(userId: string): Promise<void>;
   isUserMuted(userId: string): Promise<boolean>;
+
+  // Loader Zone - Ads
+  getLoaderAd(id: string): Promise<LoaderAd | undefined>;
+  getLoaderAdsByLoader(loaderId: string): Promise<LoaderAd[]>;
+  getActiveLoaderAds(): Promise<any[]>;
+  createLoaderAd(ad: InsertLoaderAd & { frozenCommitment: string }): Promise<LoaderAd>;
+  updateLoaderAd(id: string, updates: Partial<LoaderAd>): Promise<LoaderAd | undefined>;
+  deactivateLoaderAd(id: string): Promise<void>;
+
+  // Loader Zone - Orders
+  getLoaderOrder(id: string): Promise<LoaderOrder | undefined>;
+  getLoaderOrdersByLoader(loaderId: string): Promise<LoaderOrder[]>;
+  getLoaderOrdersByReceiver(receiverId: string): Promise<LoaderOrder[]>;
+  getLoaderOrdersByAd(adId: string): Promise<LoaderOrder[]>;
+  createLoaderOrder(order: InsertLoaderOrder): Promise<LoaderOrder>;
+  updateLoaderOrder(id: string, updates: Partial<LoaderOrder>): Promise<LoaderOrder | undefined>;
+
+  // Loader Zone - Messages
+  getLoaderOrderMessages(orderId: string): Promise<LoaderOrderMessage[]>;
+  createLoaderOrderMessage(message: InsertLoaderOrderMessage): Promise<LoaderOrderMessage>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -999,6 +1028,118 @@ export class DatabaseStorage implements IStorage {
   async isUserMuted(userId: string): Promise<boolean> {
     const mute = await this.getSocialMute(userId);
     return !!mute;
+  }
+
+  // Loader Zone - Ads
+  async getLoaderAd(id: string): Promise<LoaderAd | undefined> {
+    const [ad] = await db.select().from(loaderAds).where(eq(loaderAds.id, id));
+    return ad || undefined;
+  }
+
+  async getLoaderAdsByLoader(loaderId: string): Promise<LoaderAd[]> {
+    return await db
+      .select()
+      .from(loaderAds)
+      .where(eq(loaderAds.loaderId, loaderId))
+      .orderBy(desc(loaderAds.createdAt));
+  }
+
+  async getActiveLoaderAds(): Promise<any[]> {
+    const ads = await db
+      .select({
+        id: loaderAds.id,
+        loaderId: loaderAds.loaderId,
+        assetType: loaderAds.assetType,
+        dealAmount: loaderAds.dealAmount,
+        loadingTerms: loaderAds.loadingTerms,
+        upfrontPercentage: loaderAds.upfrontPercentage,
+        paymentMethods: loaderAds.paymentMethods,
+        frozenCommitment: loaderAds.frozenCommitment,
+        isActive: loaderAds.isActive,
+        createdAt: loaderAds.createdAt,
+        loaderUsername: users.username,
+      })
+      .from(loaderAds)
+      .leftJoin(users, eq(loaderAds.loaderId, users.id))
+      .where(eq(loaderAds.isActive, true))
+      .orderBy(desc(loaderAds.createdAt));
+    return ads;
+  }
+
+  async createLoaderAd(ad: InsertLoaderAd & { frozenCommitment: string }): Promise<LoaderAd> {
+    const [newAd] = await db.insert(loaderAds).values(ad).returning();
+    return newAd;
+  }
+
+  async updateLoaderAd(id: string, updates: Partial<LoaderAd>): Promise<LoaderAd | undefined> {
+    const [ad] = await db
+      .update(loaderAds)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(loaderAds.id, id))
+      .returning();
+    return ad || undefined;
+  }
+
+  async deactivateLoaderAd(id: string): Promise<void> {
+    await db.update(loaderAds).set({ isActive: false, updatedAt: new Date() }).where(eq(loaderAds.id, id));
+  }
+
+  // Loader Zone - Orders
+  async getLoaderOrder(id: string): Promise<LoaderOrder | undefined> {
+    const [order] = await db.select().from(loaderOrders).where(eq(loaderOrders.id, id));
+    return order || undefined;
+  }
+
+  async getLoaderOrdersByLoader(loaderId: string): Promise<LoaderOrder[]> {
+    return await db
+      .select()
+      .from(loaderOrders)
+      .where(eq(loaderOrders.loaderId, loaderId))
+      .orderBy(desc(loaderOrders.createdAt));
+  }
+
+  async getLoaderOrdersByReceiver(receiverId: string): Promise<LoaderOrder[]> {
+    return await db
+      .select()
+      .from(loaderOrders)
+      .where(eq(loaderOrders.receiverId, receiverId))
+      .orderBy(desc(loaderOrders.createdAt));
+  }
+
+  async getLoaderOrdersByAd(adId: string): Promise<LoaderOrder[]> {
+    return await db
+      .select()
+      .from(loaderOrders)
+      .where(eq(loaderOrders.adId, adId))
+      .orderBy(desc(loaderOrders.createdAt));
+  }
+
+  async createLoaderOrder(order: InsertLoaderOrder): Promise<LoaderOrder> {
+    const [newOrder] = await db.insert(loaderOrders).values(order).returning();
+    return newOrder;
+  }
+
+  async updateLoaderOrder(id: string, updates: Partial<LoaderOrder>): Promise<LoaderOrder | undefined> {
+    const [order] = await db
+      .update(loaderOrders)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(loaderOrders.id, id))
+      .returning();
+    return order || undefined;
+  }
+
+  // Loader Zone - Messages
+  async getLoaderOrderMessages(orderId: string): Promise<LoaderOrderMessage[]> {
+    return await db
+      .select()
+      .from(loaderOrderMessages)
+      .where(eq(loaderOrderMessages.orderId, orderId))
+      .orderBy(loaderOrderMessages.createdAt);
+  }
+
+  async createLoaderOrderMessage(message: InsertLoaderOrderMessage): Promise<LoaderOrderMessage> {
+    const [newMessage] = await db.insert(loaderOrderMessages).values(message).returning();
+    return newMessage;
   }
 }
 
