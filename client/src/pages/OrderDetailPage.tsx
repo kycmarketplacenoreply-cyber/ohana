@@ -17,6 +17,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import {
   MessageCircle,
   Send,
@@ -29,6 +31,7 @@ import {
   Lock,
   Unlock,
   KeyRound,
+  BadgeCheck,
 } from "lucide-react";
 
 interface Order {
@@ -71,6 +74,8 @@ export default function OrderDetailPage() {
   const [accountDetailsConfirmed, setAccountDetailsConfirmed] = useState(false);
   const [show2FADialog, setShow2FADialog] = useState(false);
   const [twoFactorCode, setTwoFactorCode] = useState("");
+  const [showDisputeDialog, setShowDisputeDialog] = useState(false);
+  const [disputeReason, setDisputeReason] = useState("");
 
   const { data: order, isLoading: orderLoading } = useQuery<Order>({
     queryKey: ["order", orderId],
@@ -194,16 +199,18 @@ export default function OrderDetailPage() {
   });
 
   const openDisputeMutation = useMutation({
-    mutationFn: async () => {
+    mutationFn: async (reason: string) => {
       const res = await fetchWithAuth(`/api/orders/${orderId}/dispute`, {
         method: "POST",
-        body: JSON.stringify({ reason: "Issue with transaction" }),
+        body: JSON.stringify({ reason }),
       });
       if (!res.ok) throw new Error("Failed to open dispute");
       return res.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["order", orderId] });
+      setShowDisputeDialog(false);
+      setDisputeReason("");
       toast({ title: "Dispute opened", description: "An admin will review your case" });
     },
     onError: () => {
@@ -455,7 +462,7 @@ export default function OrderDetailPage() {
                 <Button
                   variant="outline"
                   className="border-orange-600 text-orange-400 hover:bg-orange-600/20"
-                  onClick={() => openDisputeMutation.mutate()}
+                  onClick={() => setShowDisputeDialog(true)}
                   disabled={openDisputeMutation.isPending}
                   data-testid="button-open-dispute"
                 >
@@ -548,6 +555,53 @@ export default function OrderDetailPage() {
             </form>
           </CardContent>
         </Card>
+
+        <Dialog open={showDisputeDialog} onOpenChange={setShowDisputeDialog}>
+          <DialogContent className="bg-gray-900 border-gray-800">
+            <DialogHeader>
+              <DialogTitle className="text-white flex items-center gap-2">
+                <AlertTriangle className="h-5 w-5 text-orange-400" />
+                Open Dispute
+              </DialogTitle>
+              <DialogDescription className="text-gray-400">
+                Please describe the issue with this transaction. Be as detailed as possible to help the dispute admin resolve your case.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 pt-4">
+              <div className="space-y-2">
+                <Label className="text-gray-300">Reason for dispute</Label>
+                <Textarea
+                  placeholder="Describe the issue (e.g., seller hasn't delivered, wrong product received, payment not received...)"
+                  className="bg-gray-800 border-gray-700 text-white min-h-[120px]"
+                  value={disputeReason}
+                  onChange={(e) => setDisputeReason(e.target.value)}
+                  data-testid="input-dispute-reason"
+                />
+              </div>
+              <div className="flex gap-3">
+                <Button
+                  variant="outline"
+                  className="flex-1 border-gray-700"
+                  onClick={() => {
+                    setShowDisputeDialog(false);
+                    setDisputeReason("");
+                  }}
+                  data-testid="button-cancel-dispute"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  className="flex-1 bg-orange-600 hover:bg-orange-700"
+                  onClick={() => openDisputeMutation.mutate(disputeReason)}
+                  disabled={!disputeReason.trim() || openDisputeMutation.isPending}
+                  data-testid="button-submit-dispute"
+                >
+                  {openDisputeMutation.isPending ? "Opening..." : "Open Dispute"}
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
 
         <Dialog open={show2FADialog} onOpenChange={setShow2FADialog}>
           <DialogContent className="bg-gray-900 border-gray-800">

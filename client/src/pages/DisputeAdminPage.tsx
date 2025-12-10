@@ -30,6 +30,7 @@ import {
   Gavel,
   Eye,
   DollarSign,
+  BadgeCheck,
 } from "lucide-react";
 
 interface DisputeStats {
@@ -62,12 +63,15 @@ interface DisputeDetails {
     buyerId: string;
     vendorId: string;
     fiatAmount: string;
+    escrowAmount: string;
     currency: string;
     status: string;
   };
   chatMessages: Array<{
     id: string;
     senderId: string;
+    senderName?: string;
+    senderRole?: string;
     message: string;
     createdAt: string;
   }>;
@@ -92,6 +96,7 @@ export default function DisputeAdminPage() {
   const [show2FADialog, setShow2FADialog] = useState(false);
   const [twoFactorToken, setTwoFactorToken] = useState("");
   const [pendingResolveStatus, setPendingResolveStatus] = useState<string | null>(null);
+  const [releaseAmount, setReleaseAmount] = useState("");
 
   if (user?.role !== "dispute_admin" && user?.role !== "admin") {
     setLocation("/");
@@ -157,10 +162,10 @@ export default function DisputeAdminPage() {
   });
 
   const resolveDisputeMutation = useMutation({
-    mutationFn: async ({ status, resolution, twoFactorToken }: { status: string; resolution: string; twoFactorToken: string }) => {
+    mutationFn: async ({ status, resolution, twoFactorToken, amount }: { status: string; resolution: string; twoFactorToken: string; amount?: string }) => {
       const res = await fetchWithAuth(`/api/admin/disputes/${selectedDispute}/resolve`, {
         method: "POST",
-        body: JSON.stringify({ status, resolution, adminNotes: resolution, twoFactorToken }),
+        body: JSON.stringify({ status, resolution, adminNotes: resolution, twoFactorToken, amount }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -174,7 +179,7 @@ export default function DisputeAdminPage() {
       }
       return data;
     },
-    onSuccess: (_, variables) => {
+    onSuccess: (data, variables) => {
       queryClient.invalidateQueries({ queryKey: ["openDisputes"] });
       queryClient.invalidateQueries({ queryKey: ["disputeStats"] });
       queryClient.invalidateQueries({ queryKey: ["resolvedDisputes"] });
@@ -184,8 +189,10 @@ export default function DisputeAdminPage() {
       setShow2FADialog(false);
       setTwoFactorToken("");
       setPendingResolveStatus(null);
+      setReleaseAmount("");
       const action = variables.status === "resolved_refund" ? "refunded to buyer" : "released to seller";
-      toast({ title: "Dispute Resolved", description: `Funds have been ${action}` });
+      const amountInfo = data.releasedAmount ? ` ($${data.releasedAmount})` : "";
+      toast({ title: "Dispute Resolved", description: `Funds have been ${action}${amountInfo}` });
     },
     onError: (error: any) => {
       if (error.requires2FA) {
@@ -210,7 +217,8 @@ export default function DisputeAdminPage() {
       resolveDisputeMutation.mutate({ 
         status: pendingResolveStatus, 
         resolution, 
-        twoFactorToken 
+        twoFactorToken,
+        amount: releaseAmount || undefined
       });
     }
   };
@@ -556,14 +564,36 @@ export default function DisputeAdminPage() {
                     </p>
                     <div className="h-48 overflow-y-auto space-y-2 mb-4 p-2 bg-gray-900 rounded">
                       {disputeDetails.chatMessages.length > 0 ? (
-                        disputeDetails.chatMessages.map((msg) => (
-                          <div key={msg.id} className="text-sm">
-                            <span className="text-gray-400">{new Date(msg.createdAt).toLocaleTimeString()}</span>
-                            <span className={`ml-2 ${msg.message.startsWith("[Dispute Admin]") ? "text-orange-400" : "text-white"}`}>
-                              {msg.message}
-                            </span>
-                          </div>
-                        ))
+                        disputeDetails.chatMessages.map((msg) => {
+                          const isAdmin = msg.senderRole === "admin" || msg.senderRole === "dispute_admin";
+                          const isBuyer = msg.senderId === disputeDetails.order.buyerId;
+                          const senderLabel = msg.senderName || (isBuyer ? disputeDetails.buyer?.username : disputeDetails.seller?.username) || "Unknown";
+                          
+                          return (
+                            <div key={msg.id} className="text-sm p-2 bg-gray-800/50 rounded">
+                              <div className="flex items-center gap-2 mb-1">
+                                <span className={`font-medium ${isAdmin ? "text-orange-400" : isBuyer ? "text-blue-400" : "text-green-400"}`}>
+                                  {senderLabel}
+                                </span>
+                                {isAdmin && (
+                                  <span className="flex items-center gap-1 px-1.5 py-0.5 bg-orange-600/20 rounded text-xs text-orange-300">
+                                    <BadgeCheck className="h-3 w-3" />
+                                    Verified Admin
+                                  </span>
+                                )}
+                                {!isAdmin && (
+                                  <span className={`px-1.5 py-0.5 rounded text-xs ${isBuyer ? "bg-blue-600/20 text-blue-300" : "bg-green-600/20 text-green-300"}`}>
+                                    {isBuyer ? "Buyer" : "Seller"}
+                                  </span>
+                                )}
+                                <span className="text-gray-500 text-xs ml-auto">
+                                  {new Date(msg.createdAt).toLocaleTimeString()}
+                                </span>
+                              </div>
+                              <p className="text-white">{msg.message}</p>
+                            </div>
+                          );
+                        })
                       ) : (
                         <p className="text-gray-500 text-center py-4">No messages</p>
                       )}
@@ -595,6 +625,42 @@ export default function DisputeAdminPage() {
                       onChange={(e) => setResolution(e.target.value)}
                       data-testid="input-resolution"
                     />
+                    
+                    <div className="p-3 bg-gray-800 rounded-lg space-y-2">
+                      <label className="text-gray-300 text-sm">
+                        Release Amount (optional - leave empty for full amount)
+                      </label>
+                      <div className="flex items-center gap-2">
+                        <span className="text-gray-400">$</span>
+                        <Input
+                          type="number"
+                          placeholder={`Max: ${parseFloat(disputeDetails.order.escrowAmount || disputeDetails.order.fiatAmount).toFixed(2)}`}
+                          className="bg-gray-700 border-gray-600 text-white"
+                          value={releaseAmount}
+                          onChange={(e) => {
+                            const max = parseFloat(disputeDetails.order.escrowAmount || disputeDetails.order.fiatAmount);
+                            const val = parseFloat(e.target.value);
+                            if (!e.target.value) {
+                              setReleaseAmount("");
+                            } else if (val > max) {
+                              setReleaseAmount(max.toString());
+                            } else if (val < 0) {
+                              setReleaseAmount("0");
+                            } else {
+                              setReleaseAmount(e.target.value);
+                            }
+                          }}
+                          data-testid="input-release-amount"
+                        />
+                        <span className="text-gray-400 text-sm">
+                          / {parseFloat(disputeDetails.order.escrowAmount || disputeDetails.order.fiatAmount).toFixed(2)} USDT
+                        </span>
+                      </div>
+                      <p className="text-gray-500 text-xs">
+                        Partial release: Specify an amount to release a portion of funds. Full amount releases all escrowed funds.
+                      </p>
+                    </div>
+
                     <div className="flex gap-3">
                       <Button
                         className="flex-1 bg-green-600 hover:bg-green-700"

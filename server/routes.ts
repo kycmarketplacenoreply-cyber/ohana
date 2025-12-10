@@ -1535,8 +1535,20 @@ export async function registerRoutes(
         return res.status(404).json({ message: "Order not found" });
       }
 
-      // Get order chat messages
-      const chatMessages = await storage.getChatMessagesByOrder(order.id);
+      // Get order chat messages with sender info
+      const rawChatMessages = await storage.getChatMessagesByOrder(order.id);
+      
+      // Enrich chat messages with sender names and roles
+      const chatMessages = await Promise.all(
+        rawChatMessages.map(async (msg) => {
+          const sender = await storage.getUser(msg.senderId);
+          return {
+            ...msg,
+            senderName: sender?.username || "Unknown",
+            senderRole: sender?.role || "user",
+          };
+        })
+      );
 
       // Get vendor profile to determine the vendor's user
       const vendorProfile = await storage.getVendorProfile(order.vendorId);
@@ -1601,7 +1613,7 @@ export async function registerRoutes(
   // Resolve dispute
   app.post("/api/admin/disputes/:id/resolve", requireAuth, requireDisputeAdmin, async (req: AuthRequest, res) => {
     try {
-      const { resolution, status, adminNotes, twoFactorToken } = req.body;
+      const { resolution, status, adminNotes, twoFactorToken, amount } = req.body;
 
       // Get the dispute admin user and verify 2FA
       const user = await storage.getUser(req.user!.userId);
@@ -1638,10 +1650,25 @@ export async function registerRoutes(
         return res.status(404).json({ message: "Order not found" });
       }
 
+      // Determine the amount to release/refund (default to full escrow amount)
+      const escrowAmount = parseFloat(order.escrowAmount || order.fiatAmount);
+      let releaseAmountValue = escrowAmount;
+      
+      if (amount) {
+        const requestedAmount = parseFloat(amount);
+        if (isNaN(requestedAmount) || requestedAmount <= 0) {
+          return res.status(400).json({ message: "Invalid release amount" });
+        }
+        if (requestedAmount > escrowAmount) {
+          return res.status(400).json({ message: `Release amount cannot exceed escrow amount of $${escrowAmount.toFixed(2)}` });
+        }
+        releaseAmountValue = requestedAmount;
+      }
+
       if (status === "resolved_refund") {
-        await refundBuyerEscrow(order.buyerId, order.fiatAmount, order.id);
+        await refundBuyerEscrow(order.buyerId, releaseAmountValue.toString(), order.id);
       } else if (status === "resolved_release") {
-        await releaseEscrowWithFee(order.buyerId, order.vendorId, order.fiatAmount, order.id);
+        await releaseEscrowWithFee(order.buyerId, order.vendorId, releaseAmountValue.toString(), order.id);
       }
 
       const updated = await storage.updateDispute(req.params.id, {
@@ -1661,12 +1688,12 @@ export async function registerRoutes(
         action: "dispute_resolved",
         resource: "disputes",
         resourceId: req.params.id,
-        changes: { status, resolution },
+        changes: { status, resolution, releasedAmount: releaseAmountValue.toFixed(2) },
         ipAddress: req.ip,
         userAgent: req.headers["user-agent"],
       });
 
-      res.json(updated);
+      res.json({ ...updated, releasedAmount: releaseAmountValue.toFixed(2) });
     } catch (error: any) {
       res.status(400).json({ message: error.message });
     }
