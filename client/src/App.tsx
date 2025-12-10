@@ -39,11 +39,11 @@ function ProtectedRoute({ component: Component, allowedRoles }: { component: Rea
 function Router() {
   return (
     <Switch>
-      <Route path="/" component={() => <ProtectedRoute component={HomePage} allowedRoles={["user", "vendor", "admin"]} />} />
+      <Route path="/" component={() => <ProtectedRoute component={HomePage} allowedRoles={["customer", "vendor", "admin"]} />} />
       <Route path="/auth" component={AuthPage} />
-      <Route path="/wallet" component={() => <ProtectedRoute component={WalletPage} allowedRoles={["user", "vendor", "admin"]} />} />
-      <Route path="/orders" component={() => <ProtectedRoute component={OrdersPage} allowedRoles={["user", "vendor", "admin"]} />} />
-      <Route path="/order/:id" component={() => <ProtectedRoute component={OrderDetailPage} allowedRoles={["user", "vendor", "admin"]} />} />
+      <Route path="/wallet" component={() => <ProtectedRoute component={WalletPage} allowedRoles={["customer", "vendor", "admin"]} />} />
+      <Route path="/orders" component={() => <ProtectedRoute component={OrdersPage} allowedRoles={["customer", "vendor", "admin"]} />} />
+      <Route path="/order/:id" component={() => <ProtectedRoute component={OrderDetailPage} allowedRoles={["customer", "vendor", "admin"]} />} />
       <Route path="/trade/:id" component={TradePage} />
       <Route path="/notifications" component={NotificationsPage} />
       <Route path="/settings" component={SettingsPage} />
