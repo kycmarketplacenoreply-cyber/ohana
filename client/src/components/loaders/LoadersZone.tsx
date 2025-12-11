@@ -398,7 +398,7 @@ export default function LoadersZone() {
                 />
                 {dealAmount && parseFloat(dealAmount) > 0 && (
                   <p className="text-xs text-muted-foreground mt-1">
-                    10% commitment: ${commitment.toFixed(2)}
+                    10% commitment: ${(parseFloat(dealAmount) * 0.10).toFixed(2)} + 3% fee: ${(parseFloat(dealAmount) * 0.03).toFixed(2)}
                   </p>
                 )}
               </div>
