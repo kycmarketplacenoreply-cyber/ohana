@@ -307,8 +307,10 @@ async function createTablesIfNotExist() {
       deal_amount NUMERIC(18, 2) NOT NULL,
       loading_terms TEXT,
       upfront_percentage INTEGER DEFAULT 0,
+      countdown_time VARCHAR(10) DEFAULT '30min',
       payment_methods TEXT[] NOT NULL,
       frozen_commitment NUMERIC(18, 2) NOT NULL,
+      loader_fee_reserve DECIMAL(20, 8) DEFAULT '0',
       is_active BOOLEAN NOT NULL DEFAULT true,
       created_at TIMESTAMP NOT NULL DEFAULT now(),
       updated_at TIMESTAMP NOT NULL DEFAULT now()
@@ -321,7 +323,9 @@ async function createTablesIfNotExist() {
       receiver_id VARCHAR NOT NULL REFERENCES users(id) ON DELETE CASCADE,
       deal_amount NUMERIC(18, 2) NOT NULL,
       loader_frozen_amount NUMERIC(18, 2) NOT NULL,
+      loader_fee_reserve DECIMAL(20, 8) DEFAULT '0',
       receiver_frozen_amount NUMERIC(18, 2) DEFAULT 0,
+      receiver_fee_reserve DECIMAL(20, 8) DEFAULT '0',
       status loader_order_status NOT NULL DEFAULT 'created',
       liability_type liability_type,
       liability_deadline TIMESTAMP,
@@ -350,6 +354,8 @@ async function runMigrations() {
     `ALTER TABLE users ADD COLUMN IF NOT EXISTS profile_picture TEXT;`,
     `ALTER TABLE loader_ads ADD COLUMN IF NOT EXISTS countdown_time VARCHAR(10) DEFAULT '30min';`,
     `ALTER TABLE loader_ads ADD COLUMN IF NOT EXISTS loader_fee_reserve DECIMAL(20, 8) DEFAULT '0';`,
+    `ALTER TABLE loader_orders ADD COLUMN IF NOT EXISTS loader_fee_reserve DECIMAL(20, 8) DEFAULT '0';`,
+    `ALTER TABLE loader_orders ADD COLUMN IF NOT EXISTS receiver_fee_reserve DECIMAL(20, 8) DEFAULT '0';`,
   ];
 
   for (const migration of migrations) {
