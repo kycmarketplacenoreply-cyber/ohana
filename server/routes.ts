@@ -184,6 +184,7 @@ export async function registerRoutes(
         username: user.username,
         email: user.email,
         role: user.role,
+        profilePicture: user.profilePicture,
         emailVerified: user.emailVerified,
         twoFactorEnabled: user.twoFactorEnabled,
         isFrozen: user.isFrozen,

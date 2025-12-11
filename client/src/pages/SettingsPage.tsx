@@ -41,6 +41,8 @@ export default function SettingsPage() {
   const [selfie, setSelfie] = useState<File | null>(null);
   const idDocumentRef = useRef<HTMLInputElement>(null);
   const selfieRef = useRef<HTMLInputElement>(null);
+  const profilePictureRef = useRef<HTMLInputElement>(null);
+  const [profilePicture, setProfilePicture] = useState<File | null>(null);
 
   const { data: me, isLoading } = useQuery({
     queryKey: ["me"],
@@ -109,6 +111,43 @@ export default function SettingsPage() {
     toast({ title: "Copied!", description: "Recovery codes copied to clipboard" });
   };
 
+  const uploadProfilePictureMutation = useMutation({
+    mutationFn: async (file: File) => {
+      const formData = new FormData();
+      formData.append("profilePicture", file);
+      const token = getToken();
+      const res = await fetch("/api/users/profile-picture", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+        body: formData,
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.message || "Failed to upload profile picture");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["me"] });
+      setProfilePicture(null);
+      if (profilePictureRef.current) profilePictureRef.current.value = "";
+      toast({ title: "Profile Picture Updated", description: "Your profile picture has been updated" });
+    },
+    onError: (error: Error) => {
+      toast({ variant: "destructive", title: "Upload Failed", description: error.message });
+    },
+  });
+
+  const handleProfilePictureChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setProfilePicture(file);
+      uploadProfilePictureMutation.mutate(file);
+    }
+  };
+
   const submitKycMutation = useMutation({
     mutationFn: async () => {
       if (!idDocument || !selfie || !idNumber) {
@@ -166,12 +205,46 @@ export default function SettingsPage() {
               <Skeleton className="h-32 bg-gray-800" />
             ) : (
               <div className="grid gap-4">
-                <div className="flex items-center justify-between p-4 bg-gray-800 rounded-lg">
-                  <div>
-                    <p className="text-gray-400 text-sm">Username</p>
-                    <p className="text-white font-medium">{me?.username}</p>
+                <div className="flex items-center gap-4 p-4 bg-gray-800 rounded-lg">
+                  <div className="relative">
+                    <input
+                      type="file"
+                      ref={profilePictureRef}
+                      accept="image/*"
+                      className="hidden"
+                      onChange={handleProfilePictureChange}
+                    />
+                    <div
+                      onClick={() => profilePictureRef.current?.click()}
+                      className="cursor-pointer group relative"
+                      data-testid="upload-profile-picture"
+                    >
+                      {me?.profilePicture ? (
+                        <img
+                          src={me.profilePicture}
+                          alt={me.username}
+                          className="w-20 h-20 rounded-full object-cover border-2 border-purple-500"
+                        />
+                      ) : (
+                        <div className="w-20 h-20 bg-gradient-to-br from-purple-600 to-purple-400 rounded-full flex items-center justify-center text-white text-2xl font-bold">
+                          {me?.username?.[0]?.toUpperCase()}
+                        </div>
+                      )}
+                      <div className="absolute inset-0 bg-black/50 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                        <Camera className="h-6 w-6 text-white" />
+                      </div>
+                      {uploadProfilePictureMutation.isPending && (
+                        <div className="absolute inset-0 bg-black/70 rounded-full flex items-center justify-center">
+                          <div className="animate-spin h-6 w-6 border-2 border-white border-t-transparent rounded-full" />
+                        </div>
+                      )}
+                    </div>
                   </div>
-                  <Badge>{me?.role}</Badge>
+                  <div className="flex-1">
+                    <p className="text-white font-medium text-lg">{me?.username}</p>
+                    <p className="text-gray-400 text-sm">Click the image to change your profile picture</p>
+                    <Badge className="mt-2">{me?.role}</Badge>
+                  </div>
                 </div>
                 <div className="p-4 bg-gray-800 rounded-lg">
                   <p className="text-gray-400 text-sm">Email</p>
