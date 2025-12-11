@@ -2579,34 +2579,39 @@ export async function registerRoutes(
   // Create loader ad
   app.post("/api/loaders/ads", requireAuth, async (req: AuthRequest, res) => {
     try {
-      const { assetType, dealAmount, loadingTerms, upfrontPercentage, paymentMethods } = req.body;
+      const { assetType, dealAmount, loadingTerms, upfrontPercentage, paymentMethods, countdownTime } = req.body;
       
       if (!assetType || !dealAmount || !paymentMethods || paymentMethods.length === 0) {
         return res.status(400).json({ message: "Missing required fields" });
       }
+
+      const validCountdownTimes = ["15min", "30min", "1hr", "2hr"];
+      const selectedCountdown = countdownTime && validCountdownTimes.includes(countdownTime) ? countdownTime : "30min";
 
       const amount = parseFloat(dealAmount);
       if (amount <= 0) {
         return res.status(400).json({ message: "Deal amount must be greater than 0" });
       }
 
-      // Check wallet balance (need 10% commitment)
+      // Check wallet balance (need 10% collateral + 3% fee reserve = 13% total)
       const wallet = await storage.getWalletByUserId(req.user!.userId);
       if (!wallet) {
         return res.status(400).json({ message: "Wallet not found" });
       }
 
-      const commitment = amount * 0.1;
+      const collateral = amount * 0.1; // 10% collateral
+      const feeReserve = amount * 0.03; // 3% fee reserve
+      const totalRequired = collateral + feeReserve;
       const availableBalance = parseFloat(wallet.availableBalance || "0");
       
-      if (availableBalance < commitment) {
+      if (availableBalance < totalRequired) {
         return res.status(400).json({ 
-          message: `Insufficient balance. You need at least ${commitment.toFixed(2)} (10% of deal) but have ${availableBalance.toFixed(2)}` 
+          message: `Insufficient balance. You need at least ${totalRequired.toFixed(2)} (10% collateral + 3% fee reserve) but have ${availableBalance.toFixed(2)}` 
         });
       }
 
-      // Freeze 10% commitment from wallet
-      await storage.holdEscrow(wallet.id, commitment.toString());
+      // Freeze total commitment from wallet
+      await storage.holdEscrow(wallet.id, totalRequired.toString());
 
       // Create the ad
       const ad = await storage.createLoaderAd({
@@ -2615,8 +2620,10 @@ export async function registerRoutes(
         dealAmount: amount.toString(),
         loadingTerms: loadingTerms || null,
         upfrontPercentage: upfrontPercentage || 0,
+        countdownTime: selectedCountdown,
         paymentMethods,
-        frozenCommitment: commitment.toString(),
+        frozenCommitment: collateral.toString(),
+        loaderFeeReserve: feeReserve.toString(),
       });
 
       // Log transaction
@@ -2624,9 +2631,9 @@ export async function registerRoutes(
         userId: req.user!.userId,
         walletId: wallet.id,
         type: "escrow_hold",
-        amount: commitment.toString(),
+        amount: totalRequired.toString(),
         currency: "USDT",
-        description: `Loader ad commitment for ${assetType} deal of ${amount}`,
+        description: `Loader ad: ${collateral.toFixed(2)} collateral + ${feeReserve.toFixed(2)} fee reserve for ${assetType} deal of ${amount}`,
       });
 
       res.json(ad);
@@ -2692,45 +2699,56 @@ export async function registerRoutes(
         return res.status(400).json({ message: "Cannot accept your own ad" });
       }
 
-      // Check receiver balance if upfront is required
-      const upfrontRequired = (parseFloat(ad.dealAmount) * (ad.upfrontPercentage || 0)) / 100;
+      const dealAmount = parseFloat(ad.dealAmount);
+      const upfrontRequired = (dealAmount * (ad.upfrontPercentage || 0)) / 100;
+      const receiverFeeReserve = dealAmount * 0.02; // 2% platform fee from receiver
+      const totalReceiverRequired = upfrontRequired + receiverFeeReserve;
       
-      if (upfrontRequired > 0) {
-        const receiverWallet = await storage.getWalletByUserId(req.user!.userId);
-        if (!receiverWallet) {
-          return res.status(400).json({ message: "Wallet not found" });
-        }
-        
-        const receiverBalance = parseFloat(receiverWallet.availableBalance || "0");
-        if (receiverBalance < upfrontRequired) {
-          return res.status(400).json({ 
-            message: `Insufficient balance. You need at least ${upfrontRequired.toFixed(2)} (${ad.upfrontPercentage}% upfront) but have ${receiverBalance.toFixed(2)}` 
-          });
-        }
-
-        // Freeze upfront from receiver
-        await storage.holdEscrow(receiverWallet.id, upfrontRequired.toString());
-        await storage.createTransaction({
-          userId: req.user!.userId,
-          walletId: receiverWallet.id,
-          type: "escrow_hold",
-          amount: upfrontRequired.toString(),
-          currency: "USDT",
-          description: `Loader order upfront for deal`,
+      const receiverWallet = await storage.getWalletByUserId(req.user!.userId);
+      if (!receiverWallet) {
+        return res.status(400).json({ message: "Wallet not found" });
+      }
+      
+      const receiverBalance = parseFloat(receiverWallet.availableBalance || "0");
+      if (receiverBalance < totalReceiverRequired) {
+        return res.status(400).json({ 
+          message: `Insufficient balance. You need ${upfrontRequired.toFixed(2)} upfront + ${receiverFeeReserve.toFixed(2)} (2% fee) = ${totalReceiverRequired.toFixed(2)}, but have ${receiverBalance.toFixed(2)}` 
         });
       }
 
-      // Create order
+      // Freeze total from receiver (upfront + 2% fee reserve)
+      await storage.holdEscrow(receiverWallet.id, totalReceiverRequired.toString());
+      await storage.createTransaction({
+        userId: req.user!.userId,
+        walletId: receiverWallet.id,
+        type: "escrow_hold",
+        amount: totalReceiverRequired.toString(),
+        currency: "USDT",
+        description: `Loader order: ${upfrontRequired.toFixed(2)} upfront + ${receiverFeeReserve.toFixed(2)} fee reserve`,
+      });
+
+      // Calculate countdown expiry
+      const countdownMs: Record<string, number> = {
+        "15min": 15 * 60 * 1000,
+        "30min": 30 * 60 * 1000,
+        "1hr": 60 * 60 * 1000,
+        "2hr": 2 * 60 * 60 * 1000,
+      };
+      const expiresAt = new Date(Date.now() + (countdownMs[ad.countdownTime || "30min"] || 30 * 60 * 1000));
+
+      // Create order with new flow
       const order = await storage.createLoaderOrder({
         adId: ad.id,
         loaderId: ad.loaderId,
         receiverId: req.user!.userId,
         dealAmount: ad.dealAmount,
         loaderFrozenAmount: ad.frozenCommitment,
+        loaderFeeReserve: (dealAmount * 0.03).toString(),
         receiverFrozenAmount: upfrontRequired.toString(),
-        status: "awaiting_liability_confirmation",
-        receiverConfirmed: false,
-        loaderConfirmed: false,
+        receiverFeeReserve: receiverFeeReserve.toString(),
+        status: "awaiting_payment_details",
+        countdownTime: ad.countdownTime || "30min",
+        countdownExpiresAt: expiresAt,
       });
 
       // Deactivate the ad
@@ -2741,7 +2759,7 @@ export async function registerRoutes(
         orderId: order.id,
         senderId: null,
         isSystem: true,
-        content: "Receiver must select liability terms before funds are sent.",
+        content: `Deal started! Countdown: ${ad.countdownTime || "30min"}. Either party must send payment details before the countdown expires, or the deal will auto-cancel.`,
       });
 
       res.json(order);
@@ -2806,75 +2824,55 @@ export async function registerRoutes(
     }
   });
 
-  // Select liability terms (receiver)
-  app.post("/api/loaders/orders/:id/liability", requireAuth, async (req: AuthRequest, res) => {
+  // Send payment details (stops countdown)
+  app.post("/api/loaders/orders/:id/send-payment-details", requireAuth, async (req: AuthRequest, res) => {
     try {
-      const { liabilityType, confirmed } = req.body;
-      
-      // Validate liability type
-      const validLiabilityTypes = [
-        "full_payment", "partial_10", "partial_25", "partial_50",
-        "time_bound_24h", "time_bound_48h", "time_bound_72h", 
-        "time_bound_1week", "time_bound_1month"
-      ];
-      
-      if (!liabilityType || !validLiabilityTypes.includes(liabilityType)) {
-        return res.status(400).json({ 
-          message: "Invalid liability type. Must be one of: full_payment, partial_10, partial_25, partial_50, time_bound_24h, time_bound_48h, time_bound_72h, time_bound_1week, time_bound_1month" 
-        });
-      }
-      
       const order = await storage.getLoaderOrder(req.params.id);
       if (!order) {
         return res.status(404).json({ message: "Order not found" });
       }
 
-      if (order.receiverId !== req.user!.userId) {
-        return res.status(403).json({ message: "Only receiver can select liability terms" });
+      const isLoader = order.loaderId === req.user!.userId;
+      const isReceiver = order.receiverId === req.user!.userId;
+      
+      if (!isLoader && !isReceiver) {
+        return res.status(403).json({ message: "Not authorized" });
       }
 
-      if (order.status !== "awaiting_liability_confirmation") {
-        return res.status(400).json({ message: "Order is not awaiting liability confirmation" });
+      if (order.status !== "awaiting_payment_details" && order.status !== "payment_details_sent") {
+        return res.status(400).json({ message: "Cannot send payment details in current state" });
       }
 
-      if (!confirmed) {
-        return res.status(400).json({ message: "You must confirm the liability terms" });
+      // Stop the countdown permanently
+      const updates: any = { countdownStopped: true };
+      
+      if (isLoader) {
+        updates.loaderSentPaymentDetails = true;
+      } else {
+        updates.receiverSentPaymentDetails = true;
       }
 
-      // Calculate deadline for time-bound options
-      let deadline = null;
-      if (liabilityType.startsWith("time_bound_")) {
-        const now = new Date();
-        switch (liabilityType) {
-          case "time_bound_24h": deadline = new Date(now.getTime() + 24 * 60 * 60 * 1000); break;
-          case "time_bound_48h": deadline = new Date(now.getTime() + 48 * 60 * 60 * 1000); break;
-          case "time_bound_72h": deadline = new Date(now.getTime() + 72 * 60 * 60 * 1000); break;
-          case "time_bound_1week": deadline = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000); break;
-          case "time_bound_1month": deadline = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000); break;
-        }
-      }
+      // Move to payment_details_sent status
+      updates.status = "payment_details_sent";
 
-      await storage.updateLoaderOrder(order.id, {
-        liabilityType,
-        liabilityDeadline: deadline,
-        receiverConfirmed: true,
-      });
+      await storage.updateLoaderOrder(order.id, updates);
 
+      const sender = isLoader ? "Loader" : "Receiver";
       await storage.createLoaderOrderMessage({
         orderId: order.id,
         senderId: null,
         isSystem: true,
-        content: `Receiver selected liability: ${liabilityType.replace(/_/g, " ")}. Waiting for loader confirmation.`,
+        content: `${sender} has sent payment details. Countdown stopped. Deal now waits for completion.`,
       });
 
-      res.json({ message: "Liability terms selected" });
+      res.json({ message: "Payment details sent. Countdown stopped." });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
   });
 
-  // Confirm liability terms (loader)
-  app.post("/api/loaders/orders/:id/confirm-liability", requireAuth, async (req: AuthRequest, res) => {
+  // Mark payment sent (loader only)
+  app.post("/api/loaders/orders/:id/mark-payment-sent", requireAuth, async (req: AuthRequest, res) => {
     try {
       const order = await storage.getLoaderOrder(req.params.id);
       if (!order) {
@@ -2882,32 +2880,488 @@ export async function registerRoutes(
       }
 
       if (order.loaderId !== req.user!.userId) {
-        return res.status(403).json({ message: "Only loader can confirm liability terms" });
+        return res.status(403).json({ message: "Only loader can mark payment as sent" });
       }
 
-      if (!order.receiverConfirmed) {
-        return res.status(400).json({ message: "Receiver has not selected liability terms yet" });
+      if (order.status !== "payment_details_sent") {
+        return res.status(400).json({ message: "Payment details must be exchanged first" });
       }
 
       await storage.updateLoaderOrder(order.id, {
-        loaderConfirmed: true,
-        status: "funds_sent_by_loader",
+        loaderMarkedPaymentSent: true,
+        status: "payment_sent",
       });
 
       await storage.createLoaderOrderMessage({
         orderId: order.id,
         senderId: null,
         isSystem: true,
-        content: "Both parties confirmed liability terms. Loader can now send funds.",
+        content: "Loader has marked payment as sent. Waiting for receiver to confirm receipt.",
       });
 
-      res.json({ message: "Liability terms confirmed" });
+      res.json({ message: "Payment marked as sent" });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
   });
 
-  // Complete order
+  // Cancel order with 5% penalty
+  app.post("/api/loaders/orders/:id/cancel", requireAuth, async (req: AuthRequest, res) => {
+    try {
+      const order = await storage.getLoaderOrder(req.params.id);
+      if (!order) {
+        return res.status(404).json({ message: "Order not found" });
+      }
+
+      const isLoader = order.loaderId === req.user!.userId;
+      const isReceiver = order.receiverId === req.user!.userId;
+      
+      if (!isLoader && !isReceiver) {
+        return res.status(403).json({ message: "Not authorized" });
+      }
+
+      // Receiver cannot cancel after payment is marked sent
+      if (isReceiver && order.loaderMarkedPaymentSent) {
+        return res.status(400).json({ message: "Cannot cancel after payment has been sent. Open a dispute instead." });
+      }
+
+      // Cannot cancel if already completed, cancelled, or disputed
+      const invalidStatuses = ["completed", "cancelled_auto", "cancelled_loader", "cancelled_receiver", "disputed", "resolved_loader_wins", "resolved_receiver_wins", "resolved_mutual"];
+      if (invalidStatuses.includes(order.status)) {
+        return res.status(400).json({ message: "Cannot cancel order in current state" });
+      }
+
+      const dealAmount = parseFloat(order.dealAmount);
+      const penaltyAmount = dealAmount * 0.05; // 5% penalty
+      
+      // Get admin wallet for fee
+      const kaiAdmin = await storage.getUserByUsername("Kai");
+      const adminUser = kaiAdmin || (await storage.getUsersByRole("admin"))[0];
+      const adminWallet = adminUser ? await storage.getWalletByUserId(adminUser.id) : null;
+
+      if (isLoader) {
+        // Loader cancels: pays 5% penalty from collateral
+        const loaderWallet = await storage.getWalletByUserId(order.loaderId);
+        if (loaderWallet) {
+          const loaderCollateral = parseFloat(order.loaderFrozenAmount);
+          const loaderFeeReserve = parseFloat(order.loaderFeeReserve || "0");
+          const loaderRefund = loaderCollateral + loaderFeeReserve - penaltyAmount;
+          
+          if (loaderRefund > 0) {
+            await storage.releaseEscrow(loaderWallet.id, loaderRefund.toString());
+          }
+          
+          // Transfer penalty to admin
+          if (adminWallet) {
+            const newAdminBalance = (parseFloat(adminWallet.availableBalance) + penaltyAmount).toFixed(2);
+            await storage.updateWalletBalance(adminWallet.id, newAdminBalance, adminWallet.escrowBalance);
+            await storage.createTransaction({
+              userId: adminUser!.id,
+              walletId: adminWallet.id,
+              type: "fee",
+              amount: penaltyAmount.toString(),
+              currency: "USDT",
+              description: `Cancellation penalty from loader on order ${order.id}`,
+            });
+          }
+
+          await storage.createTransaction({
+            userId: order.loaderId,
+            walletId: loaderWallet.id,
+            type: "fee",
+            amount: penaltyAmount.toString(),
+            currency: "USDT",
+            description: `5% cancellation penalty for order ${order.id}`,
+          });
+        }
+
+        // Full refund to receiver
+        const receiverWallet = await storage.getWalletByUserId(order.receiverId);
+        if (receiverWallet) {
+          const receiverUpfront = parseFloat(order.receiverFrozenAmount || "0");
+          const receiverFeeReserve = parseFloat(order.receiverFeeReserve || "0");
+          const receiverRefund = receiverUpfront + receiverFeeReserve;
+          if (receiverRefund > 0) {
+            await storage.releaseEscrow(receiverWallet.id, receiverRefund.toString());
+            await storage.createTransaction({
+              userId: order.receiverId,
+              walletId: receiverWallet.id,
+              type: "refund",
+              amount: receiverRefund.toString(),
+              currency: "USDT",
+              description: `Full refund - loader cancelled order ${order.id}`,
+            });
+          }
+        }
+
+        await storage.updateLoaderOrder(order.id, {
+          status: "cancelled_loader",
+          cancelledBy: req.user!.userId,
+          penaltyAmount: penaltyAmount.toString(),
+          penaltyPaidBy: order.loaderId,
+        });
+
+        // Remove the ad
+        await storage.deactivateLoaderAd(order.adId);
+      } else {
+        // Receiver cancels: pays 5% penalty
+        const receiverWallet = await storage.getWalletByUserId(order.receiverId);
+        const receiverUpfront = parseFloat(order.receiverFrozenAmount || "0");
+        const receiverFeeReserve = parseFloat(order.receiverFeeReserve || "0");
+        const receiverTotal = receiverUpfront + receiverFeeReserve;
+        
+        if (receiverWallet) {
+          let actualPenalty = penaltyAmount;
+          let receiverRefund = receiverTotal - penaltyAmount;
+          
+          // If upfront doesn't cover penalty, balance goes negative
+          if (receiverRefund < 0) {
+            actualPenalty = receiverTotal;
+            const deficit = penaltyAmount - receiverTotal;
+            const newAvailable = (parseFloat(receiverWallet.availableBalance) - deficit).toFixed(2);
+            await storage.updateWalletBalance(receiverWallet.id, newAvailable, receiverWallet.escrowBalance);
+            receiverRefund = 0;
+          }
+          
+          if (receiverTotal > 0) {
+            if (receiverRefund > 0) {
+              await storage.releaseEscrow(receiverWallet.id, receiverTotal.toString());
+              const newBalance = (parseFloat(receiverWallet.availableBalance) - actualPenalty).toFixed(2);
+              await storage.updateWalletBalance(receiverWallet.id, newBalance, receiverWallet.escrowBalance);
+            } else {
+              // Release escrow fully, deficit already deducted from available
+              await storage.releaseEscrow(receiverWallet.id, receiverTotal.toString());
+            }
+          }
+          
+          // Transfer penalty to admin
+          if (adminWallet) {
+            const newAdminBalance = (parseFloat(adminWallet.availableBalance) + penaltyAmount).toFixed(2);
+            await storage.updateWalletBalance(adminWallet.id, newAdminBalance, adminWallet.escrowBalance);
+            await storage.createTransaction({
+              userId: adminUser!.id,
+              walletId: adminWallet.id,
+              type: "fee",
+              amount: penaltyAmount.toString(),
+              currency: "USDT",
+              description: `Cancellation penalty from receiver on order ${order.id}`,
+            });
+          }
+
+          await storage.createTransaction({
+            userId: order.receiverId,
+            walletId: receiverWallet.id,
+            type: "fee",
+            amount: penaltyAmount.toString(),
+            currency: "USDT",
+            description: `5% cancellation penalty for order ${order.id}`,
+          });
+        }
+
+        // Full refund to loader
+        const loaderWallet = await storage.getWalletByUserId(order.loaderId);
+        if (loaderWallet) {
+          const loaderCollateral = parseFloat(order.loaderFrozenAmount);
+          const loaderFeeReserve = parseFloat(order.loaderFeeReserve || "0");
+          const loaderRefund = loaderCollateral + loaderFeeReserve;
+          if (loaderRefund > 0) {
+            await storage.releaseEscrow(loaderWallet.id, loaderRefund.toString());
+            await storage.createTransaction({
+              userId: order.loaderId,
+              walletId: loaderWallet.id,
+              type: "refund",
+              amount: loaderRefund.toString(),
+              currency: "USDT",
+              description: `Full refund - receiver cancelled order ${order.id}`,
+            });
+          }
+        }
+
+        await storage.updateLoaderOrder(order.id, {
+          status: "cancelled_receiver",
+          cancelledBy: req.user!.userId,
+          penaltyAmount: penaltyAmount.toString(),
+          penaltyPaidBy: order.receiverId,
+        });
+
+        // Remove the ad
+        await storage.deactivateLoaderAd(order.adId);
+      }
+
+      await storage.createLoaderOrderMessage({
+        orderId: order.id,
+        senderId: null,
+        isSystem: true,
+        content: `Order cancelled by ${isLoader ? "loader" : "receiver"}. 5% penalty (${penaltyAmount.toFixed(2)}) deducted.`,
+      });
+
+      res.json({ message: "Order cancelled. 5% penalty applied." });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Open dispute
+  app.post("/api/loaders/orders/:id/dispute", requireAuth, async (req: AuthRequest, res) => {
+    try {
+      const { reason } = req.body;
+      
+      const order = await storage.getLoaderOrder(req.params.id);
+      if (!order) {
+        return res.status(404).json({ message: "Order not found" });
+      }
+
+      const isLoader = order.loaderId === req.user!.userId;
+      const isReceiver = order.receiverId === req.user!.userId;
+      
+      if (!isLoader && !isReceiver) {
+        return res.status(403).json({ message: "Not authorized" });
+      }
+
+      // Can only dispute after payment details are sent
+      if (!["payment_details_sent", "payment_sent"].includes(order.status)) {
+        return res.status(400).json({ message: "Can only open dispute after payment details are exchanged" });
+      }
+
+      // Check if dispute already exists
+      const existingDispute = await storage.getLoaderDisputeByOrderId(order.id);
+      if (existingDispute) {
+        return res.status(400).json({ message: "A dispute is already open for this order" });
+      }
+
+      // Create dispute
+      const dispute = await storage.createLoaderDispute({
+        orderId: order.id,
+        openedBy: req.user!.userId,
+        reason: reason || "No reason provided",
+      });
+
+      // Update order status
+      await storage.updateLoaderOrder(order.id, {
+        status: "disputed",
+      });
+
+      const opener = isLoader ? "Loader" : "Receiver";
+      await storage.createLoaderOrderMessage({
+        orderId: order.id,
+        senderId: null,
+        isSystem: true,
+        content: `Dispute opened by ${opener}. Reason: ${reason || "No reason provided"}. Admin will review and resolve.`,
+      });
+
+      res.json({ message: "Dispute opened successfully", dispute });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Get dispute for order
+  app.get("/api/loaders/orders/:id/dispute", requireAuth, async (req: AuthRequest, res) => {
+    try {
+      const order = await storage.getLoaderOrder(req.params.id);
+      if (!order) {
+        return res.status(404).json({ message: "Order not found" });
+      }
+
+      const isLoader = order.loaderId === req.user!.userId;
+      const isReceiver = order.receiverId === req.user!.userId;
+      const isAdmin = req.user!.role === "admin" || req.user!.role === "dispute_admin";
+      
+      if (!isLoader && !isReceiver && !isAdmin) {
+        return res.status(403).json({ message: "Not authorized" });
+      }
+
+      const dispute = await storage.getLoaderDisputeByOrderId(order.id);
+      if (!dispute) {
+        return res.status(404).json({ message: "No dispute found for this order" });
+      }
+
+      res.json(dispute);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Admin: Get all open loader disputes
+  app.get("/api/admin/loader-disputes", requireAuth, async (req: AuthRequest, res) => {
+    try {
+      if (req.user!.role !== "admin" && req.user!.role !== "dispute_admin") {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+
+      const disputes = await storage.getOpenLoaderDisputes();
+      
+      // Enrich with order and user info
+      const enrichedDisputes = await Promise.all(disputes.map(async (dispute) => {
+        const order = await storage.getLoaderOrder(dispute.orderId);
+        const opener = await storage.getUser(dispute.openedBy);
+        const loader = order ? await storage.getUser(order.loaderId) : null;
+        const receiver = order ? await storage.getUser(order.receiverId) : null;
+        
+        return {
+          ...dispute,
+          order,
+          openerUsername: opener?.username,
+          loaderUsername: loader?.username,
+          receiverUsername: receiver?.username,
+        };
+      }));
+
+      res.json(enrichedDisputes);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Admin: Resolve dispute
+  app.post("/api/admin/loader-disputes/:id/resolve", requireAuth, async (req: AuthRequest, res) => {
+    try {
+      if (req.user!.role !== "admin" && req.user!.role !== "dispute_admin") {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+
+      const { winner, resolution } = req.body; // winner: "loader" | "receiver" | "mutual"
+      
+      const dispute = await storage.getLoaderDispute(req.params.id);
+      if (!dispute) {
+        return res.status(404).json({ message: "Dispute not found" });
+      }
+
+      if (dispute.status !== "open" && dispute.status !== "in_review") {
+        return res.status(400).json({ message: "Dispute is already resolved" });
+      }
+
+      const order = await storage.getLoaderOrder(dispute.orderId);
+      if (!order) {
+        return res.status(404).json({ message: "Order not found" });
+      }
+
+      const dealAmount = parseFloat(order.dealAmount);
+      const penaltyAmount = dealAmount * 0.05; // 5% penalty
+      
+      const kaiAdmin = await storage.getUserByUsername("Kai");
+      const adminUser = kaiAdmin || (await storage.getUsersByRole("admin"))[0];
+      const adminWallet = adminUser ? await storage.getWalletByUserId(adminUser.id) : null;
+
+      let newStatus: string;
+      let winnerId: string | null = null;
+      let loserId: string | null = null;
+
+      if (winner === "loader") {
+        // Loader wins: receiver pays 5% penalty
+        newStatus = "resolved_loader_wins";
+        winnerId = order.loaderId;
+        loserId = order.receiverId;
+
+        const receiverWallet = await storage.getWalletByUserId(order.receiverId);
+        if (receiverWallet) {
+          const receiverTotal = parseFloat(order.receiverFrozenAmount || "0") + parseFloat(order.receiverFeeReserve || "0");
+          const receiverRefund = receiverTotal - penaltyAmount;
+          
+          if (receiverTotal > 0) {
+            await storage.releaseEscrow(receiverWallet.id, receiverTotal.toString());
+          }
+          
+          if (receiverRefund < 0) {
+            const newBalance = (parseFloat(receiverWallet.availableBalance) + receiverRefund).toFixed(2);
+            await storage.updateWalletBalance(receiverWallet.id, newBalance, receiverWallet.escrowBalance);
+          } else {
+            const newBalance = (parseFloat(receiverWallet.availableBalance) - penaltyAmount).toFixed(2);
+            await storage.updateWalletBalance(receiverWallet.id, newBalance, receiverWallet.escrowBalance);
+          }
+          
+          if (adminWallet) {
+            const newAdminBalance = (parseFloat(adminWallet.availableBalance) + penaltyAmount).toFixed(2);
+            await storage.updateWalletBalance(adminWallet.id, newAdminBalance, adminWallet.escrowBalance);
+          }
+        }
+
+        // Full refund to loader
+        const loaderWallet = await storage.getWalletByUserId(order.loaderId);
+        if (loaderWallet) {
+          const loaderRefund = parseFloat(order.loaderFrozenAmount) + parseFloat(order.loaderFeeReserve || "0");
+          await storage.releaseEscrow(loaderWallet.id, loaderRefund.toString());
+        }
+      } else if (winner === "receiver") {
+        // Receiver wins: loader pays 5% penalty
+        newStatus = "resolved_receiver_wins";
+        winnerId = order.receiverId;
+        loserId = order.loaderId;
+
+        const loaderWallet = await storage.getWalletByUserId(order.loaderId);
+        if (loaderWallet) {
+          const loaderTotal = parseFloat(order.loaderFrozenAmount) + parseFloat(order.loaderFeeReserve || "0");
+          const loaderRefund = loaderTotal - penaltyAmount;
+          
+          if (loaderRefund > 0) {
+            await storage.releaseEscrow(loaderWallet.id, loaderRefund.toString());
+          }
+          
+          if (adminWallet) {
+            const newAdminBalance = (parseFloat(adminWallet.availableBalance) + penaltyAmount).toFixed(2);
+            await storage.updateWalletBalance(adminWallet.id, newAdminBalance, adminWallet.escrowBalance);
+          }
+        }
+
+        // Full refund to receiver
+        const receiverWallet = await storage.getWalletByUserId(order.receiverId);
+        if (receiverWallet) {
+          const receiverRefund = parseFloat(order.receiverFrozenAmount || "0") + parseFloat(order.receiverFeeReserve || "0");
+          if (receiverRefund > 0) {
+            await storage.releaseEscrow(receiverWallet.id, receiverRefund.toString());
+          }
+        }
+      } else {
+        // Mutual fault: no penalty, both refunded
+        newStatus = "resolved_mutual";
+
+        const loaderWallet = await storage.getWalletByUserId(order.loaderId);
+        if (loaderWallet) {
+          const loaderRefund = parseFloat(order.loaderFrozenAmount) + parseFloat(order.loaderFeeReserve || "0");
+          await storage.releaseEscrow(loaderWallet.id, loaderRefund.toString());
+        }
+
+        const receiverWallet = await storage.getWalletByUserId(order.receiverId);
+        if (receiverWallet) {
+          const receiverRefund = parseFloat(order.receiverFrozenAmount || "0") + parseFloat(order.receiverFeeReserve || "0");
+          if (receiverRefund > 0) {
+            await storage.releaseEscrow(receiverWallet.id, receiverRefund.toString());
+          }
+        }
+      }
+
+      // Update dispute
+      await storage.updateLoaderDispute(dispute.id, {
+        status: newStatus as any,
+        resolution: resolution || `Resolved in favor of ${winner}`,
+        resolvedBy: req.user!.userId,
+        winnerId,
+        loserId,
+        resolvedAt: new Date(),
+      });
+
+      // Update order
+      await storage.updateLoaderOrder(order.id, {
+        status: newStatus as any,
+        penaltyAmount: winner === "mutual" ? "0" : penaltyAmount.toString(),
+        penaltyPaidBy: loserId,
+      });
+
+      await storage.createLoaderOrderMessage({
+        orderId: order.id,
+        senderId: null,
+        isSystem: true,
+        isAdminMessage: true,
+        content: `Dispute resolved by admin. ${winner === "mutual" ? "Mutual fault - no penalty applied." : `${winner.charAt(0).toUpperCase() + winner.slice(1)} wins. 5% penalty (${penaltyAmount.toFixed(2)}) charged to loser.`}`,
+      });
+
+      res.json({ message: "Dispute resolved successfully" });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Complete order (confirm payment received)
   app.post("/api/loaders/orders/:id/complete", requireAuth, async (req: AuthRequest, res) => {
     try {
       const order = await storage.getLoaderOrder(req.params.id);
@@ -2916,59 +3370,105 @@ export async function registerRoutes(
       }
 
       if (order.receiverId !== req.user!.userId) {
-        return res.status(403).json({ message: "Only receiver can mark as complete" });
+        return res.status(403).json({ message: "Only receiver can confirm payment received" });
       }
 
-      if (!["funds_sent_by_loader", "asset_frozen_waiting"].includes(order.status)) {
+      // Updated to work with new statuses
+      if (!["payment_sent", "payment_details_sent"].includes(order.status)) {
         return res.status(400).json({ message: "Order cannot be completed in current state" });
       }
 
-      // Calculate and deduct fees
       const dealAmount = parseFloat(order.dealAmount);
-      const loaderFee = dealAmount * 0.03; // 3% loader fee
-      const receiverFee = parseFloat(order.receiverFrozenAmount || "0") > 0 ? dealAmount * 0.02 : 0; // 2% receiver fee if upfront
-      const totalLoaderFee = parseFloat(order.receiverFrozenAmount || "0") > 0 ? loaderFee : dealAmount * 0.05; // 5% if no receiver upfront
+      const loaderFee = dealAmount * 0.03; // 3% loader fee (from reserved fee)
+      const receiverFee = dealAmount * 0.02; // 2% receiver fee (from reserved fee)
 
-      // Release loader frozen funds minus fee
+      // Get admin wallet for fees
+      const kaiAdmin = await storage.getUserByUsername("Kai");
+      const adminUser = kaiAdmin || (await storage.getUsersByRole("admin"))[0];
+      const adminWallet = adminUser ? await storage.getWalletByUserId(adminUser.id) : null;
+      const totalPlatformFee = loaderFee + receiverFee;
+
+      // Release loader collateral (keep fee reserve for platform)
       const loaderWallet = await storage.getWalletByUserId(order.loaderId);
       if (loaderWallet) {
-        const loaderRefund = parseFloat(order.loaderFrozenAmount) - totalLoaderFee;
+        const loaderCollateral = parseFloat(order.loaderFrozenAmount);
+        const loaderFeeReserve = parseFloat(order.loaderFeeReserve || "0");
+        const loaderRefund = loaderCollateral; // Collateral back, fee goes to platform
+        
         if (loaderRefund > 0) {
-          await storage.releaseEscrow(loaderWallet.id, loaderRefund.toString());
+          await storage.releaseEscrow(loaderWallet.id, (loaderCollateral + loaderFeeReserve).toString());
+          const newBalance = (parseFloat(loaderWallet.availableBalance) - loaderFee).toFixed(2);
+          await storage.updateWalletBalance(loaderWallet.id, newBalance, loaderWallet.escrowBalance);
         }
+        
         await storage.createTransaction({
           userId: order.loaderId,
           walletId: loaderWallet.id,
           type: "fee",
-          amount: totalLoaderFee.toString(),
+          amount: loaderFee.toString(),
           currency: "USDT",
-          description: `Loader fee for completed order`,
+          description: `3% loader platform fee for completed order`,
         });
       }
 
-      // Release receiver frozen funds minus fee
-      if (parseFloat(order.receiverFrozenAmount || "0") > 0) {
-        const receiverWallet = await storage.getWalletByUserId(order.receiverId);
-        if (receiverWallet) {
-          const receiverRefund = parseFloat(order.receiverFrozenAmount || "0") - receiverFee;
-          if (receiverRefund > 0) {
-            await storage.releaseEscrow(receiverWallet.id, receiverRefund.toString());
-          }
+      // Transfer upfront to loader and deduct receiver fee
+      const receiverWallet = await storage.getWalletByUserId(order.receiverId);
+      if (receiverWallet) {
+        const receiverUpfront = parseFloat(order.receiverFrozenAmount || "0");
+        const receiverFeeReserve = parseFloat(order.receiverFeeReserve || "0");
+        
+        // Release receiver escrow
+        if (receiverUpfront + receiverFeeReserve > 0) {
+          await storage.releaseEscrow(receiverWallet.id, (receiverUpfront + receiverFeeReserve).toString());
+          // Deduct fee from available balance (fee reserve covers this)
+          const newBalance = (parseFloat(receiverWallet.availableBalance) - receiverFee).toFixed(2);
+          await storage.updateWalletBalance(receiverWallet.id, newBalance, receiverWallet.escrowBalance);
+        }
+        
+        await storage.createTransaction({
+          userId: order.receiverId,
+          walletId: receiverWallet.id,
+          type: "fee",
+          amount: receiverFee.toString(),
+          currency: "USDT",
+          description: `2% receiver platform fee for completed order`,
+        });
+
+        // Transfer upfront to loader
+        if (receiverUpfront > 0 && loaderWallet) {
+          const newLoaderBalance = (parseFloat(loaderWallet.availableBalance) + receiverUpfront).toFixed(2);
+          await storage.updateWalletBalance(loaderWallet.id, newLoaderBalance, loaderWallet.escrowBalance);
+          
           await storage.createTransaction({
-            userId: order.receiverId,
-            walletId: receiverWallet.id,
-            type: "fee",
-            amount: receiverFee.toString(),
+            userId: order.loaderId,
+            walletId: loaderWallet.id,
+            type: "escrow_release",
+            amount: receiverUpfront.toString(),
             currency: "USDT",
-            description: `Receiver fee for completed order`,
+            description: `Upfront payment received from receiver`,
           });
         }
+      }
+
+      // Transfer fees to admin
+      if (adminWallet) {
+        const newAdminBalance = (parseFloat(adminWallet.availableBalance) + totalPlatformFee).toFixed(2);
+        await storage.updateWalletBalance(adminWallet.id, newAdminBalance, adminWallet.escrowBalance);
+        await storage.createTransaction({
+          userId: adminUser!.id,
+          walletId: adminWallet.id,
+          type: "fee",
+          amount: totalPlatformFee.toString(),
+          currency: "USDT",
+          description: `Platform fees from completed loader order: ${loaderFee.toFixed(2)} (loader 3%) + ${receiverFee.toFixed(2)} (receiver 2%)`,
+        });
       }
 
       await storage.updateLoaderOrder(order.id, {
         status: "completed",
         completedAt: new Date(),
-        loaderFeeDeducted: totalLoaderFee.toString(),
+        receiverConfirmedPayment: true,
+        loaderFeeDeducted: loaderFee.toString(),
         receiverFeeDeducted: receiverFee.toString(),
       });
 
@@ -2976,10 +3476,71 @@ export async function registerRoutes(
         orderId: order.id,
         senderId: null,
         isSystem: true,
-        content: "Order completed successfully. Funds have been released.",
+        content: `Order completed! Loader paid 3% fee (${loaderFee.toFixed(2)}). Receiver paid 2% fee (${receiverFee.toFixed(2)}). Upfront transferred to loader.`,
       });
 
-      res.json({ message: "Order completed" });
+      res.json({ message: "Order completed successfully" });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Auto-cancel check endpoint (can be called by a cron job)
+  app.post("/api/loaders/check-expired-orders", async (req, res) => {
+    try {
+      const expiredOrders = await storage.getExpiredLoaderOrders();
+      let cancelledCount = 0;
+
+      for (const order of expiredOrders) {
+        // Refund both parties fully - no penalty for auto-cancel
+        const loaderWallet = await storage.getWalletByUserId(order.loaderId);
+        if (loaderWallet) {
+          const loaderRefund = parseFloat(order.loaderFrozenAmount) + parseFloat(order.loaderFeeReserve || "0");
+          await storage.releaseEscrow(loaderWallet.id, loaderRefund.toString());
+          await storage.createTransaction({
+            userId: order.loaderId,
+            walletId: loaderWallet.id,
+            type: "refund",
+            amount: loaderRefund.toString(),
+            currency: "USDT",
+            description: `Auto-cancel refund - countdown expired`,
+          });
+        }
+
+        const receiverWallet = await storage.getWalletByUserId(order.receiverId);
+        if (receiverWallet) {
+          const receiverRefund = parseFloat(order.receiverFrozenAmount || "0") + parseFloat(order.receiverFeeReserve || "0");
+          if (receiverRefund > 0) {
+            await storage.releaseEscrow(receiverWallet.id, receiverRefund.toString());
+            await storage.createTransaction({
+              userId: order.receiverId,
+              walletId: receiverWallet.id,
+              type: "refund",
+              amount: receiverRefund.toString(),
+              currency: "USDT",
+              description: `Auto-cancel refund - countdown expired`,
+            });
+          }
+        }
+
+        await storage.updateLoaderOrder(order.id, {
+          status: "cancelled_auto",
+        });
+
+        // Reactivate the ad
+        await storage.updateLoaderAd(order.adId, { isActive: true });
+
+        await storage.createLoaderOrderMessage({
+          orderId: order.id,
+          senderId: null,
+          isSystem: true,
+          content: "Order auto-cancelled. Countdown expired before payment details were sent. Full refund to both parties. Ad is now active again.",
+        });
+
+        cancelledCount++;
+      }
+
+      res.json({ message: `Checked expired orders. Cancelled ${cancelledCount} orders.` });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
