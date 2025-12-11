@@ -2679,17 +2679,21 @@ export async function registerRoutes(
         return res.status(400).json({ message: "Cannot cancel ad with active orders" });
       }
 
-      // Refund frozen commitment
+      // Refund full escrow: 10% collateral + 3% fee reserve (no penalty when no active trade)
       const wallet = await storage.getWalletByUserId(req.user!.userId);
       if (wallet) {
-        await storage.releaseEscrow(wallet.id, ad.frozenCommitment);
+        const frozenCommitment = parseFloat(ad.frozenCommitment || "0");
+        const feeReserve = parseFloat(ad.loaderFeeReserve || "0");
+        const totalRefund = frozenCommitment + feeReserve;
+        
+        await storage.releaseEscrow(wallet.id, totalRefund.toString());
         await storage.createTransaction({
           userId: req.user!.userId,
           walletId: wallet.id,
           type: "escrow_release",
-          amount: ad.frozenCommitment,
+          amount: totalRefund.toString(),
           currency: "USDT",
-          description: `Loader ad cancelled - commitment refunded`,
+          description: `Loader ad cancelled - full refund: ${frozenCommitment.toFixed(2)} collateral + ${feeReserve.toFixed(2)} fee reserve`,
         });
       }
 
