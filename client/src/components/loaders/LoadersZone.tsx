@@ -32,11 +32,20 @@ interface LoaderAd {
   dealAmount: string;
   loadingTerms: string | null;
   upfrontPercentage: number | null;
+  countdownTime?: string;
   paymentMethods: string[];
   frozenCommitment: string;
+  loaderFeeReserve?: string;
   isActive: boolean;
   createdAt: string;
 }
+
+const COUNTDOWN_OPTIONS = [
+  { value: "15min", label: "15 minutes" },
+  { value: "30min", label: "30 minutes" },
+  { value: "1hr", label: "1 hour" },
+  { value: "2hr", label: "2 hours" },
+];
 
 interface LoaderOrder {
   id: string;
@@ -77,6 +86,7 @@ export default function LoadersZone() {
   const [dealAmount, setDealAmount] = useState("");
   const [loadingTerms, setLoadingTerms] = useState("");
   const [upfrontPercentage, setUpfrontPercentage] = useState("0");
+  const [countdownTime, setCountdownTime] = useState("30min");
   const [selectedPaymentMethods, setSelectedPaymentMethods] = useState<string[]>([]);
 
   const { data: wallet } = useQuery<Wallet>({
@@ -124,6 +134,7 @@ export default function LoadersZone() {
           dealAmount: parseFloat(dealAmount),
           loadingTerms,
           upfrontPercentage: parseInt(upfrontPercentage),
+          countdownTime,
           paymentMethods: selectedPaymentMethods,
         }),
       });
@@ -142,6 +153,7 @@ export default function LoadersZone() {
       setDealAmount("");
       setLoadingTerms("");
       setUpfrontPercentage("0");
+      setCountdownTime("30min");
       setSelectedPaymentMethods([]);
       setActiveTab("active");
     },
@@ -194,9 +206,12 @@ export default function LoadersZone() {
     },
   });
 
-  const commitment = parseFloat(dealAmount || "0") * 0.1;
+  const dealAmountNum = parseFloat(dealAmount || "0");
+  const collateral = dealAmountNum * 0.1; // 10% collateral
+  const loaderFee = dealAmountNum * 0.03; // 3% platform fee
+  const totalRequired = collateral + loaderFee; // Total required upfront
   const availableBalance = parseFloat(wallet?.availableBalance || "0");
-  const canPost = dealAmount && parseFloat(dealAmount) > 0 && selectedPaymentMethods.length > 0 && availableBalance >= commitment;
+  const canPost = dealAmount && dealAmountNum > 0 && selectedPaymentMethods.length > 0 && availableBalance >= totalRequired;
 
   const togglePaymentMethod = (method: string) => {
     if (selectedPaymentMethods.includes(method)) {
@@ -208,15 +223,19 @@ export default function LoadersZone() {
 
   const getStatusBadge = (status: string) => {
     const statusMap: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
-      created: { label: "Created", variant: "secondary" },
-      awaiting_liability_confirmation: { label: "Awaiting Terms", variant: "outline" },
-      funds_sent_by_loader: { label: "Funds Sent", variant: "default" },
-      asset_frozen_waiting: { label: "Asset Frozen", variant: "destructive" },
+      awaiting_payment_details: { label: "Awaiting Details", variant: "outline" },
+      payment_details_sent: { label: "Details Sent", variant: "default" },
+      payment_sent: { label: "Payment Sent", variant: "default" },
       completed: { label: "Completed", variant: "default" },
-      closed_no_payment: { label: "Closed", variant: "secondary" },
-      cancelled: { label: "Cancelled", variant: "secondary" },
+      cancelled_auto: { label: "Auto-Cancelled", variant: "secondary" },
+      cancelled_loader: { label: "Cancelled by Loader", variant: "destructive" },
+      cancelled_receiver: { label: "Cancelled by Receiver", variant: "destructive" },
+      disputed: { label: "Disputed", variant: "destructive" },
+      resolved_loader_wins: { label: "Resolved - Loader Wins", variant: "default" },
+      resolved_receiver_wins: { label: "Resolved - Receiver Wins", variant: "default" },
+      resolved_mutual: { label: "Resolved - Mutual", variant: "secondary" },
     };
-    const s = statusMap[status] || { label: status, variant: "secondary" as const };
+    const s = statusMap[status] || { label: status.replace(/_/g, " "), variant: "secondary" as const };
     return <Badge variant={s.variant} data-testid={`status-badge-${status}`}>{s.label}</Badge>;
   };
 
@@ -284,6 +303,17 @@ export default function LoadersZone() {
                     <div>
                       <p className="text-xs text-muted-foreground">Deal Amount</p>
                       <p className="font-semibold text-foreground">${parseFloat(ad.dealAmount).toLocaleString()}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground">Countdown</p>
+                      <p className="font-semibold text-foreground flex items-center gap-1">
+                        <Clock className="h-3 w-3" />
+                        {COUNTDOWN_OPTIONS.find(o => o.value === ad.countdownTime)?.label || "30 minutes"}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground">Receiver Fee</p>
+                      <p className="font-semibold text-foreground">2% (${(parseFloat(ad.dealAmount) * 0.02).toFixed(2)})</p>
                     </div>
                   </div>
 
@@ -404,6 +434,28 @@ export default function LoadersZone() {
               </div>
 
               <div>
+                <Label>Order Countdown Timer</Label>
+                <p className="text-xs text-muted-foreground mb-2">
+                  How long receivers have to send payment details after accepting
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {COUNTDOWN_OPTIONS.map((option) => (
+                    <Button
+                      key={option.value}
+                      type="button"
+                      variant={countdownTime === option.value ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => setCountdownTime(option.value)}
+                      data-testid={`button-countdown-${option.value}`}
+                    >
+                      <Clock className="h-3 w-3 mr-1" />
+                      {option.label}
+                    </Button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
                 <Label>Receiver Payment Methods</Label>
                 <div className="flex flex-wrap gap-2 mt-2">
                   {PAYMENT_METHODS.map((method) => (
@@ -423,7 +475,10 @@ export default function LoadersZone() {
 
               <div className="p-3 bg-muted rounded-lg">
                 <p className="text-sm text-muted-foreground">
-                  <strong>Liability Rule:</strong> Receiver will choose liability terms when accepting the order.
+                  <strong>Fee Structure:</strong> Loader pays 3% fee, Receiver pays 2% fee on successful deals.
+                </p>
+                <p className="text-sm text-muted-foreground mt-1">
+                  <strong>Cancellation:</strong> 5% penalty if either party manually cancels.
                 </p>
               </div>
 
@@ -431,10 +486,10 @@ export default function LoadersZone() {
                 <div className="flex items-start gap-2">
                   <AlertCircle className="h-5 w-5 text-amber-600 mt-0.5" />
                   <div>
-                    <p className="text-sm font-medium text-amber-700">10% Commitment Notice</p>
+                    <p className="text-sm font-medium text-amber-700">Upfront Reserve Required</p>
                     <p className="text-xs text-amber-600">
-                      10% of this deal amount will be frozen from your balance when this ad is published. 
-                      It will be refunded after the deal is completed or cancelled, and platform fees apply.
+                      You need to reserve <strong>10% collateral</strong> (${collateral.toFixed(2)}) + <strong>3% fee</strong> (${loaderFee.toFixed(2)}) = <strong>${totalRequired.toFixed(2)}</strong> total.
+                      Collateral is refunded on completion. Fee is kept on successful deals.
                     </p>
                   </div>
                 </div>
@@ -444,9 +499,9 @@ export default function LoadersZone() {
                 <p className="text-sm text-foreground">
                   <strong>Your Balance:</strong> ${availableBalance.toFixed(2)}
                 </p>
-                {dealAmount && availableBalance < commitment && (
+                {dealAmount && availableBalance < totalRequired && (
                   <p className="text-xs text-destructive mt-1">
-                    Insufficient balance. You need ${commitment.toFixed(2)} for 10% commitment.
+                    Insufficient balance. You need ${totalRequired.toFixed(2)} (10% collateral + 3% fee).
                   </p>
                 )}
               </div>
