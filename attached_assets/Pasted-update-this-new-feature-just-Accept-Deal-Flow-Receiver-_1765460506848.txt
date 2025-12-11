@@ -1,0 +1,136 @@
+update this new feature just
+
+ Accept Deal Flow (Receiver Side)
+ 
+When receiver clicks Accept eal:
+if the loader set upfront % of the deal plus 2% platform fee and the receiver balace is < the % upfront plus 2% platform fee he should not click accept deal button unles his plaftorm balance is sufficent to be frozen as deal upfront
+
+Open order chat page
+
+System message:
+
+> “Receiver must select liability terms before funds are sent.”
+
+
+
+
+Receiver must choose ONE:
+
+🔘 Option 1 — Full Payment
+
+> ✅ I will pay the full deal amount even if the assets are frozen, delayed, or unusable.
+
+
+
+
+---
+
+🔘 Option 2 — Partial Payment
+
+> ✅ If the assets are frozen or unusable, I agree to pay:
+🔘 10% 🔘 25% 🔘 50% of the deal amount.
+
+
+
+
+---
+
+🔘 Option 3 — Time-Bound Temporary Freeze (Final)
+
+> ✅ If the assets are temporarily frozen, I agree to wait:
+🔘 24 hours 🔘 48 hours 🔘 72 hours 🔘 1 week 🔘 1 month
+
+• If assets are usable before the deadline, I will pay in full.
+• If assets are still frozen at the deadline, the deal closes with no payment, even if assets unlock later.
+
+
+
+
+---
+
+☑️ Mandatory Confirmation
+
+> ⛔ I understand this decision is final and cannot be changed later.
+
+
+
+[ ✅ I Agree ]
+
+
+Require:
+
+Receiver confirmation checkbox
+
+Loader acceptance checkbox
+
+
+Lock agreement after both confirm.
+
+
+---
+
+5️⃣ Escrow & Order State Logic
+
+Order states:
+
+CREATED
+
+AWAITING_LIABILITY_CONFIRMATION
+
+FUNDS_SENT_BY_LOADER
+
+ASSET_FROZEN_WAITING
+
+COMPLETED
+
+CLOSED_NO_PAYMENT
+
+DISPUTE_RESOLVED
+
+
+Rules:
+
+Loader sends funds only after liability agreement is locked
+
+Asset status evaluated only at agreed deadline
+
+No reopening after closure
+
+
+
+---
+
+Loader Protections
+
+Enforce:
+
+Loader can cancel ad before acceptance and no penetaly incur
+
+Loader’s 10%  plus 3% fee remains frozen until:
+
+Order completes ✅
+
+Order closes per agreed liability ✅
+
+
+ one the loader have click i have  send the funds on receives side the cancle button should be disabled
+ on loader page when the order is about to be initiate he is not supposed to see the button of i have sent payment details sincce its the reciver who is supposed to send 
+ 
+ 
+. AUTO-CANCEL (NO-FAULT) BEFORE DETAILS ARE SENT
+
+If countdown expires BEFORE either party sends payment details:
+
+✔ Auto-cancel
+✔ No penalty to anyone
+
+Refunds:
+
+Party	Refund
+
+Loader	10% collateral + 3% fee reserve
+Receiver	Upfront + 2% fee reserve
+and order status shifts to cancled by the system eveythinng becomes disaabled including cancle oder ,open dispute etc
+Ad returns to active status on the loders page where it was before reciver clik aept deal.
+
+0ne the deal is succeful receiver esrow fund should be deducte and creditrd to loader account if for example upfront was 100 usd and receiver have 120 usd in escrow maybe 20 is for other open trades,when the deal is succeful or settle by admin 100 usd will be deducted and 20 usd remain if he stills have other orders ,100 goes to loader wallet fees goes to admin wallet always ensure once the deal is success loaders ccolletaral should be credited back to their wallet from esrow and the 3% fess go to platform fee (admin wallet )not credited to their wallet
