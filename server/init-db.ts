@@ -360,6 +360,7 @@ async function createTablesIfNotExist() {
       is_system BOOLEAN NOT NULL DEFAULT false,
       is_admin_message BOOLEAN NOT NULL DEFAULT false,
       content TEXT NOT NULL,
+      file_url TEXT,
       created_at TIMESTAMP NOT NULL DEFAULT now()
     );
   `);
@@ -386,6 +387,7 @@ async function runMigrations() {
     `ALTER TABLE loader_orders ADD COLUMN IF NOT EXISTS penalty_amount NUMERIC(18, 2) DEFAULT 0;`,
     `ALTER TABLE loader_orders ADD COLUMN IF NOT EXISTS penalty_paid_by VARCHAR;`,
     `ALTER TABLE loader_order_messages ADD COLUMN IF NOT EXISTS is_admin_message BOOLEAN NOT NULL DEFAULT false;`,
+    `ALTER TABLE loader_order_messages ADD COLUMN IF NOT EXISTS file_url TEXT;`,
   ];
 
   for (const migration of migrations) {
