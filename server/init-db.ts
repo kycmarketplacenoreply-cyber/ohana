@@ -348,6 +348,8 @@ async function createTablesIfNotExist() {
 async function runMigrations() {
   const migrations = [
     `ALTER TABLE users ADD COLUMN IF NOT EXISTS profile_picture TEXT;`,
+    `ALTER TABLE loader_ads ADD COLUMN IF NOT EXISTS countdown_time VARCHAR(10) DEFAULT '30min';`,
+    `ALTER TABLE loader_ads ADD COLUMN IF NOT EXISTS loader_fee_reserve DECIMAL(20, 8) DEFAULT '0';`,
   ];
 
   for (const migration of migrations) {
