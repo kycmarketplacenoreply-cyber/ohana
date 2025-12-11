@@ -45,6 +45,11 @@ interface LoaderOrder {
   loaderMarkedPaymentSent?: boolean;
   penaltyAmount?: string;
   penaltyPaidBy?: string;
+  liabilityType?: string;
+  receiverLiabilityConfirmed?: boolean;
+  loaderLiabilityConfirmed?: boolean;
+  liabilityLockedAt?: string;
+  liabilityDeadline?: string;
   createdAt: string;
   ad?: {
     assetType: string;
@@ -87,6 +92,8 @@ export default function LoaderOrderPage() {
   const [showDisputeForm, setShowDisputeForm] = useState(false);
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
   const [timeRemaining, setTimeRemaining] = useState<number | null>(null);
+  const [selectedLiability, setSelectedLiability] = useState<string>("");
+  const [liabilityConfirmChecked, setLiabilityConfirmChecked] = useState(false);
 
   const { data: order, isLoading } = useQuery<LoaderOrder>({
     queryKey: ["loaderOrder", orderId],
@@ -263,6 +270,54 @@ export default function LoaderOrderPage() {
     },
   });
 
+  const selectLiabilityMutation = useMutation({
+    mutationFn: async (liabilityType: string) => {
+      const res = await fetchWithAuth(`/api/loaders/orders/${orderId}/select-liability`, {
+        method: "POST",
+        body: JSON.stringify({ liabilityType }),
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.message);
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Liability Terms Selected", description: "Both parties must now confirm the agreement." });
+      queryClient.invalidateQueries({ queryKey: ["loaderOrder", orderId] });
+      refetchMessages();
+    },
+    onError: (error: Error) => {
+      toast({ variant: "destructive", title: "Error", description: error.message });
+    },
+  });
+
+  const confirmLiabilityMutation = useMutation({
+    mutationFn: async () => {
+      const res = await fetchWithAuth(`/api/loaders/orders/${orderId}/confirm-liability`, {
+        method: "POST",
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.message);
+      }
+      return res.json();
+    },
+    onSuccess: (data) => {
+      if (data.locked) {
+        toast({ title: "Agreement Locked!", description: "Order proceeding to payment phase." });
+      } else {
+        toast({ title: "Confirmed", description: "Waiting for other party to confirm." });
+      }
+      queryClient.invalidateQueries({ queryKey: ["loaderOrder", orderId] });
+      refetchMessages();
+      setLiabilityConfirmChecked(false);
+    },
+    onError: (error: Error) => {
+      toast({ variant: "destructive", title: "Error", description: error.message });
+    },
+  });
+
   const isReceiver = order?.receiverId === currentUser?.id;
   const isLoader = order?.loaderId === currentUser?.id;
 
@@ -274,10 +329,13 @@ export default function LoaderOrderPage() {
 
   const getStatusBadge = (status: string) => {
     const statusMap: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
+      awaiting_liability_confirmation: { label: "Select Liability Terms", variant: "outline" },
       awaiting_payment_details: { label: "Awaiting Details", variant: "outline" },
       payment_details_sent: { label: "Details Sent", variant: "default" },
       payment_sent: { label: "Payment Sent", variant: "default" },
+      asset_frozen_waiting: { label: "Asset Frozen - Waiting", variant: "secondary" },
       completed: { label: "Completed", variant: "default" },
+      closed_no_payment: { label: "Closed - No Payment", variant: "secondary" },
       cancelled_auto: { label: "Auto-Cancelled", variant: "secondary" },
       cancelled_loader: { label: "Cancelled by Loader", variant: "destructive" },
       cancelled_receiver: { label: "Cancelled by Receiver", variant: "destructive" },
@@ -293,8 +351,10 @@ export default function LoaderOrderPage() {
   const dealAmount = parseFloat(order?.dealAmount || "0");
   const penaltyAmount = dealAmount * 0.05;
 
-  const canCancel = order && !["completed", "cancelled_auto", "cancelled_loader", "cancelled_receiver", "disputed", "resolved_loader_wins", "resolved_receiver_wins", "resolved_mutual"].includes(order.status);
+  const terminalStatuses = ["completed", "closed_no_payment", "cancelled_auto", "cancelled_loader", "cancelled_receiver", "disputed", "resolved_loader_wins", "resolved_receiver_wins", "resolved_mutual"];
+  const canCancel = order && !terminalStatuses.includes(order.status) && !(isReceiver && order.loaderMarkedPaymentSent);
   const canDispute = order && ["payment_details_sent", "payment_sent"].includes(order.status);
+  const isTerminalState = order && terminalStatuses.includes(order.status);
 
   if (isLoading) {
     return (
@@ -356,6 +416,185 @@ export default function LoaderOrderPage() {
               <CheckCircle2 className="h-8 w-8 text-green-600 mx-auto mb-2" />
               <p className="font-semibold text-green-600">Payment Details Exchanged</p>
               <p className="text-sm text-muted-foreground">Countdown stopped. Proceed with the transaction.</p>
+            </CardContent>
+          </Card>
+        )}
+
+        {order.status === "awaiting_liability_confirmation" && (
+          <Card className="mb-4 border-amber-500/50 bg-amber-500/5">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base flex items-center gap-2">
+                <Shield className="h-5 w-5 text-amber-600" />
+                Liability Terms Selection
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="p-3 bg-amber-100 dark:bg-amber-900/30 rounded-lg text-sm">
+                <p className="font-medium text-amber-800 dark:text-amber-200">
+                  Receiver must select liability terms before funds are sent.
+                </p>
+              </div>
+
+              {isReceiver && !order.liabilityLockedAt && (
+                <div className="space-y-4">
+                  <div className="space-y-3">
+                    <label className="flex items-start gap-3 p-3 border rounded-lg cursor-pointer hover:bg-muted/50 transition-colors">
+                      <input
+                        type="radio"
+                        name="liability"
+                        value="full_payment"
+                        checked={selectedLiability === "full_payment" || order.liabilityType === "full_payment"}
+                        onChange={(e) => setSelectedLiability(e.target.value)}
+                        className="mt-1"
+                        disabled={!!order.liabilityType}
+                        data-testid="radio-full-payment"
+                      />
+                      <div>
+                        <p className="font-medium">Option 1 — Full Payment</p>
+                        <p className="text-sm text-muted-foreground">
+                          I will pay the full deal amount even if the assets are frozen, delayed, or unusable.
+                        </p>
+                      </div>
+                    </label>
+
+                    <div className="border rounded-lg p-3">
+                      <p className="font-medium mb-2">Option 2 — Partial Payment</p>
+                      <p className="text-sm text-muted-foreground mb-3">
+                        If the assets are frozen or unusable, I agree to pay a percentage of the deal amount.
+                      </p>
+                      <div className="flex gap-2 flex-wrap">
+                        {["partial_10", "partial_25", "partial_50"].map((val) => (
+                          <label key={val} className="flex items-center gap-2 p-2 border rounded cursor-pointer hover:bg-muted/50">
+                            <input
+                              type="radio"
+                              name="liability"
+                              value={val}
+                              checked={selectedLiability === val || order.liabilityType === val}
+                              onChange={(e) => setSelectedLiability(e.target.value)}
+                              disabled={!!order.liabilityType}
+                              data-testid={`radio-${val}`}
+                            />
+                            <span>{val.split("_")[1]}%</span>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="border rounded-lg p-3">
+                      <p className="font-medium mb-2">Option 3 — Time-Bound Temporary Freeze</p>
+                      <p className="text-sm text-muted-foreground mb-3">
+                        If assets are temporarily frozen, I agree to wait. If assets are usable before the deadline, I will pay in full. If still frozen at deadline, the deal closes with no payment.
+                      </p>
+                      <div className="flex gap-2 flex-wrap">
+                        {[
+                          { val: "time_bound_24h", label: "24 hours" },
+                          { val: "time_bound_48h", label: "48 hours" },
+                          { val: "time_bound_72h", label: "72 hours" },
+                          { val: "time_bound_1week", label: "1 week" },
+                          { val: "time_bound_1month", label: "1 month" },
+                        ].map(({ val, label }) => (
+                          <label key={val} className="flex items-center gap-2 p-2 border rounded cursor-pointer hover:bg-muted/50">
+                            <input
+                              type="radio"
+                              name="liability"
+                              value={val}
+                              checked={selectedLiability === val || order.liabilityType === val}
+                              onChange={(e) => setSelectedLiability(e.target.value)}
+                              disabled={!!order.liabilityType}
+                              data-testid={`radio-${val}`}
+                            />
+                            <span>{label}</span>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+
+                  {!order.liabilityType && selectedLiability && (
+                    <Button
+                      className="w-full"
+                      onClick={() => selectLiabilityMutation.mutate(selectedLiability)}
+                      disabled={selectLiabilityMutation.isPending}
+                      data-testid="button-select-liability"
+                    >
+                      {selectLiabilityMutation.isPending ? (
+                        <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                      ) : null}
+                      Confirm Liability Selection
+                    </Button>
+                  )}
+                </div>
+              )}
+
+              {order.liabilityType && (
+                <div className="space-y-4">
+                  <div className="p-3 bg-muted rounded-lg">
+                    <p className="text-sm font-medium">Selected Liability Terms:</p>
+                    <p className="text-sm text-muted-foreground">
+                      {order.liabilityType === "full_payment" && "Full Payment - Pay full amount even if assets are frozen"}
+                      {order.liabilityType?.startsWith("partial_") && `Partial Payment - ${order.liabilityType.split("_")[1]}% if assets are frozen`}
+                      {order.liabilityType?.startsWith("time_bound_") && `Time-Bound - Wait ${order.liabilityType.replace("time_bound_", "").replace("h", " hours").replace("week", " week").replace("month", " month")}`}
+                    </p>
+                  </div>
+
+                  <div className="border-t pt-4">
+                    <div className="flex items-center gap-2 mb-4">
+                      <CheckCircle2 className={`h-5 w-5 ${order.receiverLiabilityConfirmed ? "text-green-600" : "text-muted-foreground"}`} />
+                      <span className={order.receiverLiabilityConfirmed ? "text-green-600" : ""}>
+                        Receiver {order.receiverLiabilityConfirmed ? "Confirmed" : "Pending"}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2 mb-4">
+                      <CheckCircle2 className={`h-5 w-5 ${order.loaderLiabilityConfirmed ? "text-green-600" : "text-muted-foreground"}`} />
+                      <span className={order.loaderLiabilityConfirmed ? "text-green-600" : ""}>
+                        Loader {order.loaderLiabilityConfirmed ? "Confirmed" : "Pending"}
+                      </span>
+                    </div>
+                  </div>
+
+                  {((isReceiver && !order.receiverLiabilityConfirmed) || (isLoader && !order.loaderLiabilityConfirmed)) && (
+                    <div className="space-y-3">
+                      <label className="flex items-start gap-3 p-3 border border-destructive/50 rounded-lg">
+                        <input
+                          type="checkbox"
+                          checked={liabilityConfirmChecked}
+                          onChange={(e) => setLiabilityConfirmChecked(e.target.checked)}
+                          className="mt-1"
+                          data-testid="checkbox-liability-confirm"
+                        />
+                        <div>
+                          <p className="text-sm font-medium text-destructive">Mandatory Confirmation</p>
+                          <p className="text-sm text-muted-foreground">
+                            I understand this decision is final and cannot be changed later.
+                          </p>
+                        </div>
+                      </label>
+
+                      <Button
+                        className="w-full"
+                        onClick={() => confirmLiabilityMutation.mutate()}
+                        disabled={!liabilityConfirmChecked || confirmLiabilityMutation.isPending}
+                        data-testid="button-confirm-liability"
+                      >
+                        {confirmLiabilityMutation.isPending ? (
+                          <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                        ) : (
+                          <CheckCircle2 className="h-4 w-4 mr-2" />
+                        )}
+                        I Agree - Confirm Liability Terms
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {isLoader && !order.liabilityType && (
+                <div className="p-3 bg-muted rounded-lg text-center">
+                  <p className="text-sm text-muted-foreground">
+                    Waiting for receiver to select liability terms...
+                  </p>
+                </div>
+              )}
             </CardContent>
           </Card>
         )}

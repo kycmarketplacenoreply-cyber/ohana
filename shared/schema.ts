@@ -36,10 +36,13 @@ export const countdownTimeEnum = pgEnum("countdown_time", [
 
 export const loaderOrderStatusEnum = pgEnum("loader_order_status", [
   "created",
+  "awaiting_liability_confirmation",
   "awaiting_payment_details",
   "payment_details_sent",
   "payment_sent",
+  "asset_frozen_waiting",
   "completed",
+  "closed_no_payment",
   "cancelled_auto",
   "cancelled_loader",
   "cancelled_receiver",
@@ -810,6 +813,11 @@ export const loaderOrders = pgTable("loader_orders", {
   receiverSentPaymentDetails: boolean("receiver_sent_payment_details").notNull().default(false),
   loaderMarkedPaymentSent: boolean("loader_marked_payment_sent").notNull().default(false),
   receiverConfirmedPayment: boolean("receiver_confirmed_payment").notNull().default(false),
+  liabilityType: liabilityTypeEnum("liability_type"),
+  receiverLiabilityConfirmed: boolean("receiver_liability_confirmed").notNull().default(false),
+  loaderLiabilityConfirmed: boolean("loader_liability_confirmed").notNull().default(false),
+  liabilityLockedAt: timestamp("liability_locked_at"),
+  liabilityDeadline: timestamp("liability_deadline"),
   cancelledBy: varchar("cancelled_by").references(() => users.id),
   cancelReason: text("cancel_reason"),
   loaderFeeDeducted: numeric("loader_fee_deducted", { precision: 18, scale: 2 }).default("0"),
@@ -907,8 +915,6 @@ export const insertLoaderAdSchema = createInsertSchema(loaderAds).omit({
   id: true,
   createdAt: true,
   updatedAt: true,
-  frozenCommitment: true,
-  loaderFeeReserve: true,
   isActive: true,
 });
 

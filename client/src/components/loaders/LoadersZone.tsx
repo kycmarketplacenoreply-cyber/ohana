@@ -223,10 +223,13 @@ export default function LoadersZone() {
 
   const getStatusBadge = (status: string) => {
     const statusMap: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
+      awaiting_liability_confirmation: { label: "Select Terms", variant: "outline" },
       awaiting_payment_details: { label: "Awaiting Details", variant: "outline" },
       payment_details_sent: { label: "Details Sent", variant: "default" },
       payment_sent: { label: "Payment Sent", variant: "default" },
+      asset_frozen_waiting: { label: "Frozen - Waiting", variant: "secondary" },
       completed: { label: "Completed", variant: "default" },
+      closed_no_payment: { label: "Closed", variant: "secondary" },
       cancelled_auto: { label: "Auto-Cancelled", variant: "secondary" },
       cancelled_loader: { label: "Cancelled by Loader", variant: "destructive" },
       cancelled_receiver: { label: "Cancelled by Receiver", variant: "destructive" },

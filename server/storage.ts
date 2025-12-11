@@ -220,7 +220,7 @@ export interface IStorage {
   getLoaderAd(id: string): Promise<LoaderAd | undefined>;
   getLoaderAdsByLoader(loaderId: string): Promise<LoaderAd[]>;
   getActiveLoaderAds(): Promise<any[]>;
-  createLoaderAd(ad: InsertLoaderAd & { frozenCommitment: string }): Promise<LoaderAd>;
+  createLoaderAd(ad: InsertLoaderAd): Promise<LoaderAd>;
   updateLoaderAd(id: string, updates: Partial<LoaderAd>): Promise<LoaderAd | undefined>;
   deactivateLoaderAd(id: string): Promise<void>;
 
@@ -1079,7 +1079,7 @@ export class DatabaseStorage implements IStorage {
     return ads;
   }
 
-  async createLoaderAd(ad: InsertLoaderAd & { frozenCommitment: string }): Promise<LoaderAd> {
+  async createLoaderAd(ad: InsertLoaderAd): Promise<LoaderAd> {
     const [newAd] = await db.insert(loaderAds).values(ad).returning();
     return newAd;
   }
@@ -1186,7 +1186,10 @@ export class DatabaseStorage implements IStorage {
       .from(loaderOrders)
       .where(
         and(
-          eq(loaderOrders.status, "awaiting_payment_details"),
+          or(
+            eq(loaderOrders.status, "awaiting_payment_details"),
+            eq(loaderOrders.status, "awaiting_liability_confirmation")
+          ),
           eq(loaderOrders.countdownStopped, false),
           lte(loaderOrders.countdownExpiresAt, new Date())
         )

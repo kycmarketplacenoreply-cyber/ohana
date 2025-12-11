@@ -2736,7 +2736,7 @@ export async function registerRoutes(
       };
       const expiresAt = new Date(Date.now() + (countdownMs[ad.countdownTime || "30min"] || 30 * 60 * 1000));
 
-      // Create order with new flow
+      // Create order with new flow - start with liability confirmation
       const order = await storage.createLoaderOrder({
         adId: ad.id,
         loaderId: ad.loaderId,
@@ -2746,7 +2746,7 @@ export async function registerRoutes(
         loaderFeeReserve: (dealAmount * 0.03).toString(),
         receiverFrozenAmount: upfrontRequired.toString(),
         receiverFeeReserve: receiverFeeReserve.toString(),
-        status: "awaiting_payment_details",
+        status: "awaiting_liability_confirmation",
         countdownTime: ad.countdownTime || "30min",
         countdownExpiresAt: expiresAt,
       });
@@ -2759,7 +2759,7 @@ export async function registerRoutes(
         orderId: order.id,
         senderId: null,
         isSystem: true,
-        content: `Deal started! Countdown: ${ad.countdownTime || "30min"}. Either party must send payment details before the countdown expires, or the deal will auto-cancel.`,
+        content: `Deal accepted! Receiver must select liability terms before funds are sent. Both parties must confirm the agreement to proceed.`,
       });
 
       res.json(order);
@@ -3597,6 +3597,163 @@ export async function registerRoutes(
       });
 
       res.json(message);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Receiver selects liability terms
+  app.post("/api/loaders/orders/:id/select-liability", requireAuth, async (req: AuthRequest, res) => {
+    try {
+      const { liabilityType } = req.body;
+      
+      const validTypes = [
+        "full_payment",
+        "partial_10", "partial_25", "partial_50",
+        "time_bound_24h", "time_bound_48h", "time_bound_72h", "time_bound_1week", "time_bound_1month"
+      ];
+      
+      if (!validTypes.includes(liabilityType)) {
+        return res.status(400).json({ message: "Invalid liability type" });
+      }
+
+      const order = await storage.getLoaderOrder(req.params.id);
+      if (!order) {
+        return res.status(404).json({ message: "Order not found" });
+      }
+
+      if (order.receiverId !== req.user!.userId) {
+        return res.status(403).json({ message: "Only receiver can select liability terms" });
+      }
+
+      if (order.status !== "awaiting_liability_confirmation") {
+        return res.status(400).json({ message: "Liability terms can only be selected in awaiting_liability_confirmation status" });
+      }
+
+      if (order.liabilityLockedAt) {
+        return res.status(400).json({ message: "Liability agreement is already locked" });
+      }
+
+      await storage.updateLoaderOrder(order.id, {
+        liabilityType,
+        receiverLiabilityConfirmed: false,
+        loaderLiabilityConfirmed: false,
+      });
+
+      const liabilityLabels: Record<string, string> = {
+        "full_payment": "Full Payment (pay full amount even if assets frozen)",
+        "partial_10": "Partial Payment (10% if assets frozen)",
+        "partial_25": "Partial Payment (25% if assets frozen)",
+        "partial_50": "Partial Payment (50% if assets frozen)",
+        "time_bound_24h": "Time-Bound (wait 24 hours)",
+        "time_bound_48h": "Time-Bound (wait 48 hours)",
+        "time_bound_72h": "Time-Bound (wait 72 hours)",
+        "time_bound_1week": "Time-Bound (wait 1 week)",
+        "time_bound_1month": "Time-Bound (wait 1 month)",
+      };
+
+      await storage.createLoaderOrderMessage({
+        orderId: order.id,
+        senderId: null,
+        isSystem: true,
+        content: `Receiver selected liability terms: ${liabilityLabels[liabilityType]}. Both parties must confirm to lock the agreement.`,
+      });
+
+      res.json({ message: "Liability terms selected. Both parties must now confirm." });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Confirm liability agreement (both parties must confirm)
+  app.post("/api/loaders/orders/:id/confirm-liability", requireAuth, async (req: AuthRequest, res) => {
+    try {
+      const order = await storage.getLoaderOrder(req.params.id);
+      if (!order) {
+        return res.status(404).json({ message: "Order not found" });
+      }
+
+      const isLoader = order.loaderId === req.user!.userId;
+      const isReceiver = order.receiverId === req.user!.userId;
+      
+      if (!isLoader && !isReceiver) {
+        return res.status(403).json({ message: "Not authorized" });
+      }
+
+      if (order.status !== "awaiting_liability_confirmation") {
+        return res.status(400).json({ message: "Cannot confirm liability in current status" });
+      }
+
+      if (!order.liabilityType) {
+        return res.status(400).json({ message: "Receiver must select liability terms first" });
+      }
+
+      if (order.liabilityLockedAt) {
+        return res.status(400).json({ message: "Liability agreement is already locked" });
+      }
+
+      const updates: any = {};
+      
+      if (isReceiver) {
+        if (order.receiverLiabilityConfirmed) {
+          return res.status(400).json({ message: "You have already confirmed" });
+        }
+        updates.receiverLiabilityConfirmed = true;
+      } else {
+        if (order.loaderLiabilityConfirmed) {
+          return res.status(400).json({ message: "You have already confirmed" });
+        }
+        updates.loaderLiabilityConfirmed = true;
+      }
+
+      await storage.updateLoaderOrder(order.id, updates);
+
+      const confirmer = isLoader ? "Loader" : "Receiver";
+      await storage.createLoaderOrderMessage({
+        orderId: order.id,
+        senderId: null,
+        isSystem: true,
+        content: `${confirmer} confirmed liability agreement.`,
+      });
+
+      // Check if both have confirmed
+      const updatedOrder = await storage.getLoaderOrder(order.id);
+      if (updatedOrder && 
+          (updatedOrder.receiverLiabilityConfirmed || (isReceiver && updates.receiverLiabilityConfirmed)) && 
+          (updatedOrder.loaderLiabilityConfirmed || (isLoader && updates.loaderLiabilityConfirmed))) {
+        
+        // Calculate liability deadline for time-bound options
+        let liabilityDeadline = null;
+        if (order.liabilityType?.startsWith("time_bound_")) {
+          const timeMs: Record<string, number> = {
+            "time_bound_24h": 24 * 60 * 60 * 1000,
+            "time_bound_48h": 48 * 60 * 60 * 1000,
+            "time_bound_72h": 72 * 60 * 60 * 1000,
+            "time_bound_1week": 7 * 24 * 60 * 60 * 1000,
+            "time_bound_1month": 30 * 24 * 60 * 60 * 1000,
+          };
+          liabilityDeadline = new Date(Date.now() + (timeMs[order.liabilityType] || 0));
+        }
+
+        await storage.updateLoaderOrder(order.id, {
+          liabilityLockedAt: new Date(),
+          liabilityDeadline,
+          status: "awaiting_payment_details",
+          receiverLiabilityConfirmed: true,
+          loaderLiabilityConfirmed: true,
+        });
+
+        await storage.createLoaderOrderMessage({
+          orderId: order.id,
+          senderId: null,
+          isSystem: true,
+          content: `Liability agreement locked! Both parties confirmed. Loader can now proceed to send funds. Countdown is active.`,
+        });
+
+        return res.json({ message: "Liability agreement locked. Order proceeding to payment details phase.", locked: true });
+      }
+
+      res.json({ message: "Confirmation recorded. Waiting for other party to confirm.", locked: false });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
