@@ -398,11 +398,16 @@ export async function registerRoutes(
     }
   });
 
-  // Create offer - allows any KYC verified user with 2FA enabled to post ads
+  // Create offer - allows any KYC verified user with 2FA enabled to post ads (admin cannot post)
   app.post("/api/vendor/offers", requireAuth, async (req: AuthRequest, res) => {
     try {
-      // Check if user is frozen
+      // Check if user is admin - admin cannot post ads, only monitor
       const user = await storage.getUser(req.user!.userId);
+      if (user?.role === "admin" || user?.role === "dispute_admin") {
+        return res.status(403).json({ message: "Admin accounts cannot post ads. Admins are for platform monitoring only." });
+      }
+
+      // Check if user is frozen
       if (user?.isFrozen) {
         return res.status(403).json({ message: "Your account is frozen. You cannot post ads until your account is unfrozen." });
       }
@@ -2070,9 +2075,15 @@ export async function registerRoutes(
     return urlPattern.test(text);
   };
 
-  // Create post
+  // Create post (admin cannot post)
   app.post("/api/social/posts", requireAuth, async (req: AuthRequest, res) => {
     try {
+      // Check if user is admin - admin cannot post, only monitor
+      const user = await storage.getUser(req.user!.userId);
+      if (user?.role === "admin" || user?.role === "dispute_admin") {
+        return res.status(403).json({ message: "Admin accounts cannot create posts. Admins are for platform monitoring only." });
+      }
+
       const isMuted = await storage.isUserMuted(req.user!.userId);
       if (isMuted) {
         return res.status(403).json({ message: "You are muted from the social feed" });
@@ -2576,9 +2587,15 @@ export async function registerRoutes(
     }
   });
 
-  // Create loader ad
+  // Create loader ad (admin cannot post)
   app.post("/api/loaders/ads", requireAuth, async (req: AuthRequest, res) => {
     try {
+      // Check if user is admin - admin cannot post loader ads, only monitor
+      const user = await storage.getUser(req.user!.userId);
+      if (user?.role === "admin" || user?.role === "dispute_admin") {
+        return res.status(403).json({ message: "Admin accounts cannot post loader ads. Admins are for platform monitoring only." });
+      }
+
       const { assetType, dealAmount, loadingTerms, upfrontPercentage, paymentMethods, countdownTime } = req.body;
       
       if (!assetType || !dealAmount || !paymentMethods || paymentMethods.length === 0) {
