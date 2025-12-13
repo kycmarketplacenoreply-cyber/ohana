@@ -76,9 +76,27 @@ export default function LoadersZone() {
   
   const [dealAmount, setDealAmount] = useState("");
   const [loadingTerms, setLoadingTerms] = useState("");
-  const [upfrontPercentage, setUpfrontPercentage] = useState("0");
+  const [upfrontPercentage, setUpfrontPercentage] = useState("");
   const [countdownTime, setCountdownTime] = useState("30min");
   const [paymentMethodsInput, setPaymentMethodsInput] = useState("");
+
+  const handleDealAmountChange = (value: string) => {
+    const num = parseFloat(value);
+    if (value === "" || (num >= 0)) {
+      setDealAmount(value);
+    }
+  };
+
+  const handleUpfrontPercentageChange = (value: string) => {
+    if (value === "") {
+      setUpfrontPercentage("");
+      return;
+    }
+    const num = parseInt(value);
+    if (!isNaN(num) && num >= 0 && num <= 100) {
+      setUpfrontPercentage(value);
+    }
+  };
 
   const { data: wallet } = useQuery<Wallet>({
     queryKey: ["wallet"],
@@ -125,7 +143,7 @@ export default function LoadersZone() {
           assetType: "USD",
           dealAmount: parseFloat(dealAmount),
           loadingTerms,
-          upfrontPercentage: parseInt(upfrontPercentage),
+          upfrontPercentage: upfrontPercentage ? parseInt(upfrontPercentage) : 0,
           countdownTime,
           paymentMethods,
         }),
@@ -143,7 +161,7 @@ export default function LoadersZone() {
       queryClient.invalidateQueries({ queryKey: ["wallet"] });
       setDealAmount("");
       setLoadingTerms("");
-      setUpfrontPercentage("0");
+      setUpfrontPercentage("");
       setCountdownTime("30min");
       setPaymentMethodsInput("");
       setActiveTab("active");
@@ -378,8 +396,9 @@ export default function LoadersZone() {
                 <Input 
                   id="dealAmount" 
                   type="number" 
+                  min="0"
                   value={dealAmount} 
-                  onChange={(e) => setDealAmount(e.target.value)}
+                  onChange={(e) => handleDealAmountChange(e.target.value)}
                   placeholder="Enter amount"
                   data-testid="input-deal-amount"
                 />
@@ -411,12 +430,12 @@ export default function LoadersZone() {
                   min="0" 
                   max="100"
                   value={upfrontPercentage} 
-                  onChange={(e) => setUpfrontPercentage(e.target.value)}
-                  placeholder="0 for no upfront requirement"
+                  onChange={(e) => handleUpfrontPercentageChange(e.target.value)}
+                  placeholder="0-100"
                   data-testid="input-upfront"
                 />
                 <p className="text-xs text-muted-foreground mt-1">
-                  Set 0 if no upfront is required from receiver
+                  Enter 0-100%. Leave empty or set 0 if no upfront is required from receiver
                 </p>
               </div>
 

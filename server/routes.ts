@@ -2606,8 +2606,17 @@ export async function registerRoutes(
       const selectedCountdown = countdownTime && validCountdownTimes.includes(countdownTime) ? countdownTime : "30min";
 
       const amount = parseFloat(dealAmount);
+      if (isNaN(amount) || amount < 0) {
+        return res.status(400).json({ message: "Deal amount cannot be negative" });
+      }
       if (amount <= 0) {
         return res.status(400).json({ message: "Deal amount must be greater than 0" });
+      }
+
+      // Validate upfront percentage (0-100)
+      const upfrontPct = parseInt(upfrontPercentage) || 0;
+      if (upfrontPct < 0 || upfrontPct > 100) {
+        return res.status(400).json({ message: "Upfront percentage must be between 0 and 100" });
       }
 
       // Check wallet balance (need 10% collateral + 3% fee reserve = 13% total)
@@ -2636,7 +2645,7 @@ export async function registerRoutes(
         assetType,
         dealAmount: amount.toString(),
         loadingTerms: loadingTerms || null,
-        upfrontPercentage: upfrontPercentage || 0,
+        upfrontPercentage: upfrontPct,
         countdownTime: selectedCountdown,
         paymentMethods,
         frozenCommitment: collateral.toString(),
