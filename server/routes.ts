@@ -2783,6 +2783,11 @@ export async function registerRoutes(
         return res.status(400).json({ message: "Cannot accept your own ad" });
       }
 
+      const receiver = await storage.getUser(req.user!.userId);
+      if (!receiver?.twoFactorEnabled) {
+        return res.status(400).json({ message: "Two-factor authentication must be enabled to accept deals. Please enable 2FA in Settings." });
+      }
+
       const dealAmount = parseFloat(ad.dealAmount);
       const upfrontRequired = (dealAmount * (ad.upfrontPercentage || 0)) / 100;
       const receiverFeeReserve = dealAmount * 0.02; // 2% platform fee from receiver

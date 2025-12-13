@@ -33,6 +33,7 @@ import {
   DollarSign,
   BadgeCheck,
   Loader2,
+  Flag,
 } from "lucide-react";
 
 interface DisputeStats {
@@ -564,9 +565,17 @@ export default function DisputeAdminPage() {
                               <Badge className="bg-orange-600 text-xs">{dispute.status}</Badge>
                             </div>
                             <p className="text-gray-600 dark:text-gray-400 text-sm line-clamp-2">{dispute.reason}</p>
-                            <p className="text-gray-600 dark:text-gray-500 text-xs mt-1">
-                              ${dispute.order?.dealAmount || "0"} • {new Date(dispute.createdAt).toLocaleDateString()}
-                            </p>
+                            <div className="flex items-center justify-between mt-1">
+                              <p className="text-gray-600 dark:text-gray-500 text-xs">
+                                ${dispute.order?.dealAmount || "0"} • {new Date(dispute.createdAt).toLocaleDateString()}
+                              </p>
+                              {dispute.openerUsername && (
+                                <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-amber-500 text-amber-600 dark:text-amber-400">
+                                  <Flag className="h-2 w-2 mr-1" />
+                                  {dispute.openerUsername}
+                                </Badge>
+                              )}
+                            </div>
                           </div>
                         ))}
                       </div>
@@ -639,7 +648,15 @@ export default function DisputeAdminPage() {
                               </div>
                             </div>
                             <div className="p-3 bg-purple-100 dark:bg-purple-900/30 border border-purple-300 dark:border-purple-700 rounded-lg">
-                              <p className="text-purple-700 dark:text-purple-300 text-sm font-medium mb-1">Dispute Reason</p>
+                              <div className="flex items-center justify-between mb-2">
+                                <p className="text-purple-700 dark:text-purple-300 text-sm font-medium">Dispute Reason</p>
+                                {loaderDisputeDetails.dispute.openedBy && (
+                                  <Badge className="bg-amber-600 text-xs flex items-center gap-1">
+                                    <Flag className="h-3 w-3" />
+                                    Opened by: {loaderDisputeDetails.dispute.openedBy === loaderDisputeDetails.order.loaderId ? loaderDisputeDetails.loader?.username : loaderDisputeDetails.receiver?.username}
+                                  </Badge>
+                                )}
+                              </div>
                               <p className="text-gray-900 dark:text-white text-sm">{loaderDisputeDetails.dispute.reason}</p>
                               <p className="text-gray-600 dark:text-gray-400 text-xs mt-2">Deal: <span className="text-gray-900 dark:text-white font-bold">${parseFloat(loaderDisputeDetails.order.dealAmount).toFixed(2)}</span></p>
                             </div>
@@ -700,20 +717,114 @@ export default function DisputeAdminPage() {
                       {[1, 2, 3].map((i) => <Skeleton key={i} className="h-20 bg-gray-200 dark:bg-gray-700" />)}
                     </div>
                   ) : resolvedLoaderDisputes && resolvedLoaderDisputes.length > 0 ? (
-                    <div className="space-y-3 max-h-[400px] overflow-y-auto">
-                      {resolvedLoaderDisputes.map((dispute: any) => (
-                        <div key={dispute.id} className="p-3 rounded-lg bg-gray-200 dark:bg-gray-700" data-testid={`loader-resolved-dispute-${dispute.id}`}>
-                          <div className="flex items-center justify-between mb-2">
-                            <span className="text-gray-900 dark:text-white font-medium text-sm">Order #{dispute.orderId.slice(0, 8)}</span>
-                            <Badge className="bg-green-600 text-xs">{dispute.status}</Badge>
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                      <div className="space-y-3 max-h-[400px] overflow-y-auto">
+                        {resolvedLoaderDisputes.map((dispute: any) => (
+                          <div 
+                            key={dispute.id} 
+                            className={`p-3 rounded-lg cursor-pointer transition-colors ${
+                              selectedLoaderDispute === dispute.id
+                                ? "bg-green-900/50 border border-green-600"
+                                : "bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600"
+                            }`}
+                            onClick={() => setSelectedLoaderDispute(dispute.id)}
+                            data-testid={`loader-resolved-dispute-${dispute.id}`}
+                          >
+                            <div className="flex items-center justify-between mb-2">
+                              <span className="text-gray-900 dark:text-white font-medium text-sm">Order #{dispute.orderId.slice(0, 8)}</span>
+                              <Badge className="bg-green-600 text-xs">{dispute.status}</Badge>
+                            </div>
+                            <p className="text-gray-600 dark:text-gray-400 text-sm line-clamp-2">{dispute.reason}</p>
+                            <div className="flex items-center justify-between mt-1">
+                              <p className="text-gray-600 dark:text-gray-500 text-xs">
+                                ${dispute.order?.dealAmount || "0"} • {dispute.resolvedAt ? new Date(dispute.resolvedAt).toLocaleDateString() : "N/A"}
+                              </p>
+                              {dispute.openerUsername && (
+                                <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-amber-500 text-amber-600 dark:text-amber-400">
+                                  <Flag className="h-2 w-2 mr-1" />
+                                  {dispute.openerUsername}
+                                </Badge>
+                              )}
+                            </div>
+                            {dispute.resolverName && (
+                              <p className="text-gray-500 text-xs mt-1">Resolved by {dispute.resolverName}</p>
+                            )}
                           </div>
-                          <p className="text-gray-600 dark:text-gray-400 text-sm line-clamp-2">{dispute.reason}</p>
-                          <p className="text-gray-600 dark:text-gray-500 text-xs mt-1">
-                            ${dispute.order?.dealAmount || "0"} • Resolved: {dispute.resolvedAt ? new Date(dispute.resolvedAt).toLocaleDateString() : "N/A"}
-                            {dispute.resolverName && ` by ${dispute.resolverName}`}
-                          </p>
-                        </div>
-                      ))}
+                        ))}
+                      </div>
+                      
+                      <div className="lg:col-span-2">
+                        {!selectedLoaderDispute ? (
+                          <div className="text-center py-12 bg-gray-200 dark:bg-gray-700/50 rounded-lg">
+                            <Eye className="h-16 w-16 text-gray-400 dark:text-gray-500 mx-auto mb-4" />
+                            <p className="text-gray-600 dark:text-gray-400">Select a resolved dispute to review details</p>
+                          </div>
+                        ) : loaderDetailsLoading ? (
+                          <div className="space-y-4">
+                            <Skeleton className="h-32 bg-gray-200 dark:bg-gray-700" />
+                            <Skeleton className="h-64 bg-gray-200 dark:bg-gray-700" />
+                          </div>
+                        ) : loaderDisputeDetails ? (
+                          <div className="space-y-4 bg-gray-200 dark:bg-gray-700/50 rounded-lg p-4">
+                            <div className="p-3 bg-green-100 dark:bg-green-900/30 border border-green-300 dark:border-green-700 rounded-lg">
+                              <p className="text-green-700 dark:text-green-300 text-sm font-medium mb-1">Resolution</p>
+                              <p className="text-gray-900 dark:text-white text-sm">{loaderDisputeDetails.dispute.status.replace(/_/g, " ").replace(/^\w/, (c: string) => c.toUpperCase())}</p>
+                            </div>
+                            <div className="grid grid-cols-2 gap-4">
+                              <div className="p-3 bg-gray-100 dark:bg-gray-800 rounded-lg">
+                                <p className="text-gray-400 text-sm flex items-center gap-1 mb-2">
+                                  <User className="h-4 w-4" /> Loader
+                                </p>
+                                <p className="text-gray-900 dark:text-white font-bold">{loaderDisputeDetails.loader?.username || "Unknown"}</p>
+                              </div>
+                              <div className="p-3 bg-gray-100 dark:bg-gray-800 rounded-lg">
+                                <p className="text-gray-400 text-sm flex items-center gap-1 mb-2">
+                                  <User className="h-4 w-4" /> Receiver
+                                </p>
+                                <p className="text-gray-900 dark:text-white font-bold">{loaderDisputeDetails.receiver?.username || "Unknown"}</p>
+                              </div>
+                            </div>
+                            <div className="p-3 bg-purple-100 dark:bg-purple-900/30 border border-purple-300 dark:border-purple-700 rounded-lg">
+                              <div className="flex items-center justify-between mb-2">
+                                <p className="text-purple-700 dark:text-purple-300 text-sm font-medium">Dispute Reason</p>
+                                {loaderDisputeDetails.dispute.openedBy && (
+                                  <Badge className="bg-amber-600 text-xs flex items-center gap-1">
+                                    <Flag className="h-3 w-3" />
+                                    Opened by: {loaderDisputeDetails.dispute.openedBy === loaderDisputeDetails.order.loaderId ? loaderDisputeDetails.loader?.username : loaderDisputeDetails.receiver?.username}
+                                  </Badge>
+                                )}
+                              </div>
+                              <p className="text-gray-900 dark:text-white text-sm">{loaderDisputeDetails.dispute.reason}</p>
+                              <p className="text-gray-600 dark:text-gray-400 text-xs mt-2">Deal: <span className="text-gray-900 dark:text-white font-bold">${parseFloat(loaderDisputeDetails.order.dealAmount).toFixed(2)}</span></p>
+                            </div>
+                            <div className="bg-gray-100 dark:bg-gray-800 rounded-lg p-3">
+                              <p className="text-gray-900 dark:text-white font-medium mb-2 flex items-center gap-2 text-sm">
+                                <MessageCircle className="h-4 w-4" /> Chat History
+                              </p>
+                              <div className="h-32 overflow-y-auto space-y-2 p-2 bg-gray-200 dark:bg-gray-900 rounded">
+                                {loaderDisputeDetails.chatMessages.length > 0 ? (
+                                  loaderDisputeDetails.chatMessages.map((msg) => {
+                                    const isAdmin = msg.senderRole === "admin" || msg.senderRole === "dispute_admin";
+                                    const isLoaderMsg = msg.senderId === loaderDisputeDetails.order.loaderId;
+                                    const senderLabel = msg.senderName || (isLoaderMsg ? loaderDisputeDetails.loader?.username : loaderDisputeDetails.receiver?.username) || "Unknown";
+                                    return (
+                                      <div key={msg.id} className="text-xs p-2 bg-gray-300 dark:bg-gray-800/50 rounded">
+                                        <div className="flex items-center gap-2 mb-1">
+                                          <span className={`font-medium ${isAdmin ? "text-purple-600 dark:text-purple-400" : isLoaderMsg ? "text-blue-600 dark:text-blue-400" : "text-green-600 dark:text-green-400"}`}>{senderLabel}</span>
+                                          {isAdmin && <span className="flex items-center gap-1 px-1 py-0.5 bg-purple-600/20 rounded text-xs text-purple-700 dark:text-purple-300"><BadgeCheck className="h-2 w-2" />Admin</span>}
+                                          {!isAdmin && <span className={`px-1 py-0.5 rounded text-xs ${isLoaderMsg ? "bg-blue-600/20 text-blue-700 dark:text-blue-300" : "bg-green-600/20 text-green-700 dark:text-green-300"}`}>{isLoaderMsg ? "Loader" : "Receiver"}</span>}
+                                          <span className="text-gray-500 text-xs ml-auto">{new Date(msg.createdAt).toLocaleTimeString()}</span>
+                                        </div>
+                                        <p className="text-gray-900 dark:text-white">{msg.content}</p>
+                                      </div>
+                                    );
+                                  })
+                                ) : <p className="text-gray-500 text-center py-2 text-xs">No messages</p>}
+                              </div>
+                            </div>
+                          </div>
+                        ) : null}
+                      </div>
                     </div>
                   ) : (
                     <div className="text-center py-16">

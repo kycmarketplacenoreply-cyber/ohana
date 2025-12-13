@@ -1207,57 +1207,111 @@ export default function LoaderOrderPage() {
           </Card>
         )}
 
-        <Card>
-          <CardHeader className="pb-2">
+        <Card className="border-2">
+          <CardHeader className="pb-3 border-b bg-muted/30">
             <CardTitle className="text-base flex items-center gap-2">
-              <MessageCircle className="h-5 w-5" />
+              <MessageCircle className="h-5 w-5 text-primary" />
               Order Chat
+              <Badge variant="outline" className="ml-auto text-xs">
+                {messages?.length || 0} messages
+              </Badge>
             </CardTitle>
           </CardHeader>
-          <CardContent>
-            <ScrollArea className="h-64 mb-4 border rounded-lg p-3">
-              {messages?.map((msg) => (
-                <div
-                  key={msg.id}
-                  className={`mb-3 ${msg.isSystem ? "text-center" : msg.senderId === currentUser?.id ? "text-right" : ""}`}
-                >
-                  {msg.isSystem ? (
-                    <div className={`inline-block px-3 py-2 rounded-lg text-sm ${msg.isAdminMessage ? "bg-amber-500/20 text-amber-700" : "bg-muted text-muted-foreground"}`}>
-                      {msg.isAdminMessage && <AlertCircle className="h-3 w-3 inline mr-1" />}
-                      {msg.content}
+          <CardContent className="p-0">
+            <ScrollArea className="h-80 p-4">
+              <div className="space-y-4">
+                {messages?.map((msg) => {
+                  const isOwnMessage = msg.senderId === currentUser?.id;
+                  const isLoaderMessage = msg.senderId === order?.loaderId;
+                  const isReceiverMessage = msg.senderId === order?.receiverId;
+                  
+                  if (msg.isSystem) {
+                    return (
+                      <div key={msg.id} className="flex justify-center my-3">
+                        <div className={`inline-flex items-center gap-2 px-4 py-2 rounded-full text-xs font-medium ${
+                          msg.isAdminMessage 
+                            ? "bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300 border border-amber-300 dark:border-amber-700" 
+                            : "bg-muted text-muted-foreground"
+                        }`}>
+                          {msg.isAdminMessage && <Shield className="h-3 w-3" />}
+                          {msg.content}
+                        </div>
+                      </div>
+                    );
+                  }
+                  
+                  return (
+                    <div
+                      key={msg.id}
+                      className={`flex items-end gap-2 ${isOwnMessage ? "flex-row-reverse" : "flex-row"}`}
+                    >
+                      <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold ${
+                        isLoaderMessage 
+                          ? "bg-blue-500 text-white" 
+                          : isReceiverMessage 
+                            ? "bg-green-500 text-white" 
+                            : "bg-gray-500 text-white"
+                      }`}>
+                        {msg.senderUsername?.slice(0, 2).toUpperCase() || "??"}
+                      </div>
+                      <div className={`max-w-[75%] ${isOwnMessage ? "items-end" : "items-start"}`}>
+                        <div className={`flex items-center gap-2 mb-1 ${isOwnMessage ? "flex-row-reverse" : "flex-row"}`}>
+                          <span className={`text-xs font-semibold ${
+                            isLoaderMessage ? "text-blue-600 dark:text-blue-400" : "text-green-600 dark:text-green-400"
+                          }`}>
+                            {msg.senderUsername}
+                          </span>
+                          <Badge variant="outline" className="text-[10px] px-1.5 py-0">
+                            {isLoaderMessage ? "Loader" : "Receiver"}
+                          </Badge>
+                        </div>
+                        <div className={`px-4 py-2.5 rounded-2xl shadow-sm ${
+                          isOwnMessage 
+                            ? "bg-primary text-primary-foreground rounded-br-md" 
+                            : "bg-muted border rounded-bl-md"
+                        }`}>
+                          <p className="text-sm whitespace-pre-wrap break-words">{msg.content}</p>
+                        </div>
+                        <p className={`text-[10px] text-muted-foreground mt-1 ${isOwnMessage ? "text-right" : "text-left"}`}>
+                          {new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        </p>
+                      </div>
                     </div>
-                  ) : (
-                    <div className={`inline-block px-3 py-2 rounded-lg ${msg.senderId === currentUser?.id ? "bg-primary text-primary-foreground" : "bg-muted"}`}>
-                      <p className="text-xs font-medium mb-1">{msg.senderUsername}</p>
-                      <p className="text-sm">{msg.content}</p>
-                    </div>
-                  )}
-                  <p className="text-xs text-muted-foreground mt-1">
-                    {new Date(msg.createdAt).toLocaleTimeString()}
-                  </p>
-                </div>
-              ))}
-              {(!messages || messages.length === 0) && (
-                <p className="text-center text-muted-foreground text-sm py-8">No messages yet</p>
-              )}
+                  );
+                })}
+                {(!messages || messages.length === 0) && (
+                  <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
+                    <MessageCircle className="h-12 w-12 mb-3 opacity-30" />
+                    <p className="text-sm font-medium">No messages yet</p>
+                    <p className="text-xs">Start the conversation below</p>
+                  </div>
+                )}
+              </div>
             </ScrollArea>
 
-            <div className="flex gap-2">
-              <Input
-                value={newMessage}
-                onChange={(e) => setNewMessage(e.target.value)}
-                placeholder="Type a message..."
-                onKeyDown={(e) => e.key === "Enter" && newMessage && sendMessageMutation.mutate()}
-                data-testid="input-message"
-              />
-              <Button
-                size="icon"
-                onClick={() => sendMessageMutation.mutate()}
-                disabled={!newMessage || sendMessageMutation.isPending}
-                data-testid="button-send"
-              >
-                <Send className="h-4 w-4" />
-              </Button>
+            <div className="p-4 border-t bg-muted/20">
+              <div className="flex gap-2">
+                <Input
+                  value={newMessage}
+                  onChange={(e) => setNewMessage(e.target.value)}
+                  placeholder="Type your message..."
+                  className="flex-1"
+                  onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && newMessage && sendMessageMutation.mutate()}
+                  data-testid="input-message"
+                />
+                <Button
+                  onClick={() => sendMessageMutation.mutate()}
+                  disabled={!newMessage || sendMessageMutation.isPending}
+                  className="px-4"
+                  data-testid="button-send"
+                >
+                  {sendMessageMutation.isPending ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Send className="h-4 w-4" />
+                  )}
+                </Button>
+              </div>
             </div>
           </CardContent>
         </Card>
