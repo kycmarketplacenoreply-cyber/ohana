@@ -79,6 +79,7 @@ export default function LoadersZone() {
   const [upfrontPercentage, setUpfrontPercentage] = useState("");
   const [countdownTime, setCountdownTime] = useState("30min");
   const [paymentMethodsInput, setPaymentMethodsInput] = useState("");
+  const [lowUpfrontConfirmed, setLowUpfrontConfirmed] = useState(false);
 
   const handleDealAmountChange = (value: string) => {
     if (value === "") {
@@ -176,6 +177,7 @@ export default function LoadersZone() {
       setUpfrontPercentage("");
       setCountdownTime("30min");
       setPaymentMethodsInput("");
+      setLowUpfrontConfirmed(false);
       setActiveTab("active");
     },
     onError: (error: Error) => {
@@ -232,7 +234,11 @@ export default function LoadersZone() {
   const loaderFee = dealAmountNum * 0.03; // 3% platform fee
   const totalRequired = collateral + loaderFee; // Total required upfront
   const availableBalance = parseFloat(wallet?.availableBalance || "0");
-  const canPost = dealAmount && dealAmountNum > 0 && paymentMethodsInput.trim().length > 0 && availableBalance >= totalRequired;
+  const upfrontPct = parseInt(upfrontPercentage) || 0;
+  const upfrontAmount = (dealAmountNum * upfrontPct) / 100;
+  const isLowUpfront = upfrontPct < 50;
+  const needsLowUpfrontConfirmation = isLowUpfront && dealAmountNum > 0;
+  const canPost = dealAmount && dealAmountNum > 0 && paymentMethodsInput.trim().length > 0 && availableBalance >= totalRequired && (!needsLowUpfrontConfirmation || lowUpfrontConfirmed);
 
   const getStatusBadge = (status: string) => {
     const statusMap: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
@@ -442,7 +448,10 @@ export default function LoadersZone() {
                   min="0" 
                   max="100"
                   value={upfrontPercentage} 
-                  onChange={(e) => handleUpfrontPercentageChange(e.target.value)}
+                  onChange={(e) => {
+                    handleUpfrontPercentageChange(e.target.value);
+                    setLowUpfrontConfirmed(false);
+                  }}
                   placeholder="0-100"
                   data-testid="input-upfront"
                 />
@@ -450,6 +459,31 @@ export default function LoadersZone() {
                   Enter 0-100%. Leave empty or set 0 if no upfront is required from receiver
                 </p>
               </div>
+
+              {needsLowUpfrontConfirmation && (
+                <div className="p-3 bg-amber-500/10 rounded-lg border border-amber-500/30">
+                  <div className="flex items-start gap-3">
+                    <AlertCircle className="h-5 w-5 text-amber-600 mt-0.5 flex-shrink-0" />
+                    <div className="flex-1">
+                      <p className="text-sm font-medium text-amber-700">Low Upfront Warning</p>
+                      <p className="text-xs text-amber-600 mt-1">
+                        You are setting the upfront requirement to <strong>{upfrontPct}%</strong> (${upfrontAmount.toFixed(2)} of ${dealAmountNum.toFixed(2)}).
+                        {upfrontPct === 0 ? " This means the receiver pays nothing upfront." : " This is below 50% of the deal amount."}
+                      </p>
+                      <label className="flex items-start gap-2 mt-3 cursor-pointer">
+                        <Checkbox
+                          checked={lowUpfrontConfirmed}
+                          onCheckedChange={(checked) => setLowUpfrontConfirmed(checked === true)}
+                          data-testid="checkbox-low-upfront"
+                        />
+                        <span className="text-xs text-amber-700">
+                          I understand I will only receive ${upfrontAmount.toFixed(2)} upfront from the receiver. I want to proceed with this amount.
+                        </span>
+                      </label>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               <div>
                 <Label>Order Countdown Timer</Label>

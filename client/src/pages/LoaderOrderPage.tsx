@@ -126,8 +126,11 @@ export default function LoaderOrderPage() {
     enabled: !!orderId && order?.status === "disputed",
   });
 
+  const terminalStatuses = ["completed", "closed_no_payment", "cancelled_auto", "cancelled_loader", "cancelled_receiver", "disputed", "resolved_loader_wins", "resolved_receiver_wins", "resolved_mutual"];
+
   useEffect(() => {
-    if (!order?.countdownExpiresAt || order.countdownStopped) {
+    // Stop countdown if order is cancelled or in terminal state
+    if (!order?.countdownExpiresAt || order.countdownStopped || terminalStatuses.includes(order?.status || "")) {
       setTimeRemaining(null);
       return;
     }
@@ -142,7 +145,7 @@ export default function LoaderOrderPage() {
     updateTimer();
     const interval = setInterval(updateTimer, 1000);
     return () => clearInterval(interval);
-  }, [order?.countdownExpiresAt, order?.countdownStopped]);
+  }, [order?.countdownExpiresAt, order?.countdownStopped, order?.status]);
 
   const sendPaymentDetailsMutation = useMutation({
     mutationFn: async () => {
@@ -351,7 +354,6 @@ export default function LoaderOrderPage() {
   const dealAmount = parseFloat(order?.dealAmount || "0");
   const penaltyAmount = dealAmount * 0.05;
 
-  const terminalStatuses = ["completed", "closed_no_payment", "cancelled_auto", "cancelled_loader", "cancelled_receiver", "disputed", "resolved_loader_wins", "resolved_receiver_wins", "resolved_mutual"];
   const canCancel = order && !terminalStatuses.includes(order.status) && !(isReceiver && order.loaderMarkedPaymentSent);
   const canDispute = order && ["payment_details_sent", "payment_sent"].includes(order.status);
   const isTerminalState = order && terminalStatuses.includes(order.status);
@@ -633,7 +635,7 @@ export default function LoaderOrderPage() {
           </CardContent>
         </Card>
 
-        {order.status === "awaiting_payment_details" && (
+        {order.status === "awaiting_payment_details" && isReceiver && (
           <Card className="mb-4 border-primary/50">
             <CardHeader className="pb-2">
               <CardTitle className="text-base flex items-center gap-2">
@@ -643,7 +645,7 @@ export default function LoaderOrderPage() {
             </CardHeader>
             <CardContent className="space-y-4">
               <p className="text-sm text-muted-foreground">
-                Either party must send payment details before the countdown expires to continue the deal.
+                Send your payment details to the loader in the chat below. Once done, click the button to confirm.
               </p>
               <Button
                 className="w-full"
@@ -658,6 +660,18 @@ export default function LoaderOrderPage() {
                 )}
                 I've Sent Payment Details in Chat
               </Button>
+            </CardContent>
+          </Card>
+        )}
+
+        {order.status === "awaiting_payment_details" && isLoader && (
+          <Card className="mb-4 border-amber-500/50 bg-amber-500/5">
+            <CardContent className="py-4 text-center">
+              <Clock className="h-8 w-8 text-amber-600 mx-auto mb-2" />
+              <p className="font-semibold text-amber-600">Waiting for Receiver</p>
+              <p className="text-sm text-muted-foreground">
+                The receiver needs to send their payment details before the countdown expires.
+              </p>
             </CardContent>
           </Card>
         )}
