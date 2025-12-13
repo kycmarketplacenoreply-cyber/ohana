@@ -3357,6 +3357,65 @@ export async function registerRoutes(
     }
   });
 
+  // Admin: Get loader dispute stats
+  app.get("/api/admin/loader-disputes/stats", requireAuth, async (req: AuthRequest, res) => {
+    try {
+      if (req.user!.role !== "admin" && req.user!.role !== "dispute_admin") {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+
+      const openDisputes = await storage.getOpenLoaderDisputes();
+      const resolvedDisputes = await storage.getResolvedLoaderDisputes();
+      const inReviewDisputes = await storage.getInReviewLoaderDisputes();
+      const allDisputes = await storage.getAllLoaderDisputes();
+
+      res.json({
+        openCount: openDisputes.length,
+        resolvedCount: resolvedDisputes.length,
+        inReviewCount: inReviewDisputes.length,
+        totalCount: allDisputes.length,
+      });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Admin: Get resolved loader disputes
+  app.get("/api/admin/loader-disputes/resolved", requireAuth, async (req: AuthRequest, res) => {
+    try {
+      if (req.user!.role !== "admin" && req.user!.role !== "dispute_admin") {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+
+      const disputes = await storage.getResolvedLoaderDisputes();
+      
+      const enrichedDisputes = await Promise.all(disputes.map(async (dispute) => {
+        const order = await storage.getLoaderOrder(dispute.orderId);
+        const opener = await storage.getUser(dispute.openedBy);
+        const loader = order ? await storage.getUser(order.loaderId) : null;
+        const receiver = order ? await storage.getUser(order.receiverId) : null;
+        let resolverName = null;
+        if (dispute.resolvedBy) {
+          const resolver = await storage.getUser(dispute.resolvedBy);
+          resolverName = resolver?.username || null;
+        }
+        
+        return {
+          ...dispute,
+          order,
+          openerUsername: opener?.username,
+          loaderUsername: loader?.username,
+          receiverUsername: receiver?.username,
+          resolverName,
+        };
+      }));
+
+      res.json(enrichedDisputes);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Admin: Get loader dispute details
   app.get("/api/admin/loader-disputes/:id/details", requireAuth, async (req: AuthRequest, res) => {
     try {

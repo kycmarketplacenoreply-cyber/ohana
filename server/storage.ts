@@ -246,6 +246,9 @@ export interface IStorage {
   getLoaderDispute(id: string): Promise<LoaderDispute | undefined>;
   getLoaderDisputeByOrderId(orderId: string): Promise<LoaderDispute | undefined>;
   getOpenLoaderDisputes(): Promise<LoaderDispute[]>;
+  getResolvedLoaderDisputes(): Promise<LoaderDispute[]>;
+  getInReviewLoaderDisputes(): Promise<LoaderDispute[]>;
+  getAllLoaderDisputes(): Promise<LoaderDispute[]>;
   createLoaderDispute(dispute: InsertLoaderDispute): Promise<LoaderDispute>;
   updateLoaderDispute(id: string, updates: Partial<LoaderDispute>): Promise<LoaderDispute | undefined>;
   getExpiredLoaderOrders(): Promise<LoaderOrder[]>;
@@ -1188,6 +1191,24 @@ export class DatabaseStorage implements IStorage {
 
   async getOpenLoaderDisputes(): Promise<LoaderDispute[]> {
     return await db.select().from(loaderDisputes).where(eq(loaderDisputes.status, "open")).orderBy(desc(loaderDisputes.createdAt));
+  }
+
+  async getResolvedLoaderDisputes(): Promise<LoaderDispute[]> {
+    return await db.select().from(loaderDisputes).where(
+      or(
+        eq(loaderDisputes.status, "resolved_loader_wins"),
+        eq(loaderDisputes.status, "resolved_receiver_wins"),
+        eq(loaderDisputes.status, "resolved_mutual")
+      )
+    ).orderBy(desc(loaderDisputes.resolvedAt));
+  }
+
+  async getInReviewLoaderDisputes(): Promise<LoaderDispute[]> {
+    return await db.select().from(loaderDisputes).where(eq(loaderDisputes.status, "in_review")).orderBy(desc(loaderDisputes.createdAt));
+  }
+
+  async getAllLoaderDisputes(): Promise<LoaderDispute[]> {
+    return await db.select().from(loaderDisputes).orderBy(desc(loaderDisputes.createdAt));
   }
 
   async createLoaderDispute(dispute: InsertLoaderDispute): Promise<LoaderDispute> {
