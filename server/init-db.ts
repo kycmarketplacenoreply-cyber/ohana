@@ -19,6 +19,7 @@ async function createEnumsIfNotExist() {
     `DO $$ BEGIN CREATE TYPE liability_type AS ENUM ('full_payment', 'partial_10', 'partial_25', 'partial_50', 'time_bound_24h', 'time_bound_48h', 'time_bound_72h', 'time_bound_1week', 'time_bound_1month'); EXCEPTION WHEN duplicate_object THEN null; END $$;`,
     `DO $$ BEGIN CREATE TYPE countdown_time AS ENUM ('15min', '30min', '1hr', '2hr', '4hr', '24hr'); EXCEPTION WHEN duplicate_object THEN null; END $$;`,
     `DO $$ BEGIN CREATE TYPE loader_feedback_type AS ENUM ('positive', 'negative'); EXCEPTION WHEN duplicate_object THEN null; END $$;`,
+    `DO $$ BEGIN CREATE TYPE loader_dispute_status AS ENUM ('open', 'in_review', 'resolved_loader_wins', 'resolved_receiver_wins', 'resolved_mutual'); EXCEPTION WHEN duplicate_object THEN null; END $$;`,
   ];
 
   for (const query of enumQueries) {
@@ -387,6 +388,22 @@ async function createTablesIfNotExist() {
       is_verified_vendor BOOLEAN NOT NULL DEFAULT false,
       created_at TIMESTAMP NOT NULL DEFAULT now(),
       updated_at TIMESTAMP NOT NULL DEFAULT now()
+    );
+
+    CREATE TABLE IF NOT EXISTS loader_disputes (
+      id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid(),
+      order_id VARCHAR NOT NULL REFERENCES loader_orders(id) ON DELETE CASCADE,
+      opened_by VARCHAR NOT NULL REFERENCES users(id),
+      reason TEXT NOT NULL,
+      evidence_urls TEXT[] DEFAULT ARRAY[]::text[],
+      status loader_dispute_status NOT NULL DEFAULT 'open',
+      resolution TEXT,
+      resolved_by VARCHAR REFERENCES users(id),
+      winner_id VARCHAR REFERENCES users(id),
+      loser_id VARCHAR REFERENCES users(id),
+      admin_notes TEXT,
+      created_at TIMESTAMP NOT NULL DEFAULT now(),
+      resolved_at TIMESTAMP
     );
   `);
 }
