@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { fetchWithAuth, getUser } from "@/lib/auth";
 import { useLocation } from "wouter";
@@ -31,6 +32,7 @@ import {
   Eye,
   DollarSign,
   BadgeCheck,
+  Loader2,
 } from "lucide-react";
 
 interface DisputeStats {
@@ -54,6 +56,25 @@ interface ResolvedDispute extends Dispute {
   resolvedAt: string | null;
   resolvedBy: string | null;
   resolverName: string | null;
+}
+
+interface LoaderDispute {
+  id: string;
+  orderId: string;
+  openedBy: string;
+  reason: string;
+  status: string;
+  createdAt: string;
+  order?: {
+    id: string;
+    loaderId: string;
+    receiverId: string;
+    dealAmount: string;
+    status: string;
+  };
+  openerUsername?: string;
+  loaderUsername?: string;
+  receiverUsername?: string;
 }
 
 interface DisputeDetails {
@@ -97,6 +118,9 @@ export default function DisputeAdminPage() {
   const [twoFactorToken, setTwoFactorToken] = useState("");
   const [pendingResolveStatus, setPendingResolveStatus] = useState<string | null>(null);
   const [releaseAmount, setReleaseAmount] = useState("");
+  const [disputeTab, setDisputeTab] = useState<"marketplace" | "loaders">("marketplace");
+  const [selectedLoaderDispute, setSelectedLoaderDispute] = useState<string | null>(null);
+  const [loaderResolution, setLoaderResolution] = useState("");
 
   if (user?.role !== "dispute_admin" && user?.role !== "admin") {
     setLocation("/");
@@ -140,6 +164,39 @@ export default function DisputeAdminPage() {
     },
     enabled: !!selectedDispute,
     refetchInterval: selectedDispute ? 5000 : false,
+  });
+
+  const { data: loaderDisputes, isLoading: loaderDisputesLoading } = useQuery<LoaderDispute[]>({
+    queryKey: ["loaderDisputes"],
+    queryFn: async () => {
+      const res = await fetchWithAuth("/api/admin/loader-disputes");
+      if (!res.ok) return [];
+      return res.json();
+    },
+    enabled: disputeTab === "loaders",
+  });
+
+  const resolveLoaderDisputeMutation = useMutation({
+    mutationFn: async ({ disputeId, winner, resolution }: { disputeId: string; winner: string; resolution: string }) => {
+      const res = await fetchWithAuth(`/api/admin/loader-disputes/${disputeId}/resolve`, {
+        method: "POST",
+        body: JSON.stringify({ winner, resolution }),
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.message || "Failed to resolve dispute");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["loaderDisputes"] });
+      setSelectedLoaderDispute(null);
+      setLoaderResolution("");
+      toast({ title: "Dispute Resolved", description: "Loader zone dispute has been resolved" });
+    },
+    onError: (error: any) => {
+      toast({ variant: "destructive", title: "Failed to resolve dispute", description: error.message });
+    },
   });
 
   const sendMessageMutation = useMutation({
@@ -281,6 +338,117 @@ export default function DisputeAdminPage() {
           <h1 className="text-3xl font-bold text-white">Dispute Resolution Center</h1>
         </div>
 
+        <Tabs value={disputeTab} onValueChange={(v) => setDisputeTab(v as "marketplace" | "loaders")} className="w-full">
+          <TabsList className="bg-gray-800 border border-gray-700">
+            <TabsTrigger value="marketplace" className="data-[state=active]:bg-orange-600" data-testid="tab-marketplace-disputes">
+              Marketplace Disputes
+            </TabsTrigger>
+            <TabsTrigger value="loaders" className="data-[state=active]:bg-purple-600" data-testid="tab-loader-disputes">
+              <Loader2 className="h-4 w-4 mr-1" />
+              Loaders Zone ({loaderDisputes?.length || 0})
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="loaders" className="mt-4">
+            <Card className="bg-gray-900/50 border-gray-800">
+              <CardHeader>
+                <CardTitle className="text-white flex items-center gap-2">
+                  <Shield className="h-5 w-5 text-purple-400" />
+                  Loaders Zone Disputes
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {loaderDisputesLoading ? (
+                  <div className="space-y-3">
+                    {[1, 2, 3].map((i) => <Skeleton key={i} className="h-20 bg-gray-800" />)}
+                  </div>
+                ) : loaderDisputes && loaderDisputes.length > 0 ? (
+                  <div className="space-y-4">
+                    {loaderDisputes.map((dispute) => (
+                      <div key={dispute.id} className="p-4 bg-gray-800 rounded-lg border border-gray-700">
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-white font-medium">Order #{dispute.orderId.slice(0, 8)}</span>
+                          <Badge className="bg-orange-600">{dispute.status}</Badge>
+                        </div>
+                        <p className="text-gray-400 text-sm mb-2">{dispute.reason}</p>
+                        <div className="text-sm text-gray-500 mb-3">
+                          <p>Loader: {dispute.loaderUsername || "Unknown"}</p>
+                          <p>Receiver: {dispute.receiverUsername || "Unknown"}</p>
+                          <p>Amount: ${dispute.order?.dealAmount || "0"}</p>
+                        </div>
+                        {selectedLoaderDispute === dispute.id ? (
+                          <div className="space-y-3 pt-3 border-t border-gray-700">
+                            <Textarea
+                              placeholder="Resolution notes..."
+                              value={loaderResolution}
+                              onChange={(e) => setLoaderResolution(e.target.value)}
+                              className="bg-gray-900 border-gray-700"
+                              data-testid="input-loader-resolution"
+                            />
+                            <div className="flex gap-2 flex-wrap">
+                              <Button
+                                size="sm"
+                                className="bg-green-600 hover:bg-green-700"
+                                onClick={() => resolveLoaderDisputeMutation.mutate({ disputeId: dispute.id, winner: "loader", resolution: loaderResolution })}
+                                disabled={!loaderResolution.trim() || resolveLoaderDisputeMutation.isPending}
+                                data-testid="button-resolve-loader-wins"
+                              >
+                                Loader Wins
+                              </Button>
+                              <Button
+                                size="sm"
+                                className="bg-blue-600 hover:bg-blue-700"
+                                onClick={() => resolveLoaderDisputeMutation.mutate({ disputeId: dispute.id, winner: "receiver", resolution: loaderResolution })}
+                                disabled={!loaderResolution.trim() || resolveLoaderDisputeMutation.isPending}
+                                data-testid="button-resolve-receiver-wins"
+                              >
+                                Receiver Wins
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="border-gray-600"
+                                onClick={() => resolveLoaderDisputeMutation.mutate({ disputeId: dispute.id, winner: "mutual", resolution: loaderResolution })}
+                                disabled={!loaderResolution.trim() || resolveLoaderDisputeMutation.isPending}
+                                data-testid="button-resolve-mutual"
+                              >
+                                Mutual Resolution
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => { setSelectedLoaderDispute(null); setLoaderResolution(""); }}
+                                data-testid="button-cancel-resolve"
+                              >
+                                Cancel
+                              </Button>
+                            </div>
+                          </div>
+                        ) : (
+                          <Button
+                            size="sm"
+                            className="bg-purple-600 hover:bg-purple-700"
+                            onClick={() => setSelectedLoaderDispute(dispute.id)}
+                            data-testid={`button-resolve-loader-dispute-${dispute.id}`}
+                          >
+                            <Gavel className="h-4 w-4 mr-1" />
+                            Resolve Dispute
+                          </Button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-8">
+                    <CheckCircle className="h-12 w-12 text-green-400 mx-auto mb-3" />
+                    <p className="text-gray-400">No open loader disputes</p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="marketplace" className="mt-4">
         {statsLoading ? (
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             {[1, 2, 3, 4].map((i) => (
@@ -687,6 +855,8 @@ export default function DisputeAdminPage() {
             </CardContent>
           </Card>
         </div>
+          </TabsContent>
+        </Tabs>
 
         <Dialog open={showFreezeDialog} onOpenChange={setShowFreezeDialog}>
           <DialogContent className="bg-gray-900 border-gray-800">
