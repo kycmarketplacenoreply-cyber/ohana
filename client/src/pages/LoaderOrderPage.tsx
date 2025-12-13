@@ -24,6 +24,9 @@ import {
   Flag,
   AlertCircle,
   KeyRound,
+  ThumbsUp,
+  ThumbsDown,
+  Star,
 } from "lucide-react";
 
 interface LoaderOrder {
@@ -81,6 +84,21 @@ interface Dispute {
   createdAt: string;
 }
 
+interface FeedbackData {
+  feedback: Array<{
+    id: string;
+    orderId: string;
+    giverId: string;
+    receiverId: string;
+    feedbackType: "positive" | "negative";
+    comment: string | null;
+    giverUsername?: string;
+    createdAt: string;
+  }>;
+  hasLeftFeedback: boolean;
+  userFeedback: any | null;
+}
+
 export default function LoaderOrderPage() {
   const [, params] = useRoute("/loader-order/:id");
   const [, setLocation] = useLocation();
@@ -100,6 +118,9 @@ export default function LoaderOrderPage() {
   const [twoFactorCode, setTwoFactorCode] = useState("");
   const [showPostOrderDispute, setShowPostOrderDispute] = useState(false);
   const [postOrderDisputeReason, setPostOrderDisputeReason] = useState("");
+  const [showFeedbackForm, setShowFeedbackForm] = useState(false);
+  const [feedbackType, setFeedbackType] = useState<"positive" | "negative" | null>(null);
+  const [feedbackComment, setFeedbackComment] = useState("");
 
   const { data: order, isLoading } = useQuery<LoaderOrder>({
     queryKey: ["loaderOrder", orderId],

@@ -3666,6 +3666,21 @@ export async function registerRoutes(
         content: `Order completed! Loader paid 3% fee (${loaderFee.toFixed(2)}). Receiver paid 2% fee (${receiverFee.toFixed(2)}). Upfront transferred to loader.`,
       });
 
+      // Update loader stats for both parties (increment completedTrades)
+      try {
+        const loaderStats = await storage.getOrCreateLoaderStats(order.loaderId);
+        await storage.updateLoaderStats(order.loaderId, {
+          completedTrades: loaderStats.completedTrades + 1,
+        });
+        
+        const receiverStats = await storage.getOrCreateLoaderStats(order.receiverId);
+        await storage.updateLoaderStats(order.receiverId, {
+          completedTrades: receiverStats.completedTrades + 1,
+        });
+      } catch (statsError) {
+        console.error("Failed to update loader stats:", statsError);
+      }
+
       // Send notifications to both parties (non-blocking)
       try {
         await createNotification(order.loaderId, "order", "Order Completed", 
@@ -3677,6 +3692,106 @@ export async function registerRoutes(
       }
 
       res.json({ message: "Order completed successfully" });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Submit feedback for completed order
+  app.post("/api/loaders/orders/:id/feedback", requireAuth, async (req: AuthRequest, res) => {
+    try {
+      const { feedbackType, comment } = req.body;
+      
+      if (!["positive", "negative"].includes(feedbackType)) {
+        return res.status(400).json({ message: "Invalid feedback type. Must be 'positive' or 'negative'" });
+      }
+
+      const order = await storage.getLoaderOrder(req.params.id);
+      if (!order) {
+        return res.status(404).json({ message: "Order not found" });
+      }
+
+      if (order.status !== "completed") {
+        return res.status(400).json({ message: "Feedback can only be left on completed orders" });
+      }
+
+      const isLoader = order.loaderId === req.user!.userId;
+      const isReceiver = order.receiverId === req.user!.userId;
+      
+      if (!isLoader && !isReceiver) {
+        return res.status(403).json({ message: "Only order participants can leave feedback" });
+      }
+
+      // Determine who is receiving the feedback
+      const receiverId = isLoader ? order.receiverId : order.loaderId;
+      const giverId = req.user!.userId;
+
+      // Check if user already left feedback for this order
+      const existingFeedback = await storage.getLoaderFeedbackByOrderId(order.id);
+      const alreadyLeft = existingFeedback.some(f => f.giverId === giverId);
+      
+      if (alreadyLeft) {
+        return res.status(400).json({ message: "You have already left feedback for this order" });
+      }
+
+      // Create feedback
+      const feedback = await storage.createLoaderFeedback({
+        orderId: order.id,
+        giverId,
+        receiverId,
+        feedbackType: feedbackType as "positive" | "negative",
+        comment: comment || null,
+      });
+
+      // Update receiver's stats
+      const receiverStats = await storage.getOrCreateLoaderStats(receiverId);
+      if (feedbackType === "positive") {
+        await storage.updateLoaderStats(receiverId, {
+          positiveFeedback: receiverStats.positiveFeedback + 1,
+        });
+      } else {
+        await storage.updateLoaderStats(receiverId, {
+          negativeFeedback: receiverStats.negativeFeedback + 1,
+        });
+      }
+
+      res.json({ message: "Feedback submitted successfully", feedback });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Get feedback for an order
+  app.get("/api/loaders/orders/:id/feedback", requireAuth, async (req: AuthRequest, res) => {
+    try {
+      const order = await storage.getLoaderOrder(req.params.id);
+      if (!order) {
+        return res.status(404).json({ message: "Order not found" });
+      }
+
+      const isLoader = order.loaderId === req.user!.userId;
+      const isReceiver = order.receiverId === req.user!.userId;
+      
+      if (!isLoader && !isReceiver) {
+        return res.status(403).json({ message: "Not authorized" });
+      }
+
+      const feedback = await storage.getLoaderFeedbackByOrderId(order.id);
+      
+      // Enrich with giver usernames
+      const enrichedFeedback = await Promise.all(feedback.map(async (f) => {
+        const giver = await storage.getUser(f.giverId);
+        return { ...f, giverUsername: giver?.username };
+      }));
+
+      // Check if current user already left feedback
+      const userFeedback = enrichedFeedback.find(f => f.giverId === req.user!.userId);
+      
+      res.json({ 
+        feedback: enrichedFeedback,
+        hasLeftFeedback: !!userFeedback,
+        userFeedback: userFeedback || null,
+      });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
