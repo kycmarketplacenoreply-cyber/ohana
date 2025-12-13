@@ -81,8 +81,16 @@ export default function LoadersZone() {
   const [paymentMethodsInput, setPaymentMethodsInput] = useState("");
 
   const handleDealAmountChange = (value: string) => {
+    if (value === "") {
+      setDealAmount("");
+      return;
+    }
+    // Only allow digits and one decimal point, no scientific notation
+    if (!/^[0-9]*\.?[0-9]*$/.test(value)) {
+      return;
+    }
     const num = parseFloat(value);
-    if (value === "" || (num >= 0)) {
+    if (!isNaN(num) && num >= 0) {
       setDealAmount(value);
     }
   };
@@ -90,6 +98,10 @@ export default function LoadersZone() {
   const handleUpfrontPercentageChange = (value: string) => {
     if (value === "") {
       setUpfrontPercentage("");
+      return;
+    }
+    // Only allow digits, no decimal or scientific notation
+    if (!/^[0-9]+$/.test(value)) {
       return;
     }
     const num = parseInt(value);

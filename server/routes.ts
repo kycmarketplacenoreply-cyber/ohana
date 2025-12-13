@@ -2605,6 +2605,11 @@ export async function registerRoutes(
       const validCountdownTimes = ["15min", "30min", "1hr", "2hr"];
       const selectedCountdown = countdownTime && validCountdownTimes.includes(countdownTime) ? countdownTime : "30min";
 
+      // Validate deal amount - only allow regular numbers, no scientific notation
+      const dealAmountStr = String(dealAmount);
+      if (!/^[0-9]+\.?[0-9]*$/.test(dealAmountStr)) {
+        return res.status(400).json({ message: "Deal amount must be a valid number (no scientific notation)" });
+      }
       const amount = parseFloat(dealAmount);
       if (isNaN(amount) || amount < 0) {
         return res.status(400).json({ message: "Deal amount cannot be negative" });
@@ -2613,7 +2618,11 @@ export async function registerRoutes(
         return res.status(400).json({ message: "Deal amount must be greater than 0" });
       }
 
-      // Validate upfront percentage (0-100)
+      // Validate upfront percentage (0-100, integers only, no scientific notation)
+      const upfrontStr = String(upfrontPercentage || "0");
+      if (!/^[0-9]+$/.test(upfrontStr)) {
+        return res.status(400).json({ message: "Upfront percentage must be a whole number (no decimals or scientific notation)" });
+      }
       const upfrontPct = parseInt(upfrontPercentage) || 0;
       if (upfrontPct < 0 || upfrontPct > 100) {
         return res.status(400).json({ message: "Upfront percentage must be between 0 and 100" });
