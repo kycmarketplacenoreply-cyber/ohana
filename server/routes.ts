@@ -1100,12 +1100,34 @@ export async function registerRoutes(
       const cancelledOrders = uniqueOrders.filter(o => o.status === "cancelled");
       const disputedOrders = uniqueOrders.filter(o => o.status === "disputed");
 
+      // Get Loader Zone orders
+      const loaderOrders = await storage.getLoaderOrdersByLoader(req.user!.userId);
+      const receiverOrders = await storage.getLoaderOrdersByReceiver(req.user!.userId);
+      const allLoaderOrders = [...loaderOrders, ...receiverOrders];
+      const uniqueLoaderOrders = allLoaderOrders.filter((order, index, self) => 
+        index === self.findIndex(o => o.id === order.id)
+      );
+      
+      // Fetch usernames for loader orders
+      const loaderOrdersWithDetails = await Promise.all(uniqueLoaderOrders.map(async (order) => {
+        const loader = await storage.getUser(order.loaderId);
+        const receiver = await storage.getUser(order.receiverId);
+        return {
+          ...order,
+          loaderUsername: loader?.username,
+          receiverUsername: receiver?.username,
+          role: order.loaderId === req.user!.userId ? "loader" : "receiver",
+          orderType: "loader" as const,
+        };
+      }));
+
       res.json({
         buyerOrders,
         vendorOrders,
         pendingOrders,
         cancelledOrders,
         disputedOrders,
+        loaderOrders: loaderOrdersWithDetails,
       });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
@@ -2571,7 +2593,30 @@ export async function registerRoutes(
   app.get("/api/loaders/ads", async (req, res) => {
     try {
       const ads = await storage.getActiveLoaderAds();
-      res.json(ads);
+      
+      // Enrich ads with loader stats
+      const enrichedAds = await Promise.all(
+        ads.map(async (ad) => {
+          const loaderStats = await storage.getLoaderStats(ad.loaderId);
+          const vendorProfile = await storage.getVendorProfileByUserId(ad.loaderId);
+          return {
+            ...ad,
+            loaderStats: loaderStats ? {
+              completedTrades: loaderStats.completedTrades || 0,
+              positiveFeedback: loaderStats.positiveFeedback || 0,
+              negativeFeedback: loaderStats.negativeFeedback || 0,
+              isVerifiedVendor: vendorProfile?.isApproved || false,
+            } : {
+              completedTrades: 0,
+              positiveFeedback: 0,
+              negativeFeedback: 0,
+              isVerifiedVendor: vendorProfile?.isApproved || false,
+            },
+          };
+        })
+      );
+      
+      res.json(enrichedAds);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
@@ -2800,6 +2845,16 @@ export async function registerRoutes(
         isSystem: true,
         content: `Deal accepted! Receiver must select liability terms before funds are sent. Both parties must confirm the agreement to proceed.`,
       });
+
+      // Send notifications to both parties (non-blocking)
+      try {
+        await createNotification(ad.loaderId, "order", "Loader Deal Accepted", 
+          "Someone accepted your loading ad", `/loader-order/${order.id}`);
+        await createNotification(req.user!.userId, "order", "Deal Started", 
+          "You accepted a loader deal", `/loader-order/${order.id}`);
+      } catch (notifError) {
+        console.error("Failed to send notifications:", notifError);
+      }
 
       res.json(order);
     } catch (error: any) {
@@ -3163,6 +3218,16 @@ export async function registerRoutes(
         content: `Order cancelled by ${isLoader ? "loader" : "receiver"}. 5% penalty (${penaltyAmount.toFixed(2)}) deducted.`,
       });
 
+      // Send notifications to both parties (non-blocking)
+      try {
+        await createNotification(order.loaderId, "order", "Order Cancelled", 
+          `Loader order was cancelled by ${isLoader ? "you" : "the receiver"}`, `/loader-order/${order.id}`);
+        await createNotification(order.receiverId, "order", "Order Cancelled", 
+          `Loader order was cancelled by ${isReceiver ? "you" : "the loader"}`, `/loader-order/${order.id}`);
+      } catch (notifError) {
+        console.error("Failed to send notifications:", notifError);
+      }
+
       res.json({ message: "Order cancelled. 5% penalty applied." });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
@@ -3186,9 +3251,10 @@ export async function registerRoutes(
         return res.status(403).json({ message: "Not authorized" });
       }
 
-      // Can only dispute after payment details are sent
-      if (!["payment_details_sent", "payment_sent"].includes(order.status)) {
-        return res.status(400).json({ message: "Can only open dispute after payment details are exchanged" });
+      // Can dispute during active order or after completion/cancellation
+      const disputeableStatuses = ["payment_details_sent", "payment_sent", "completed", "cancelled_loader", "cancelled_receiver", "cancelled_auto"];
+      if (!disputeableStatuses.includes(order.status)) {
+        return res.status(400).json({ message: "Cannot open dispute in current order state" });
       }
 
       // Check if dispute already exists
@@ -3446,6 +3512,27 @@ export async function registerRoutes(
         return res.status(400).json({ message: "Order cannot be completed in current state" });
       }
 
+      // Verify 2FA if user has it enabled
+      const user = await storage.getUser(req.user!.userId);
+      if (user?.twoFactorEnabled) {
+        const { twoFactorCode } = req.body;
+        if (!twoFactorCode) {
+          return res.status(400).json({ message: "2FA verification required" });
+        }
+        const isValidTotp = verifyTotp(twoFactorCode, user.twoFactorSecret!);
+        const isRecoveryCode = user.twoFactorRecoveryCodes?.includes(twoFactorCode);
+        
+        if (!isValidTotp && !isRecoveryCode) {
+          return res.status(401).json({ message: "Invalid 2FA code" });
+        }
+        
+        // Consume recovery code if used
+        if (isRecoveryCode) {
+          const updatedCodes = user.twoFactorRecoveryCodes!.filter(code => code !== twoFactorCode);
+          await storage.updateUser(user.id, { twoFactorRecoveryCodes: updatedCodes });
+        }
+      }
+
       const dealAmount = parseFloat(order.dealAmount);
       const loaderFee = dealAmount * 0.03; // 3% loader fee (from reserved fee)
       const receiverFee = dealAmount * 0.02; // 2% receiver fee (from reserved fee)
@@ -3568,6 +3655,16 @@ export async function registerRoutes(
         isSystem: true,
         content: `Order completed! Loader paid 3% fee (${loaderFee.toFixed(2)}). Receiver paid 2% fee (${receiverFee.toFixed(2)}). Upfront transferred to loader.`,
       });
+
+      // Send notifications to both parties (non-blocking)
+      try {
+        await createNotification(order.loaderId, "order", "Order Completed", 
+          "Loader order completed successfully", `/loader-order/${order.id}`);
+        await createNotification(order.receiverId, "order", "Order Completed", 
+          "Loader order completed successfully", `/loader-order/${order.id}`);
+      } catch (notifError) {
+        console.error("Failed to send notifications:", notifError);
+      }
 
       res.json({ message: "Order completed successfully" });
     } catch (error: any) {

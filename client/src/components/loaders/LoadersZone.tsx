@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
@@ -9,6 +9,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { fetchWithAuth, getUser, isAuthenticated } from "@/lib/auth";
 import { 
@@ -21,13 +22,26 @@ import {
   DollarSign,
   User,
   Loader2,
-  X
+  X,
+  Search,
+  ArrowUpDown,
+  BadgeCheck,
+  ThumbsUp,
+  ThumbsDown
 } from "lucide-react";
+
+interface LoaderStats {
+  completedTrades: number;
+  positiveFeedback: number;
+  negativeFeedback: number;
+  isVerifiedVendor: boolean;
+}
 
 interface LoaderAd {
   id: string;
   loaderId: string;
   loaderUsername?: string;
+  loaderStats?: LoaderStats;
   assetType: string;
   dealAmount: string;
   loadingTerms: string | null;
@@ -80,6 +94,9 @@ export default function LoadersZone() {
   const [countdownTime, setCountdownTime] = useState("30min");
   const [paymentMethodsInput, setPaymentMethodsInput] = useState("");
   const [lowUpfrontConfirmed, setLowUpfrontConfirmed] = useState(false);
+  
+  const [searchQuery, setSearchQuery] = useState("");
+  const [sortOrder, setSortOrder] = useState<"default" | "high_to_low" | "low_to_high">("default");
 
   const handleDealAmountChange = (value: string) => {
     if (value === "") {
@@ -240,6 +257,33 @@ export default function LoadersZone() {
   const needsLowUpfrontConfirmation = isLowUpfront && dealAmountNum > 0;
   const canPost = dealAmount && dealAmountNum > 0 && paymentMethodsInput.trim().length > 0 && availableBalance >= totalRequired && (!needsLowUpfrontConfirmation || lowUpfrontConfirmed);
 
+  const filteredAndSortedAds = useMemo(() => {
+    if (!activeAds) return [];
+    
+    let filtered = activeAds.filter(ad => {
+      if (!searchQuery.trim()) return true;
+      const query = searchQuery.toLowerCase();
+      const matchesUsername = ad.loaderUsername?.toLowerCase().includes(query);
+      const matchesPaymentMethod = ad.paymentMethods.some(pm => pm.toLowerCase().includes(query));
+      return matchesUsername || matchesPaymentMethod;
+    });
+    
+    if (sortOrder === "high_to_low") {
+      filtered = [...filtered].sort((a, b) => parseFloat(b.dealAmount) - parseFloat(a.dealAmount));
+    } else if (sortOrder === "low_to_high") {
+      filtered = [...filtered].sort((a, b) => parseFloat(a.dealAmount) - parseFloat(b.dealAmount));
+    }
+    
+    return filtered;
+  }, [activeAds, searchQuery, sortOrder]);
+
+  const getTrustScore = (stats?: LoaderStats) => {
+    if (!stats) return null;
+    const total = stats.positiveFeedback + stats.negativeFeedback;
+    if (total === 0) return null;
+    return Math.round((stats.positiveFeedback / total) * 100);
+  };
+
   const getStatusBadge = (status: string) => {
     const statusMap: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
       awaiting_liability_confirmation: { label: "Select Terms", variant: "outline" },
@@ -291,12 +335,36 @@ export default function LoadersZone() {
         </TabsList>
 
         <TabsContent value="active" className="space-y-4">
+          <div className="flex flex-col sm:flex-row gap-3 mb-4">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search by username or payment method..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-10"
+                data-testid="input-search-ads"
+              />
+            </div>
+            <Select value={sortOrder} onValueChange={(value: "default" | "high_to_low" | "low_to_high") => setSortOrder(value)}>
+              <SelectTrigger className="w-full sm:w-48" data-testid="select-sort">
+                <ArrowUpDown className="h-4 w-4 mr-2" />
+                <SelectValue placeholder="Sort by amount" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="default">Default</SelectItem>
+                <SelectItem value="high_to_low">Amount: High to Low</SelectItem>
+                <SelectItem value="low_to_high">Amount: Low to High</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
           {adsLoading ? (
             <div className="flex justify-center py-12">
               <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
             </div>
-          ) : activeAds && activeAds.length > 0 ? (
-            activeAds.map((ad) => (
+          ) : filteredAndSortedAds && filteredAndSortedAds.length > 0 ? (
+            filteredAndSortedAds.map((ad) => (
               <Card key={ad.id} className="overflow-hidden" data-testid={`card-ad-${ad.id}`}>
                 <CardContent className="p-4">
                   <div className="flex justify-between items-start mb-3">
@@ -305,10 +373,33 @@ export default function LoadersZone() {
                         {(ad.loaderUsername || "L")[0].toUpperCase()}
                       </div>
                       <div>
-                        <p className="font-medium text-foreground" data-testid={`text-loader-${ad.id}`}>
-                          {ad.loaderUsername || "Loader"}
-                        </p>
-                        <p className="text-xs text-muted-foreground">Trust Score: N/A</p>
+                        <div className="flex items-center gap-1">
+                          <p className="font-medium text-foreground" data-testid={`text-loader-${ad.id}`}>
+                            {ad.loaderUsername || "Loader"}
+                          </p>
+                          {ad.loaderStats?.isVerifiedVendor && (
+                            <BadgeCheck className="h-4 w-4 text-blue-500" data-testid={`verified-badge-${ad.id}`} />
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                          <span>{ad.loaderStats?.completedTrades || 0} trades</span>
+                          {getTrustScore(ad.loaderStats) !== null && (
+                            <>
+                              <span>•</span>
+                              <span className={getTrustScore(ad.loaderStats)! >= 80 ? "text-green-600" : getTrustScore(ad.loaderStats)! >= 50 ? "text-yellow-600" : "text-red-600"}>
+                                {getTrustScore(ad.loaderStats)}% trust
+                              </span>
+                              <span className="flex items-center gap-0.5">
+                                <ThumbsUp className="h-3 w-3 text-green-600" />
+                                {ad.loaderStats?.positiveFeedback || 0}
+                              </span>
+                              <span className="flex items-center gap-0.5">
+                                <ThumbsDown className="h-3 w-3 text-red-600" />
+                                {ad.loaderStats?.negativeFeedback || 0}
+                              </span>
+                            </>
+                          )}
+                        </div>
                       </div>
                     </div>
                     <Badge variant="outline" className="flex items-center gap-1 text-green-600 border-green-600">

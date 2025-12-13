@@ -15,6 +15,8 @@ import {
   AlertTriangle,
   ArrowRight,
   Package,
+  Loader2,
+  Shield,
 } from "lucide-react";
 
 interface Order {
@@ -31,12 +33,25 @@ interface Order {
   createdAt: string;
 }
 
+interface LoaderOrder {
+  id: string;
+  loaderId: string;
+  loaderUsername?: string;
+  receiverId: string;
+  receiverUsername?: string;
+  dealAmount: string;
+  status: string;
+  role: string;
+  createdAt: string;
+}
+
 interface OrdersData {
   buyerOrders: Order[];
   vendorOrders: Order[];
   pendingOrders: Order[];
   cancelledOrders: Order[];
   disputedOrders: Order[];
+  loaderOrders: LoaderOrder[];
 }
 
 export default function OrdersPage() {
@@ -96,6 +111,25 @@ export default function OrdersPage() {
       default:
         return <Package className="h-5 w-5 text-gray-400" />;
     }
+  };
+
+  const getLoaderStatusBadge = (status: string) => {
+    const statusMap: Record<string, { label: string; className: string }> = {
+      awaiting_liability_confirmation: { label: "Select Terms", className: "bg-yellow-600" },
+      awaiting_payment_details: { label: "Awaiting Details", className: "bg-yellow-600" },
+      payment_details_sent: { label: "Details Sent", className: "bg-blue-600" },
+      payment_sent: { label: "Payment Sent", className: "bg-purple-600" },
+      completed: { label: "Completed", className: "bg-green-600" },
+      cancelled_auto: { label: "Auto-Cancelled", className: "bg-gray-600" },
+      cancelled_loader: { label: "Cancelled", className: "bg-red-600" },
+      cancelled_receiver: { label: "Cancelled", className: "bg-red-600" },
+      disputed: { label: "Disputed", className: "bg-orange-600" },
+      resolved_loader_wins: { label: "Resolved", className: "bg-green-600" },
+      resolved_receiver_wins: { label: "Resolved", className: "bg-green-600" },
+      resolved_mutual: { label: "Resolved", className: "bg-gray-600" },
+    };
+    const s = statusMap[status] || { label: status.replace(/_/g, " "), className: "bg-gray-600" };
+    return <Badge className={s.className}>{s.label}</Badge>;
   };
 
   const renderOrderList = (orders: Order[], role: "buyer" | "vendor") => {
@@ -161,6 +195,73 @@ export default function OrdersPage() {
     );
   };
 
+  const renderLoaderOrderList = (orders: LoaderOrder[]) => {
+    if (!orders || orders.length === 0) {
+      return (
+        <div className="text-center py-12">
+          <Shield className="h-12 w-12 text-gray-600 mx-auto mb-4" />
+          <p className="text-gray-400">No loader orders yet</p>
+          <p className="text-gray-500 text-sm">
+            Your Loaders Zone orders will appear here
+          </p>
+        </div>
+      );
+    }
+
+    return (
+      <div className="space-y-4">
+        {orders.map((order) => (
+          <div
+            key={order.id}
+            className="p-4 rounded-xl bg-gray-800/50 border border-gray-700 hover:border-purple-600 transition-colors"
+            data-testid={`loader-order-card-${order.id}`}
+          >
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div className="flex items-center gap-4">
+                <div className="p-2 rounded-lg bg-purple-700">
+                  <Shield className="h-5 w-5 text-white" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-white font-medium">
+                      {order.role === "loader" ? "Loading to" : "Receiving from"}{" "}
+                      {order.role === "loader" ? order.receiverUsername : order.loaderUsername}
+                    </span>
+                    {getLoaderStatusBadge(order.status)}
+                    <Badge variant="outline" className="text-purple-400 border-purple-400">
+                      Loaders Zone
+                    </Badge>
+                  </div>
+                  <p className="text-sm text-gray-400">
+                    {new Date(order.createdAt).toLocaleDateString()} at{" "}
+                    {new Date(order.createdAt).toLocaleTimeString()}
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-4">
+                <div className="text-right">
+                  <p className="text-xl font-bold text-white">
+                    ${parseFloat(order.dealAmount).toLocaleString()}
+                  </p>
+                  <p className="text-sm text-gray-400">
+                    {order.role === "loader" ? "Loader" : "Receiver"}
+                  </p>
+                </div>
+                <Link href={`/loader-order/${order.id}`}>
+                  <Button variant="outline" size="sm" className="gap-2" data-testid={`button-view-loader-order-${order.id}`}>
+                    View Details
+                    <ArrowRight className="h-4 w-4" />
+                  </Button>
+                </Link>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  };
+
   return (
     <Layout>
       <div className="space-y-8">
@@ -189,6 +290,10 @@ export default function OrdersPage() {
                   <TabsTrigger value="selling" data-testid="tab-selling">
                     Selling ({data?.vendorOrders?.length || 0})
                   </TabsTrigger>
+                  <TabsTrigger value="loaders" data-testid="tab-loaders">
+                    <Shield className="h-4 w-4 mr-1" />
+                    Loaders Zone ({data?.loaderOrders?.length || 0})
+                  </TabsTrigger>
                   <TabsTrigger value="pending" data-testid="tab-pending">
                     Pending ({data?.pendingOrders?.length || 0})
                   </TabsTrigger>
@@ -206,6 +311,10 @@ export default function OrdersPage() {
 
                 <TabsContent value="selling">
                   {renderOrderList(data?.vendorOrders || [], "vendor")}
+                </TabsContent>
+
+                <TabsContent value="loaders">
+                  {renderLoaderOrderList(data?.loaderOrders || [])}
                 </TabsContent>
 
                 <TabsContent value="pending">

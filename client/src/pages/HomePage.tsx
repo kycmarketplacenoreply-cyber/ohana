@@ -8,6 +8,12 @@ import { ThemeToggle } from "@/components/marketplace/ThemeToggle";
 import SocialFeed from "@/components/social/SocialFeed";
 import LoadersZone from "@/components/loaders/LoadersZone";
 import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -30,6 +36,7 @@ import {
   Rss,
   Store,
   Loader2,
+  Shield,
 } from "lucide-react";
 
 interface Offer {
@@ -71,6 +78,7 @@ export default function HomePage() {
   const [activeTab, setActiveTab] = useState<"buy" | "sell">("buy");
   const [selectedAccount, setSelectedAccount] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
+  const [showAdsModal, setShowAdsModal] = useState(false);
 
   const { data: offers, isLoading } = useQuery<Offer[]>({
     queryKey: ["offers", activeTab === "buy" ? "sell" : "buy", selectedAccount, searchQuery],
@@ -398,12 +406,14 @@ export default function HomePage() {
               <span className={`text-xs ${location === "/orders" ? "text-foreground" : "text-muted-foreground"}`}>Orders</span>
             </button>
           </Link>
-          <Link href="/vendor">
-            <button className="flex flex-col items-center gap-1 px-4 py-2" data-testid="nav-ads">
-              <Megaphone className={`h-6 w-6 ${location === "/vendor" ? "text-foreground" : "text-muted-foreground"}`} />
-              <span className={`text-xs ${location === "/vendor" ? "text-foreground" : "text-muted-foreground"}`}>Ads</span>
-            </button>
-          </Link>
+          <button 
+            className="flex flex-col items-center gap-1 px-4 py-2" 
+            data-testid="nav-ads"
+            onClick={() => setShowAdsModal(true)}
+          >
+            <Megaphone className="h-6 w-6 text-muted-foreground" />
+            <span className="text-xs text-muted-foreground">Ads</span>
+          </button>
           <Link href="/notifications">
             <button className="flex flex-col items-center gap-1 px-4 py-2 relative" data-testid="nav-chat">
               <MessageCircle className={`h-6 w-6 ${location === "/notifications" ? "text-foreground" : "text-muted-foreground"}`} />
@@ -423,6 +433,48 @@ export default function HomePage() {
           </Link>
         </div>
       </nav>
+
+      <Dialog open={showAdsModal} onOpenChange={setShowAdsModal}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Choose Ad Type</DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <button
+              onClick={() => {
+                setShowAdsModal(false);
+                setLocation("/vendor");
+              }}
+              className="flex items-center gap-4 p-4 rounded-lg border border-border hover:bg-muted transition-colors"
+              data-testid="btn-kyc-ad"
+            >
+              <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
+                <Store className="h-6 w-6 text-primary" />
+              </div>
+              <div className="text-left">
+                <h3 className="font-medium text-foreground">KYC Marketplace Ad</h3>
+                <p className="text-sm text-muted-foreground">Post an ad to buy or sell KYC verified accounts</p>
+              </div>
+            </button>
+            <button
+              onClick={() => {
+                setShowAdsModal(false);
+                setMainSection("loaders");
+              }}
+              className="flex items-center gap-4 p-4 rounded-lg border border-border hover:bg-muted transition-colors"
+              data-testid="btn-loader-ad"
+            >
+              <div className="w-12 h-12 rounded-full bg-amber-500/10 flex items-center justify-center">
+                <Shield className="h-6 w-6 text-amber-500" />
+              </div>
+              <div className="text-left">
+                <h3 className="font-medium text-foreground">Loaders Zone Ad</h3>
+                <p className="text-sm text-muted-foreground">Post an ad to offer or find loading services</p>
+              </div>
+            </button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
