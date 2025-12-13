@@ -3283,6 +3283,16 @@ export async function registerRoutes(
         content: `Dispute opened by ${opener}. Reason: ${reason || "No reason provided"}. Admin will review and resolve.`,
       });
 
+      // Notify the other party
+      const otherPartyId = isLoader ? order.receiverId : order.loaderId;
+      await storage.createNotification({
+        userId: otherPartyId,
+        type: "dispute",
+        title: "Dispute Opened",
+        message: `A dispute has been opened on your loader order`,
+        link: `/loader-order/${order.id}`,
+      });
+
       res.json({ message: "Dispute opened successfully", dispute });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
