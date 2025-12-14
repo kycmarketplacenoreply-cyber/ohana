@@ -51,9 +51,6 @@ interface KycStatus {
   tier: string;
 }
 
-const exchangeOptions = ["OKX", "Binance", "Bybit", "KuCoin", "Huobi", "Gate.io", "MEXC", "Bitget", "Coinbase", "Kraken"];
-const accountTypeOptions = ["Binance", "OKX", "MEXC", "Bybit", "Bitget", "KuCoin", "Wallet"];
-
 export default function VendorPage() {
   const [, setLocation] = useLocation();
   const queryClient = useQueryClient();
@@ -66,9 +63,38 @@ export default function VendorPage() {
     minLimit: "",
     maxLimit: "",
     availableAmount: "",
-    accountType: "Binance",
+    accountType: "",
     terms: "",
   });
+
+  const calculateMaxAmount = (price: string, available: string) => {
+    const priceNum = parseFloat(price) || 0;
+    const availableNum = parseFloat(available) || 0;
+    if (priceNum > 0 && availableNum > 0) {
+      return String(Math.floor(priceNum * availableNum));
+    }
+    return "";
+  };
+
+  const handlePriceChange = (value: string) => {
+    const numValue = parseFloat(value);
+    if (numValue < 0) return;
+    const maxLimit = calculateMaxAmount(value, newOffer.availableAmount);
+    setNewOffer({ ...newOffer, pricePerUnit: value, maxLimit });
+  };
+
+  const handleAvailableChange = (value: string) => {
+    const numValue = parseFloat(value);
+    if (numValue < 0) return;
+    const maxLimit = calculateMaxAmount(newOffer.pricePerUnit, value);
+    setNewOffer({ ...newOffer, availableAmount: value, maxLimit });
+  };
+
+  const handleMinLimitChange = (value: string) => {
+    const numValue = parseFloat(value);
+    if (numValue < 0) return;
+    setNewOffer({ ...newOffer, minLimit: value });
+  };
 
   if (!isAuthenticated()) {
     setLocation("/auth");
@@ -95,14 +121,20 @@ export default function VendorPage() {
 
   const createOfferMutation = useMutation({
     mutationFn: async (offer: typeof newOffer) => {
+      if (parseFloat(offer.pricePerUnit) <= 0 || parseFloat(offer.availableAmount) <= 0 || parseFloat(offer.minLimit) < 0) {
+        throw new Error("Price, accounts, and min limit must be positive values");
+      }
+      if (!offer.accountType.trim()) {
+        throw new Error("Account type is required");
+      }
       const payload: any = {
         type: offer.type,
-        currency: offer.currency,
+        currency: "USD",
         pricePerUnit: offer.pricePerUnit,
         minLimit: offer.minLimit,
         maxLimit: offer.maxLimit,
         availableAmount: offer.availableAmount,
-        paymentMethods: [offer.accountType === "Wallet" ? "Wallet Address" : `${offer.accountType} UID`],
+        paymentMethods: [offer.accountType.trim()],
         terms: offer.terms,
       };
       const res = await fetchWithAuth("/api/vendor/offers", {
@@ -127,7 +159,7 @@ export default function VendorPage() {
         minLimit: "",
         maxLimit: "",
         availableAmount: "",
-        accountType: "Binance",
+        accountType: "",
         terms: "",
       });
     },
@@ -184,19 +216,14 @@ export default function VendorPage() {
                     </div>
                     <div className="space-y-2">
                       <Label>Payment Currency</Label>
-                      <Select
-                        value={newOffer.currency}
-                        onValueChange={(v) => setNewOffer({ ...newOffer, currency: v })}
-                      >
-                        <SelectTrigger className="bg-gray-800 border-gray-700" data-testid="select-offer-currency">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="USD">USD</SelectItem>
-                          <SelectItem value="USDT">USDT</SelectItem>
-                          <SelectItem value="KES">KES</SelectItem>
-                        </SelectContent>
-                      </Select>
+                      <Input
+                        type="text"
+                        value="USD"
+                        className="bg-gray-800 border-gray-700 opacity-60"
+                        data-testid="input-offer-currency"
+                        readOnly
+                        disabled
+                      />
                     </div>
                   </div>
                   <div className="space-y-2">
@@ -204,11 +231,25 @@ export default function VendorPage() {
                     <Input
                       type="number"
                       step="0.01"
+                      min="0"
                       value={newOffer.pricePerUnit}
-                      onChange={(e) => setNewOffer({ ...newOffer, pricePerUnit: e.target.value })}
+                      onChange={(e) => handlePriceChange(e.target.value)}
                       className="bg-gray-800 border-gray-700"
                       placeholder="e.g. 100"
                       data-testid="input-price"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Available Accounts</Label>
+                    <Input
+                      type="number"
+                      step="1"
+                      min="1"
+                      value={newOffer.availableAmount}
+                      onChange={(e) => handleAvailableChange(e.target.value)}
+                      className="bg-gray-800 border-gray-700"
+                      placeholder="Number of accounts for sale"
+                      data-testid="input-available"
                     />
                   </div>
                   <div className="grid grid-cols-2 gap-4">
@@ -216,50 +257,35 @@ export default function VendorPage() {
                       <Label>Min Limit (USD)</Label>
                       <Input
                         type="number"
+                        min="0"
                         value={newOffer.minLimit}
-                        onChange={(e) => setNewOffer({ ...newOffer, minLimit: e.target.value })}
+                        onChange={(e) => handleMinLimitChange(e.target.value)}
                         className="bg-gray-800 border-gray-700"
                         data-testid="input-min-limit"
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label>Max Limit (USD)</Label>
+                      <Label>Max Limit (USD) - Auto calculated</Label>
                       <Input
                         type="number"
                         value={newOffer.maxLimit}
-                        onChange={(e) => setNewOffer({ ...newOffer, maxLimit: e.target.value })}
-                        className="bg-gray-800 border-gray-700"
+                        className="bg-gray-800 border-gray-700 opacity-60"
                         data-testid="input-max-limit"
+                        readOnly
+                        disabled
                       />
                     </div>
                   </div>
                   <div className="space-y-2">
-                    <Label>Available Accounts</Label>
-                    <Input
-                      type="number"
-                      step="1"
-                      value={newOffer.availableAmount}
-                      onChange={(e) => setNewOffer({ ...newOffer, availableAmount: e.target.value })}
-                      className="bg-gray-800 border-gray-700"
-                      placeholder="Number of accounts for sale"
-                      data-testid="input-available"
-                    />
-                  </div>
-                  <div className="space-y-2">
                     <Label>Account Type</Label>
-                    <Select
+                    <Input
+                      type="text"
                       value={newOffer.accountType}
-                      onValueChange={(v) => setNewOffer({ ...newOffer, accountType: v })}
-                    >
-                      <SelectTrigger className="bg-gray-800 border-gray-700" data-testid="select-account-type">
-                        <SelectValue placeholder="Select account type" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {accountTypeOptions.map((type) => (
-                          <SelectItem key={type} value={type}>{type}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                      onChange={(e) => setNewOffer({ ...newOffer, accountType: e.target.value })}
+                      className="bg-gray-800 border-gray-700"
+                      placeholder="e.g. Binance, OKX, MEXC, Bybit, Custom..."
+                      data-testid="input-account-type"
+                    />
                   </div>
                   <div className="space-y-2">
                     <Label>Terms (Optional)</Label>

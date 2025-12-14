@@ -32,6 +32,10 @@ import {
   Unlock,
   KeyRound,
   BadgeCheck,
+  XCircle,
+  Star,
+  ThumbsUp,
+  User,
 } from "lucide-react";
 
 interface Order {
@@ -76,6 +80,11 @@ export default function OrderDetailPage() {
   const [twoFactorCode, setTwoFactorCode] = useState("");
   const [showDisputeDialog, setShowDisputeDialog] = useState(false);
   const [disputeReason, setDisputeReason] = useState("");
+  const [showCancelDialog, setShowCancelDialog] = useState(false);
+  const [cancelReason, setCancelReason] = useState("");
+  const [showFeedbackDialog, setShowFeedbackDialog] = useState(false);
+  const [feedbackStars, setFeedbackStars] = useState(5);
+  const [feedbackComment, setFeedbackComment] = useState("");
 
   const { data: order, isLoading: orderLoading } = useQuery<Order>({
     queryKey: ["order", orderId],
@@ -216,6 +225,62 @@ export default function OrderDetailPage() {
     onError: () => {
       toast({ variant: "destructive", title: "Failed to open dispute" });
     },
+  });
+
+  const cancelOrderMutation = useMutation({
+    mutationFn: async (reason: string) => {
+      const res = await fetchWithAuth(`/api/orders/${orderId}/cancel`, {
+        method: "POST",
+        body: JSON.stringify({ reason }),
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.message || "Failed to cancel order");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["order", orderId] });
+      setShowCancelDialog(false);
+      setCancelReason("");
+      toast({ title: "Order cancelled", description: "The order has been cancelled and any escrowed funds have been refunded" });
+    },
+    onError: (error: Error) => {
+      toast({ variant: "destructive", title: "Failed to cancel order", description: error.message });
+    },
+  });
+
+  const submitFeedbackMutation = useMutation({
+    mutationFn: async ({ stars, comment }: { stars: number; comment: string }) => {
+      const res = await fetchWithAuth(`/api/orders/${orderId}/feedback`, {
+        method: "POST",
+        body: JSON.stringify({ stars, comment }),
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.message || "Failed to submit feedback");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["feedback", orderId] });
+      setShowFeedbackDialog(false);
+      setFeedbackStars(5);
+      setFeedbackComment("");
+      toast({ title: "Feedback submitted", description: "Thank you for your feedback!" });
+    },
+    onError: (error: Error) => {
+      toast({ variant: "destructive", title: "Failed to submit feedback", description: error.message });
+    },
+  });
+
+  const { data: feedbackStatus } = useQuery({
+    queryKey: ["feedback", orderId],
+    queryFn: async () => {
+      const res = await fetchWithAuth(`/api/orders/${orderId}/feedback`);
+      return res.json();
+    },
+    enabled: !!orderId && order?.status === "completed",
   });
 
   const depositMutation = useMutation({

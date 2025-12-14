@@ -1183,6 +1183,142 @@ export async function registerRoutes(
     }
   });
 
+  // Cancel order (before account/payment exchange only)
+  app.post("/api/orders/:id/cancel", requireAuth, async (req: AuthRequest, res) => {
+    try {
+      const order = await storage.getOrder(req.params.id);
+      if (!order) {
+        return res.status(404).json({ message: "Order not found" });
+      }
+
+      const vendorProfile = await storage.getVendorProfile(order.vendorId);
+      const isBuyer = order.buyerId === req.user!.userId;
+      const isVendor = vendorProfile?.userId === req.user!.userId;
+      
+      if (!isBuyer && !isVendor) {
+        return res.status(403).json({ message: "Not authorized to cancel this order" });
+      }
+
+      const cancellableStatuses = ["created", "escrowed"];
+      if (!cancellableStatuses.includes(order.status)) {
+        return res.status(400).json({ message: "Order cannot be cancelled after payment or account details have been exchanged" });
+      }
+
+      const { reason } = req.body;
+      
+      if (order.status === "escrowed" && order.escrowAmount) {
+        const escrowAmount = parseFloat(order.escrowAmount);
+        if (escrowAmount > 0) {
+          const buyerWallet = await storage.getWalletByUserId(order.buyerId, "USDT");
+          if (buyerWallet) {
+            await storage.releaseEscrow(buyerWallet.id, order.escrowAmount);
+            await storage.createTransaction({
+              userId: order.buyerId,
+              walletId: buyerWallet.id,
+              type: "refund",
+              amount: order.escrowAmount,
+              currency: "USDT",
+              relatedOrderId: order.id,
+              description: "Order cancelled - escrow refunded",
+            });
+          }
+        }
+      }
+
+      const offer = await storage.getOffer(order.offerId);
+      if (offer) {
+        const restoredAmount = (parseFloat(offer.availableAmount) + parseFloat(order.amount)).toFixed(8);
+        await storage.updateOffer(offer.id, { availableAmount: restoredAmount, isActive: true });
+      }
+
+      await storage.updateOrder(req.params.id, {
+        status: "cancelled",
+        cancelReason: reason || "Cancelled by user",
+      });
+
+      await storage.createChatMessage({
+        orderId: req.params.id,
+        senderId: req.user!.userId,
+        message: `Order cancelled: ${reason || "No reason provided"}`,
+        isSystemMessage: true,
+      });
+
+      res.json({ message: "Order cancelled successfully" });
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  // Submit feedback after successful trade
+  app.post("/api/orders/:id/feedback", requireAuth, async (req: AuthRequest, res) => {
+    try {
+      const order = await storage.getOrder(req.params.id);
+      if (!order) {
+        return res.status(404).json({ message: "Order not found" });
+      }
+
+      if (order.status !== "completed") {
+        return res.status(400).json({ message: "Feedback can only be submitted for completed orders" });
+      }
+
+      const vendorProfile = await storage.getVendorProfile(order.vendorId);
+      const isBuyer = order.buyerId === req.user!.userId;
+      const isVendor = vendorProfile?.userId === req.user!.userId;
+      
+      if (!isBuyer && !isVendor) {
+        return res.status(403).json({ message: "Not authorized to submit feedback for this order" });
+      }
+
+      const existingRating = await storage.getRatingByOrder(order.id);
+      if (existingRating && existingRating.ratedBy === req.user!.userId) {
+        return res.status(400).json({ message: "You have already submitted feedback for this order" });
+      }
+
+      const { stars, comment } = req.body;
+      if (!stars || stars < 1 || stars > 5) {
+        return res.status(400).json({ message: "Rating must be between 1 and 5 stars" });
+      }
+
+      const rating = await storage.createRating({
+        orderId: order.id,
+        vendorId: order.vendorId,
+        ratedBy: req.user!.userId,
+        stars,
+        comment: comment || "",
+      });
+
+      const allRatings = await storage.getRatingsByVendor(order.vendorId);
+      const totalStars = allRatings.reduce((sum, r) => sum + r.stars, 0);
+      const averageRating = (totalStars / allRatings.length).toFixed(2);
+      
+      await storage.updateVendorStats(order.vendorId, {
+        averageRating,
+        totalRatings: allRatings.length,
+      });
+
+      res.json(rating);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  // Check if feedback was submitted for order
+  app.get("/api/orders/:id/feedback", requireAuth, async (req: AuthRequest, res) => {
+    try {
+      const order = await storage.getOrder(req.params.id);
+      if (!order) {
+        return res.status(404).json({ message: "Order not found" });
+      }
+
+      const existingRating = await storage.getRatingByOrder(order.id);
+      const hasSubmitted = existingRating?.ratedBy === req.user!.userId;
+      
+      res.json({ hasSubmitted, rating: existingRating });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // ==================== WALLET ROUTES ====================
   
   // Get wallet balance
