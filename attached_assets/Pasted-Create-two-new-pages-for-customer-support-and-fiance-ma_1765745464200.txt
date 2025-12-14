@@ -1,0 +1,87 @@
+Create two new pages for customer support and fiance manager ensure all changes are saved and database changes are also saved 
+
+Username for customer support is Cs password #28522520Turbo
+
+Username for finaace manager is Elon
+Passwords is 2024P07545
+
+No kyc is required for  the two of them, ensure the page matches their role then again add the new features to already existing page of admin and dispute admin
+
+1. Admin / CEO (Super Admin)
+  
+Create / edit / delete all user roles 
+free or unfreez users account
+Can check total number of users,categories like today, this month, this week. 
+he can also help finance manager in withdrwals
+Able to check all user's total balance combined and total pending withdrawals. 
+Set platform fees (e.g. 10%)
+Enable/disable deposits & withdrawals
+View all transactions & walletsEmergency actions (freeze platform, freeze accounts)
+
+  Maintenance Page (inside admin page)
+  
+Purpose
+Temporarily disable user actions during:
+System upgrades
+Wallet maintenance
+Security incidents
+Database migrations
+Blockchain node issues
+
+What Users See
+
+“🚧 Platform Under Maintenance”
+Reason (admin costom text)
+Expected downtime 
+Contact/support link
+Read-only access (optional)Maintenance Modes (Very Important)
+You should have multiple levels, not just ON/OFF:
+
+1️⃣ Full Maintenance
+Logi disabled
+Deposts ❌
+Withdrwals ❌
+Escrow 
+Admin access ✅
+
+2️⃣ Financial Mintenance
+Deposits ❌
+Withdrawals ❌
+Browsing & chats ✅
+Escrow locked
+
+3️⃣ Trading / Order Maintenance
+New orders ❌
+Existing orders visible
+Withdrawals ✅(optional)
+
+4️⃣ Read-Only Moe
+Users can log inView balances & history
+No actions alloed7.
+
+ Best-Practice Message Example
+> Scheduled Maienance
+We are upgrading our systems to improve security and performance.
+⏰ Estimated time: 2 hours
+🔒 Deposits & withdrawals temporarily unavailabl
+Thank you for your patience.
+
+2. Finance Manager
+
+able to check the customer's account transaction  history for withdrawals if the account is frozen or in dispute.
+freze or unfreeze users account 
+When approving withdrawals, the manager will
+View all financial transactions
+Approve or reject withdrawals
+Flag suspicious accounts
+View wallet balances of users requesing for withdrawls
+Approve daily withdrawals
+
+3Customer Support
+
+approve kyc and vendors
+View user profiles
+View order statu
+Reset passwords / 2FA 
+Assist with KYC approval
+Flag suspicious behaviour
