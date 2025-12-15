@@ -149,6 +149,10 @@ export default function AdminPage() {
   const [userToDelete, setUserToDelete] = useState<UserData | null>(null);
   const [userToFreeze, setUserToFreeze] = useState<UserData | null>(null);
   const [freezeReason, setFreezeReason] = useState("");
+  const [pendingMaintenanceMode, setPendingMaintenanceMode] = useState<string | null>(null);
+  const [maintenanceCustomReason, setMaintenanceCustomReason] = useState("");
+  const [maintenanceDowntime, setMaintenanceDowntime] = useState("");
+  const [hasMaintenanceChanges, setHasMaintenanceChanges] = useState(false);
 
   const getDocuments = (kyc: KycApplication): DocumentImage[] => {
     const docs: DocumentImage[] = [];
@@ -1218,7 +1222,7 @@ export default function AdminPage() {
                       </div>
                     </div>
 
-                    {/* Maintenance Mode Selection */}
+                    {/* Maintenance Mode Selection with Confirmation */}
                     <div className="space-y-3">
                       <Label className="text-white text-lg font-semibold">Maintenance Mode</Label>
                       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-3">
@@ -1231,16 +1235,22 @@ export default function AdminPage() {
                         ].map((mode) => (
                           <button
                             key={mode.value}
-                            onClick={() => updateMaintenanceMutation.mutate({ mode: mode.value as any })}
+                            onClick={() => {
+                              if (mode.value !== "none" && maintenanceSettings?.mode === "none") {
+                                setPendingMaintenanceMode(mode.value);
+                              } else {
+                                updateMaintenanceMutation.mutate({ mode: mode.value as any });
+                              }
+                            }}
                             disabled={updateMaintenanceMutation.isPending}
                             className={`p-4 rounded-lg border-2 text-left transition-all ${
                               maintenanceSettings?.mode === mode.value
-                                ? `border-${mode.color}-500 bg-${mode.color}-900/30`
+                                ? mode.value === "none" ? "border-green-500 bg-green-900/30" : "border-red-500 bg-red-900/30"
                                 : "border-gray-700 bg-gray-800/50 hover:border-gray-600"
                             }`}
                             data-testid={`maintenance-mode-${mode.value}`}
                           >
-                            <p className={`font-bold ${maintenanceSettings?.mode === mode.value ? `text-${mode.color}-400` : "text-white"}`}>
+                            <p className={`font-bold ${maintenanceSettings?.mode === mode.value ? (mode.value === "none" ? "text-green-400" : "text-red-400") : "text-white"}`}>
                               {mode.label}
                             </p>
                             <p className="text-gray-400 text-xs mt-1">{mode.desc}</p>
@@ -1255,8 +1265,11 @@ export default function AdminPage() {
                       <Textarea
                         placeholder="We are upgrading our systems to improve security and performance..."
                         className="bg-gray-800 border-gray-700 text-white min-h-[100px]"
-                        defaultValue={maintenanceSettings?.customReason || ""}
-                        onBlur={(e) => updateMaintenanceMutation.mutate({ customReason: e.target.value })}
+                        value={maintenanceCustomReason || maintenanceSettings?.customReason || ""}
+                        onChange={(e) => {
+                          setMaintenanceCustomReason(e.target.value);
+                          setHasMaintenanceChanges(true);
+                        }}
                         data-testid="maintenance-custom-reason"
                       />
                     </div>
@@ -1268,12 +1281,40 @@ export default function AdminPage() {
                         <Input
                           placeholder="e.g., 2 hours, 30 minutes"
                           className="bg-gray-800 border-gray-700 text-white max-w-xs"
-                          defaultValue={maintenanceSettings?.expectedDowntime || ""}
-                          onBlur={(e) => updateMaintenanceMutation.mutate({ expectedDowntime: e.target.value })}
+                          value={maintenanceDowntime || maintenanceSettings?.expectedDowntime || ""}
+                          onChange={(e) => {
+                            setMaintenanceDowntime(e.target.value);
+                            setHasMaintenanceChanges(true);
+                          }}
                           data-testid="maintenance-expected-downtime"
                         />
                         <Clock className="h-10 w-10 text-gray-500" />
                       </div>
+                    </div>
+
+                    {/* Save Button for Custom Message and Downtime */}
+                    <div className="flex gap-3">
+                      <Button
+                        className="bg-blue-600 hover:bg-blue-700"
+                        onClick={() => {
+                          updateMaintenanceMutation.mutate({
+                            customReason: maintenanceCustomReason || maintenanceSettings?.customReason || "",
+                            expectedDowntime: maintenanceDowntime || maintenanceSettings?.expectedDowntime || "",
+                          });
+                          setHasMaintenanceChanges(false);
+                        }}
+                        disabled={updateMaintenanceMutation.isPending || !hasMaintenanceChanges}
+                        data-testid="button-save-maintenance-settings"
+                      >
+                        <Check className="h-4 w-4 mr-2" />
+                        Save Message & Downtime
+                      </Button>
+                      {hasMaintenanceChanges && (
+                        <p className="text-yellow-400 text-sm flex items-center">
+                          <MessageSquare className="h-4 w-4 mr-1" />
+                          You have unsaved changes
+                        </p>
+                      )}
                     </div>
 
                     {/* Feature Toggles */}
@@ -1309,11 +1350,11 @@ export default function AdminPage() {
                           <div className="text-center space-y-4">
                             <div className="text-5xl">🚧</div>
                             <h3 className="text-2xl font-bold text-white">Platform Under Maintenance</h3>
-                            <p className="text-gray-300">{maintenanceSettings?.customReason || "We are upgrading our systems to improve security and performance."}</p>
-                            {maintenanceSettings?.expectedDowntime && (
+                            <p className="text-gray-300">{maintenanceCustomReason || maintenanceSettings?.customReason || "We are upgrading our systems to improve security and performance."}</p>
+                            {(maintenanceDowntime || maintenanceSettings?.expectedDowntime) && (
                               <div className="flex items-center justify-center gap-2 text-yellow-400">
                                 <Clock className="h-5 w-5" />
-                                <span>Estimated time: {maintenanceSettings.expectedDowntime}</span>
+                                <span>Estimated time: {maintenanceDowntime || maintenanceSettings?.expectedDowntime}</span>
                               </div>
                             )}
                             <div className="flex flex-wrap justify-center gap-2 pt-4">
@@ -1346,6 +1387,60 @@ export default function AdminPage() {
                 )}
               </CardContent>
             </Card>
+
+            {/* Confirmation Dialog for Enabling Maintenance */}
+            <Dialog open={!!pendingMaintenanceMode} onOpenChange={() => setPendingMaintenanceMode(null)}>
+              <DialogContent className="bg-gray-900 border-gray-800">
+                <DialogHeader>
+                  <DialogTitle className="text-white flex items-center gap-2">
+                    <AlertTriangle className="h-5 w-5 text-yellow-500" />
+                    Enable Maintenance Mode?
+                  </DialogTitle>
+                  <DialogDescription className="text-gray-400">
+                    This will affect all users on the platform. Make sure you have notified your team before proceeding.
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="space-y-4 py-4">
+                  <div className="p-4 bg-yellow-900/20 border border-yellow-700 rounded-lg">
+                    <p className="text-yellow-400 text-sm">
+                      <strong>Warning:</strong> Enabling {pendingMaintenanceMode === "full" ? "Full Maintenance" : 
+                        pendingMaintenanceMode === "financial" ? "Financial Maintenance" :
+                        pendingMaintenanceMode === "trading" ? "Trading Maintenance" : "Read-Only Mode"} 
+                      {" "}will restrict user access to the platform.
+                    </p>
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-gray-400">Reason for maintenance (optional):</Label>
+                    <Textarea
+                      placeholder="Scheduled system upgrade..."
+                      className="bg-gray-800 border-gray-700 text-white"
+                      value={maintenanceCustomReason}
+                      onChange={(e) => setMaintenanceCustomReason(e.target.value)}
+                    />
+                  </div>
+                </div>
+                <DialogFooter>
+                  <DialogClose asChild>
+                    <Button variant="outline" className="border-gray-700">Cancel</Button>
+                  </DialogClose>
+                  <Button 
+                    className="bg-red-600 hover:bg-red-700"
+                    onClick={() => {
+                      updateMaintenanceMutation.mutate({ 
+                        mode: pendingMaintenanceMode as any,
+                        customReason: maintenanceCustomReason || undefined
+                      });
+                      setPendingMaintenanceMode(null);
+                    }}
+                    disabled={updateMaintenanceMutation.isPending}
+                    data-testid="button-confirm-maintenance"
+                  >
+                    <Power className="h-4 w-4 mr-2" />
+                    Enable Maintenance
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
           </TabsContent>
         </Tabs>
 

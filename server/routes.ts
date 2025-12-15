@@ -2013,7 +2013,26 @@ export async function registerRoutes(
     }
   });
 
-  // Maintenance settings
+  // Public maintenance status endpoint (no auth required)
+  app.get("/api/maintenance/status", async (req, res) => {
+    try {
+      const settings = await storage.getMaintenanceSettings();
+      res.json({
+        mode: settings?.mode || "none",
+        message: settings?.message,
+        customReason: settings?.customReason,
+        expectedDowntime: settings?.expectedDowntime,
+        depositsEnabled: settings?.depositsEnabled ?? true,
+        withdrawalsEnabled: settings?.withdrawalsEnabled ?? true,
+        tradingEnabled: settings?.tradingEnabled ?? true,
+        loginEnabled: settings?.loginEnabled ?? true,
+      });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Maintenance settings (admin only)
   app.get("/api/admin/maintenance", requireAuth, requireAdmin, async (req: AuthRequest, res) => {
     try {
       const settings = await storage.getMaintenanceSettings();

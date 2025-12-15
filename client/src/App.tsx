@@ -1,6 +1,6 @@
 import { Switch, Route, Redirect } from "wouter";
 import { queryClient } from "./lib/queryClient";
-import { QueryClientProvider } from "@tanstack/react-query";
+import { QueryClientProvider, useQuery } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { ThemeProvider } from "@/components/ThemeProvider";
@@ -22,7 +22,13 @@ const DisputeAdminPage = lazy(() => import("@/pages/DisputeAdminPage"));
 const LoaderOrderPage = lazy(() => import("@/pages/LoaderOrderPage"));
 const SupportPage = lazy(() => import("@/pages/SupportPage"));
 const FinancePage = lazy(() => import("@/pages/FinancePage"));
+const MaintenancePage = lazy(() => import("@/pages/MaintenancePage"));
 const NotFound = lazy(() => import("@/pages/not-found"));
+
+interface MaintenanceStatus {
+  mode: "none" | "full" | "financial" | "trading" | "readonly";
+  loginEnabled: boolean;
+}
 
 function PageLoader() {
   return (
@@ -53,17 +59,14 @@ const ProtectedRoute = memo(function ProtectedRoute({
     return <Redirect to="/disputes" />;
   }
   
-  // Admin should only access wallet, admin panel, and disputes - redirect from other pages
   if (user?.role === "admin" && allowedRoles && !allowedRoles.includes("admin")) {
     return <Redirect to="/wallet" />;
   }
   
-  // Support redirects to support dashboard
   if (user?.role === "support" && allowedRoles && !allowedRoles.includes("support")) {
     return <Redirect to="/support" />;
   }
   
-  // Finance manager redirects to finance dashboard
   if (user?.role === "finance_manager" && allowedRoles && !allowedRoles.includes("finance_manager")) {
     return <Redirect to="/finance" />;
   }
@@ -76,6 +79,30 @@ const ProtectedRoute = memo(function ProtectedRoute({
 });
 
 function Router() {
+  const { data: maintenanceStatus, isLoading } = useQuery<MaintenanceStatus>({
+    queryKey: ["maintenance-status"],
+    queryFn: async () => {
+      const res = await fetch("/api/maintenance/status");
+      if (!res.ok) throw new Error("Failed to fetch maintenance status");
+      return res.json();
+    },
+    refetchInterval: 60000,
+    staleTime: 30000,
+  });
+
+  const user = JSON.parse(localStorage.getItem("user") || "{}");
+  const isStaff = ["admin", "support", "finance_manager", "dispute_admin"].includes(user?.role);
+
+  const isMaintenanceActive = maintenanceStatus?.mode && maintenanceStatus.mode !== "none";
+
+  if (!isLoading && isMaintenanceActive && !isStaff) {
+    return (
+      <Suspense fallback={<PageLoader />}>
+        <MaintenancePage />
+      </Suspense>
+    );
+  }
+
   return (
     <Suspense fallback={<PageLoader />}>
       <Switch>
@@ -93,6 +120,7 @@ function Router() {
         <Route path="/support" component={() => <ProtectedRoute component={SupportPage} allowedRoles={["admin", "support"]} />} />
         <Route path="/finance" component={() => <ProtectedRoute component={FinancePage} allowedRoles={["admin", "finance_manager"]} />} />
         <Route path="/loader-order/:id" component={() => <ProtectedRoute component={LoaderOrderPage} allowedRoles={["customer", "vendor"]} />} />
+        <Route path="/maintenance" component={MaintenancePage} />
         <Route component={NotFound} />
       </Switch>
     </Suspense>
