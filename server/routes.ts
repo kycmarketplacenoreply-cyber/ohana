@@ -400,7 +400,7 @@ export async function registerRoutes(
   });
 
   // Create offer - allows any KYC verified user with 2FA enabled to post ads (admin cannot post)
-  app.post("/api/vendor/offers", requireAuth, async (req: AuthRequest, res) => {
+  app.post("/api/vendor/offers", requireAuth, requireTradingEnabled, async (req: AuthRequest, res) => {
     try {
       // Check if user is admin - admin cannot post ads, only monitor
       const user = await storage.getUser(req.user!.userId);
@@ -518,7 +518,7 @@ export async function registerRoutes(
   });
 
   // Update offer
-  app.patch("/api/vendor/offers/:id", requireAuth, requireRole("vendor", "admin"), async (req: AuthRequest, res) => {
+  app.patch("/api/vendor/offers/:id", requireAuth, requireTradingEnabled, requireRole("vendor", "admin"), async (req: AuthRequest, res) => {
     try {
       const offer = await storage.getOffer(req.params.id);
       if (!offer) {
@@ -555,7 +555,7 @@ export async function registerRoutes(
   });
 
   // Delete offer
-  app.delete("/api/vendor/offers/:id", requireAuth, async (req: AuthRequest, res) => {
+  app.delete("/api/vendor/offers/:id", requireAuth, requireTradingEnabled, async (req: AuthRequest, res) => {
     try {
       const offer = await storage.getOffer(req.params.id);
       if (!offer) {
@@ -777,7 +777,7 @@ export async function registerRoutes(
 
   // Deposit funds for buy_ad orders - DEPRECATED: Funds are now held when posting buy ads
   // This endpoint is kept for backward compatibility but will return an error
-  app.post("/api/orders/:id/deposit", requireAuth, async (req: AuthRequest, res) => {
+  app.post("/api/orders/:id/deposit", requireAuth, requireTradingEnabled, async (req: AuthRequest, res) => {
     try {
       const order = await storage.getOrder(req.params.id);
       if (!order) {
@@ -801,7 +801,7 @@ export async function registerRoutes(
   });
 
   // Legacy deposit confirmation route (placeholder for old clients) - DEPRECATED
-  app.post("/api/orders/:id/confirm-deposit", requireAuth, async (req: AuthRequest, res) => {
+  app.post("/api/orders/:id/confirm-deposit", requireAuth, requireTradingEnabled, async (req: AuthRequest, res) => {
     try {
       const order = await storage.getOrder(req.params.id);
       if (!order) {
@@ -876,7 +876,7 @@ export async function registerRoutes(
   });
 
   // Mark order as paid (for external fiat payments if applicable)
-  app.post("/api/orders/:id/paid", requireAuth, async (req: AuthRequest, res) => {
+  app.post("/api/orders/:id/paid", requireAuth, requireTradingEnabled, async (req: AuthRequest, res) => {
     try {
       const order = await storage.getOrder(req.params.id);
       if (!order) {
@@ -911,7 +911,7 @@ export async function registerRoutes(
   });
 
   // Confirm delivery - Buyer confirms they received the product (or Admin can confirm)
-  app.post("/api/orders/:id/confirm", requireAuth, async (req: AuthRequest, res) => {
+  app.post("/api/orders/:id/confirm", requireAuth, requireTradingEnabled, async (req: AuthRequest, res) => {
     try {
       const { twoFactorToken } = req.body;
       
@@ -1011,7 +1011,7 @@ export async function registerRoutes(
   });
 
   // Seller delivers product - marks order as product delivered
-  app.post("/api/orders/:id/deliver", requireAuth, async (req: AuthRequest, res) => {
+  app.post("/api/orders/:id/deliver", requireAuth, requireTradingEnabled, async (req: AuthRequest, res) => {
     try {
       const order = await storage.getOrder(req.params.id);
       if (!order) {
@@ -1226,7 +1226,7 @@ export async function registerRoutes(
   });
 
   // Cancel order (before account/payment exchange only)
-  app.post("/api/orders/:id/cancel", requireAuth, async (req: AuthRequest, res) => {
+  app.post("/api/orders/:id/cancel", requireAuth, requireTradingEnabled, async (req: AuthRequest, res) => {
     try {
       const order = await storage.getOrder(req.params.id);
       if (!order) {
@@ -2830,7 +2830,7 @@ export async function registerRoutes(
   });
 
   // Create loader ad (admin cannot post)
-  app.post("/api/loaders/ads", requireAuth, async (req: AuthRequest, res) => {
+  app.post("/api/loaders/ads", requireAuth, requireTradingEnabled, async (req: AuthRequest, res) => {
     try {
       // Check if user is admin - admin cannot post loader ads, only monitor
       const user = await storage.getUser(req.user!.userId);
@@ -2920,7 +2920,7 @@ export async function registerRoutes(
   });
 
   // Cancel loader ad (before acceptance)
-  app.delete("/api/loaders/ads/:id", requireAuth, async (req: AuthRequest, res) => {
+  app.delete("/api/loaders/ads/:id", requireAuth, requireTradingEnabled, async (req: AuthRequest, res) => {
     try {
       const ad = await storage.getLoaderAd(req.params.id);
       if (!ad) {
@@ -2965,7 +2965,7 @@ export async function registerRoutes(
   });
 
   // Accept loader deal (receiver side)
-  app.post("/api/loaders/ads/:id/accept", requireAuth, async (req: AuthRequest, res) => {
+  app.post("/api/loaders/ads/:id/accept", requireAuth, requireTradingEnabled, async (req: AuthRequest, res) => {
     try {
       const ad = await storage.getLoaderAd(req.params.id);
       if (!ad) {
@@ -3121,7 +3121,7 @@ export async function registerRoutes(
   });
 
   // Send payment details (stops countdown)
-  app.post("/api/loaders/orders/:id/send-payment-details", requireAuth, async (req: AuthRequest, res) => {
+  app.post("/api/loaders/orders/:id/send-payment-details", requireAuth, requireTradingEnabled, async (req: AuthRequest, res) => {
     try {
       const order = await storage.getLoaderOrder(req.params.id);
       if (!order) {
@@ -3168,7 +3168,7 @@ export async function registerRoutes(
   });
 
   // Mark payment sent (loader only)
-  app.post("/api/loaders/orders/:id/mark-payment-sent", requireAuth, async (req: AuthRequest, res) => {
+  app.post("/api/loaders/orders/:id/mark-payment-sent", requireAuth, requireTradingEnabled, async (req: AuthRequest, res) => {
     try {
       const order = await storage.getLoaderOrder(req.params.id);
       if (!order) {
@@ -3202,7 +3202,7 @@ export async function registerRoutes(
   });
 
   // Cancel order with 5% penalty
-  app.post("/api/loaders/orders/:id/cancel", requireAuth, async (req: AuthRequest, res) => {
+  app.post("/api/loaders/orders/:id/cancel", requireAuth, requireTradingEnabled, async (req: AuthRequest, res) => {
     try {
       const order = await storage.getLoaderOrder(req.params.id);
       if (!order) {
@@ -3916,7 +3916,7 @@ export async function registerRoutes(
   });
 
   // Complete order (confirm payment received)
-  app.post("/api/loaders/orders/:id/complete", requireAuth, async (req: AuthRequest, res) => {
+  app.post("/api/loaders/orders/:id/complete", requireAuth, requireTradingEnabled, async (req: AuthRequest, res) => {
     try {
       const order = await storage.getLoaderOrder(req.params.id);
       if (!order) {
@@ -4325,7 +4325,7 @@ export async function registerRoutes(
   });
 
   // Receiver selects liability terms
-  app.post("/api/loaders/orders/:id/select-liability", requireAuth, async (req: AuthRequest, res) => {
+  app.post("/api/loaders/orders/:id/select-liability", requireAuth, requireTradingEnabled, async (req: AuthRequest, res) => {
     try {
       const { liabilityType } = req.body;
       
@@ -4388,7 +4388,7 @@ export async function registerRoutes(
   });
 
   // Confirm liability agreement (both parties must confirm)
-  app.post("/api/loaders/orders/:id/confirm-liability", requireAuth, async (req: AuthRequest, res) => {
+  app.post("/api/loaders/orders/:id/confirm-liability", requireAuth, requireTradingEnabled, async (req: AuthRequest, res) => {
     try {
       const order = await storage.getLoaderOrder(req.params.id);
       if (!order) {
