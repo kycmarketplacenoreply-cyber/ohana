@@ -229,6 +229,12 @@ async function createTablesIfNotExist() {
       id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid(),
       mode maintenance_mode NOT NULL DEFAULT 'none',
       message TEXT,
+      custom_reason TEXT,
+      expected_downtime TEXT,
+      deposits_enabled BOOLEAN NOT NULL DEFAULT true,
+      withdrawals_enabled BOOLEAN NOT NULL DEFAULT true,
+      trading_enabled BOOLEAN NOT NULL DEFAULT true,
+      login_enabled BOOLEAN NOT NULL DEFAULT true,
       updated_by VARCHAR REFERENCES users(id),
       updated_at TIMESTAMP NOT NULL DEFAULT now()
     );
@@ -456,6 +462,15 @@ async function runMigrations() {
     `DO $$ BEGIN ALTER TYPE loader_order_status ADD VALUE IF NOT EXISTS 'resolved_loader_wins'; EXCEPTION WHEN duplicate_object THEN null; END $$;`,
     `DO $$ BEGIN ALTER TYPE loader_order_status ADD VALUE IF NOT EXISTS 'resolved_receiver_wins'; EXCEPTION WHEN duplicate_object THEN null; END $$;`,
     `DO $$ BEGIN ALTER TYPE loader_order_status ADD VALUE IF NOT EXISTS 'resolved_mutual'; EXCEPTION WHEN duplicate_object THEN null; END $$;`,
+    `ALTER TABLE maintenance_settings ADD COLUMN IF NOT EXISTS custom_reason TEXT;`,
+    `ALTER TABLE maintenance_settings ADD COLUMN IF NOT EXISTS expected_downtime TEXT;`,
+    `ALTER TABLE maintenance_settings ADD COLUMN IF NOT EXISTS deposits_enabled BOOLEAN NOT NULL DEFAULT true;`,
+    `ALTER TABLE maintenance_settings ADD COLUMN IF NOT EXISTS withdrawals_enabled BOOLEAN NOT NULL DEFAULT true;`,
+    `ALTER TABLE maintenance_settings ADD COLUMN IF NOT EXISTS trading_enabled BOOLEAN NOT NULL DEFAULT true;`,
+    `ALTER TABLE maintenance_settings ADD COLUMN IF NOT EXISTS login_enabled BOOLEAN NOT NULL DEFAULT true;`,
+    `DO $$ BEGIN ALTER TYPE maintenance_mode ADD VALUE IF NOT EXISTS 'financial'; EXCEPTION WHEN duplicate_object THEN null; END $$;`,
+    `DO $$ BEGIN ALTER TYPE maintenance_mode ADD VALUE IF NOT EXISTS 'trading'; EXCEPTION WHEN duplicate_object THEN null; END $$;`,
+    `DO $$ BEGIN ALTER TYPE maintenance_mode ADD VALUE IF NOT EXISTS 'readonly'; EXCEPTION WHEN duplicate_object THEN null; END $$;`,
   ];
 
   for (const migration of migrations) {
