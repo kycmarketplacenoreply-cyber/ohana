@@ -49,10 +49,12 @@ async function scanForNewDeposits(): Promise<void> {
     return;
   }
 
-  const fromBlock = lastScanBlock > 0 ? lastScanBlock - 10 : currentBlock - 5000;
+  const fromBlock = lastScanBlock > 0 ? lastScanBlock - 5 : currentBlock - 50;
 
   console.log(`[DepositScanner] Scanning ${depositAddresses.length} addresses from block ${fromBlock}`);
 
+  let allSuccessful = true;
+  
   for (const depositAddress of depositAddresses) {
     try {
       const transfers = await monitorDepositAddress(depositAddress.address, fromBlock);
@@ -86,10 +88,13 @@ async function scanForNewDeposits(): Promise<void> {
       }
     } catch (error) {
       console.error(`[DepositScanner] Error scanning address ${depositAddress.address}:`, error);
+      allSuccessful = false;
     }
   }
 
-  lastScanBlock = currentBlock;
+  if (allSuccessful) {
+    lastScanBlock = currentBlock;
+  }
 }
 
 async function updatePendingDeposits(): Promise<void> {

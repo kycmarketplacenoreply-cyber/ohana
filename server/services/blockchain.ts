@@ -206,7 +206,7 @@ export async function monitorDepositAddress(
 
     const filter = usdtContract.filters.Transfer(null, address);
     const currentBlock = await getCurrentBlockNumber();
-    const startBlock = fromBlock || currentBlock - 1000;
+    const startBlock = fromBlock || currentBlock - 50;
 
     const events = await usdtContract.queryFilter(filter, startBlock, currentBlock);
 
