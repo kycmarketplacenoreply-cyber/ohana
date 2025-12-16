@@ -1078,3 +1078,241 @@ export type LoaderFeedback = typeof loaderFeedback.$inferSelect;
 
 export type InsertLoaderStats = z.infer<typeof insertLoaderStatsSchema>;
 export type LoaderStats = typeof loaderStats.$inferSelect;
+
+// ==================== BLOCKCHAIN WALLET TABLES ====================
+
+// Deposit Status Enum
+export const depositStatusEnum = pgEnum("deposit_status", [
+  "pending",
+  "confirming",
+  "confirmed",
+  "credited",
+  "sweep_pending",
+  "swept",
+  "failed"
+]);
+
+// Sweep Status Enum
+export const sweepStatusEnum = pgEnum("sweep_status", [
+  "pending",
+  "processing",
+  "completed",
+  "failed"
+]);
+
+// Withdrawal Status Enum (extended)
+export const withdrawalStatusEnum = pgEnum("withdrawal_status", [
+  "pending",
+  "approved",
+  "processing",
+  "sent",
+  "completed",
+  "rejected",
+  "failed",
+  "cancelled"
+]);
+
+// User Deposit Addresses - Unique deposit address per user
+export const userDepositAddresses = pgTable("user_deposit_addresses", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  address: text("address").notNull().unique(),
+  network: text("network").notNull().default("BSC"),
+  derivationIndex: integer("derivation_index").notNull(),
+  encryptedPrivateKey: text("encrypted_private_key").notNull(),
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+});
+
+// Blockchain Deposits - Track all incoming deposits
+export const blockchainDeposits = pgTable("blockchain_deposits", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  depositAddressId: varchar("deposit_address_id").notNull().references(() => userDepositAddresses.id),
+  txHash: text("tx_hash").notNull().unique(),
+  fromAddress: text("from_address").notNull(),
+  toAddress: text("to_address").notNull(),
+  amount: numeric("amount", { precision: 18, scale: 8 }).notNull(),
+  tokenContract: text("token_contract").notNull(),
+  network: text("network").notNull().default("BSC"),
+  blockNumber: integer("block_number").notNull(),
+  confirmations: integer("confirmations").notNull().default(0),
+  requiredConfirmations: integer("required_confirmations").notNull().default(15),
+  status: depositStatusEnum("status").notNull().default("pending"),
+  creditedAt: timestamp("credited_at"),
+  creditedTransactionId: varchar("credited_transaction_id"),
+  detectedAt: timestamp("detected_at").notNull().default(sql`now()`),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+  updatedAt: timestamp("updated_at").notNull().default(sql`now()`),
+});
+
+// Deposit Sweeps - Track sweep transactions to master wallet
+export const depositSweeps = pgTable("deposit_sweeps", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  depositId: varchar("deposit_id").notNull().references(() => blockchainDeposits.id),
+  fromAddress: text("from_address").notNull(),
+  toAddress: text("to_address").notNull(),
+  amount: numeric("amount", { precision: 18, scale: 8 }).notNull(),
+  gasFee: numeric("gas_fee", { precision: 18, scale: 8 }),
+  txHash: text("tx_hash"),
+  status: sweepStatusEnum("status").notNull().default("pending"),
+  attempts: integer("attempts").notNull().default(0),
+  lastAttemptAt: timestamp("last_attempt_at"),
+  completedAt: timestamp("completed_at"),
+  errorMessage: text("error_message"),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+  updatedAt: timestamp("updated_at").notNull().default(sql`now()`),
+});
+
+// Platform Wallet Controls - Kill switches and limits
+export const platformWalletControls = pgTable("platform_wallet_controls", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  withdrawalsEnabled: boolean("withdrawals_enabled").notNull().default(true),
+  depositsEnabled: boolean("deposits_enabled").notNull().default(true),
+  sweepsEnabled: boolean("sweeps_enabled").notNull().default(true),
+  emergencyMode: boolean("emergency_mode").notNull().default(false),
+  hotWalletBalanceCap: numeric("hot_wallet_balance_cap", { precision: 18, scale: 8 }).notNull().default("100000"),
+  perUserDailyWithdrawalLimit: numeric("per_user_daily_withdrawal_limit", { precision: 18, scale: 8 }).notNull().default("10000"),
+  platformDailyWithdrawalLimit: numeric("platform_daily_withdrawal_limit", { precision: 18, scale: 8 }).notNull().default("100000"),
+  minWithdrawalAmount: numeric("min_withdrawal_amount", { precision: 18, scale: 8 }).notNull().default("10"),
+  withdrawalFeePercent: numeric("withdrawal_fee_percent", { precision: 5, scale: 2 }).notNull().default("0.1"),
+  withdrawalFeeFixed: numeric("withdrawal_fee_fixed", { precision: 18, scale: 8 }).notNull().default("1"),
+  firstWithdrawalDelayMinutes: integer("first_withdrawal_delay_minutes").notNull().default(60),
+  largeWithdrawalThreshold: numeric("large_withdrawal_threshold", { precision: 18, scale: 8 }).notNull().default("1000"),
+  largeWithdrawalDelayMinutes: integer("large_withdrawal_delay_minutes").notNull().default(120),
+  requiredConfirmations: integer("required_confirmations").notNull().default(15),
+  walletUnlocked: boolean("wallet_unlocked").notNull().default(false),
+  unlockedAt: timestamp("unlocked_at"),
+  unlockedBy: varchar("unlocked_by").references(() => users.id),
+  updatedBy: varchar("updated_by").references(() => users.id),
+  updatedAt: timestamp("updated_at").notNull().default(sql`now()`),
+});
+
+// Blockchain Admin Actions - Immutable audit log for wallet operations
+export const blockchainAdminActions = pgTable("blockchain_admin_actions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  adminId: varchar("admin_id").notNull().references(() => users.id),
+  action: text("action").notNull(),
+  targetType: text("target_type").notNull(),
+  targetId: varchar("target_id"),
+  previousValue: jsonb("previous_value"),
+  newValue: jsonb("new_value"),
+  reason: text("reason"),
+  ipAddress: text("ip_address"),
+  userAgent: text("user_agent"),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+});
+
+// User Withdrawal Limits - Track daily withdrawal usage
+export const userWithdrawalLimits = pgTable("user_withdrawal_limits", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  date: text("date").notNull(),
+  totalWithdrawn: numeric("total_withdrawn", { precision: 18, scale: 8 }).notNull().default("0"),
+  withdrawalCount: integer("withdrawal_count").notNull().default(0),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+  updatedAt: timestamp("updated_at").notNull().default(sql`now()`),
+});
+
+// User First Withdrawal Tracking
+export const userFirstWithdrawals = pgTable("user_first_withdrawals", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().unique().references(() => users.id, { onDelete: "cascade" }),
+  hasWithdrawn: boolean("has_withdrawn").notNull().default(false),
+  firstWithdrawalAt: timestamp("first_withdrawal_at"),
+  lastPasswordChangeAt: timestamp("last_password_change_at"),
+  lastEmailChangeAt: timestamp("last_email_change_at"),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+});
+
+// Blockchain Deposit Address Relations
+export const userDepositAddressesRelations = relations(userDepositAddresses, ({ one, many }) => ({
+  user: one(users, {
+    fields: [userDepositAddresses.userId],
+    references: [users.id],
+  }),
+  deposits: many(blockchainDeposits),
+}));
+
+export const blockchainDepositsRelations = relations(blockchainDeposits, ({ one }) => ({
+  user: one(users, {
+    fields: [blockchainDeposits.userId],
+    references: [users.id],
+  }),
+  depositAddress: one(userDepositAddresses, {
+    fields: [blockchainDeposits.depositAddressId],
+    references: [userDepositAddresses.id],
+  }),
+}));
+
+export const depositSweepsRelations = relations(depositSweeps, ({ one }) => ({
+  deposit: one(blockchainDeposits, {
+    fields: [depositSweeps.depositId],
+    references: [blockchainDeposits.id],
+  }),
+}));
+
+// Blockchain Insert Schemas
+export const insertUserDepositAddressSchema = createInsertSchema(userDepositAddresses).omit({
+  id: true,
+  createdAt: true,
+  isActive: true,
+});
+
+export const insertBlockchainDepositSchema = createInsertSchema(blockchainDeposits).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+  creditedAt: true,
+  creditedTransactionId: true,
+});
+
+export const insertDepositSweepSchema = createInsertSchema(depositSweeps).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+  txHash: true,
+  completedAt: true,
+  errorMessage: true,
+  attempts: true,
+  lastAttemptAt: true,
+});
+
+export const insertBlockchainAdminActionSchema = createInsertSchema(blockchainAdminActions).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertUserWithdrawalLimitSchema = createInsertSchema(userWithdrawalLimits).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertUserFirstWithdrawalSchema = createInsertSchema(userFirstWithdrawals).omit({
+  id: true,
+  createdAt: true,
+  hasWithdrawn: true,
+  firstWithdrawalAt: true,
+});
+
+// Blockchain Type Exports
+export type InsertUserDepositAddress = z.infer<typeof insertUserDepositAddressSchema>;
+export type UserDepositAddress = typeof userDepositAddresses.$inferSelect;
+
+export type InsertBlockchainDeposit = z.infer<typeof insertBlockchainDepositSchema>;
+export type BlockchainDeposit = typeof blockchainDeposits.$inferSelect;
+
+export type InsertDepositSweep = z.infer<typeof insertDepositSweepSchema>;
+export type DepositSweep = typeof depositSweeps.$inferSelect;
+
+export type PlatformWalletControls = typeof platformWalletControls.$inferSelect;
+
+export type InsertBlockchainAdminAction = z.infer<typeof insertBlockchainAdminActionSchema>;
+export type BlockchainAdminAction = typeof blockchainAdminActions.$inferSelect;
+
+export type InsertUserWithdrawalLimit = z.infer<typeof insertUserWithdrawalLimitSchema>;
+export type UserWithdrawalLimit = typeof userWithdrawalLimits.$inferSelect;
+
+export type InsertUserFirstWithdrawal = z.infer<typeof insertUserFirstWithdrawalSchema>;
+export type UserFirstWithdrawal = typeof userFirstWithdrawals.$inferSelect;

@@ -430,6 +430,132 @@ async function createTablesIfNotExist() {
   `);
 }
 
+async function createBlockchainTables() {
+  const blockchainEnums = [
+    `DO $$ BEGIN CREATE TYPE deposit_status AS ENUM ('pending', 'confirming', 'confirmed', 'credited', 'sweep_pending', 'swept', 'failed'); EXCEPTION WHEN duplicate_object THEN null; END $$;`,
+    `DO $$ BEGIN CREATE TYPE sweep_status AS ENUM ('pending', 'processing', 'completed', 'failed'); EXCEPTION WHEN duplicate_object THEN null; END $$;`,
+    `DO $$ BEGIN CREATE TYPE withdrawal_status AS ENUM ('pending', 'approved', 'processing', 'sent', 'completed', 'rejected', 'failed', 'cancelled'); EXCEPTION WHEN duplicate_object THEN null; END $$;`,
+  ];
+
+  for (const query of blockchainEnums) {
+    await pool.query(query);
+  }
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS user_deposit_addresses (
+      id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid(),
+      user_id VARCHAR NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      address TEXT NOT NULL UNIQUE,
+      network TEXT NOT NULL DEFAULT 'BSC',
+      derivation_index INTEGER NOT NULL,
+      encrypted_private_key TEXT NOT NULL,
+      is_active BOOLEAN NOT NULL DEFAULT true,
+      created_at TIMESTAMP NOT NULL DEFAULT now()
+    );
+
+    CREATE TABLE IF NOT EXISTS blockchain_deposits (
+      id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid(),
+      user_id VARCHAR NOT NULL REFERENCES users(id),
+      deposit_address_id VARCHAR NOT NULL REFERENCES user_deposit_addresses(id),
+      tx_hash TEXT NOT NULL UNIQUE,
+      from_address TEXT NOT NULL,
+      to_address TEXT NOT NULL,
+      amount NUMERIC(18, 8) NOT NULL,
+      token_contract TEXT NOT NULL,
+      network TEXT NOT NULL DEFAULT 'BSC',
+      block_number INTEGER NOT NULL,
+      confirmations INTEGER NOT NULL DEFAULT 0,
+      required_confirmations INTEGER NOT NULL DEFAULT 15,
+      status deposit_status NOT NULL DEFAULT 'pending',
+      credited_at TIMESTAMP,
+      credited_transaction_id VARCHAR,
+      detected_at TIMESTAMP NOT NULL DEFAULT now(),
+      created_at TIMESTAMP NOT NULL DEFAULT now(),
+      updated_at TIMESTAMP NOT NULL DEFAULT now()
+    );
+
+    CREATE TABLE IF NOT EXISTS deposit_sweeps (
+      id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid(),
+      deposit_id VARCHAR NOT NULL REFERENCES blockchain_deposits(id),
+      from_address TEXT NOT NULL,
+      to_address TEXT NOT NULL,
+      amount NUMERIC(18, 8) NOT NULL,
+      gas_fee NUMERIC(18, 8),
+      tx_hash TEXT,
+      status sweep_status NOT NULL DEFAULT 'pending',
+      attempts INTEGER NOT NULL DEFAULT 0,
+      last_attempt_at TIMESTAMP,
+      completed_at TIMESTAMP,
+      error_message TEXT,
+      created_at TIMESTAMP NOT NULL DEFAULT now(),
+      updated_at TIMESTAMP NOT NULL DEFAULT now()
+    );
+
+    CREATE TABLE IF NOT EXISTS platform_wallet_controls (
+      id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid(),
+      withdrawals_enabled BOOLEAN NOT NULL DEFAULT true,
+      deposits_enabled BOOLEAN NOT NULL DEFAULT true,
+      sweeps_enabled BOOLEAN NOT NULL DEFAULT true,
+      emergency_mode BOOLEAN NOT NULL DEFAULT false,
+      hot_wallet_balance_cap NUMERIC(18, 8) NOT NULL DEFAULT 100000,
+      per_user_daily_withdrawal_limit NUMERIC(18, 8) NOT NULL DEFAULT 10000,
+      platform_daily_withdrawal_limit NUMERIC(18, 8) NOT NULL DEFAULT 100000,
+      min_withdrawal_amount NUMERIC(18, 8) NOT NULL DEFAULT 10,
+      withdrawal_fee_percent NUMERIC(5, 2) NOT NULL DEFAULT 0.1,
+      withdrawal_fee_fixed NUMERIC(18, 8) NOT NULL DEFAULT 1,
+      first_withdrawal_delay_minutes INTEGER NOT NULL DEFAULT 60,
+      large_withdrawal_threshold NUMERIC(18, 8) NOT NULL DEFAULT 1000,
+      large_withdrawal_delay_minutes INTEGER NOT NULL DEFAULT 120,
+      required_confirmations INTEGER NOT NULL DEFAULT 15,
+      wallet_unlocked BOOLEAN NOT NULL DEFAULT false,
+      unlocked_at TIMESTAMP,
+      unlocked_by VARCHAR REFERENCES users(id),
+      updated_by VARCHAR REFERENCES users(id),
+      updated_at TIMESTAMP NOT NULL DEFAULT now()
+    );
+
+    CREATE TABLE IF NOT EXISTS blockchain_admin_actions (
+      id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid(),
+      admin_id VARCHAR NOT NULL REFERENCES users(id),
+      action TEXT NOT NULL,
+      target_type TEXT NOT NULL,
+      target_id VARCHAR,
+      previous_value JSONB,
+      new_value JSONB,
+      reason TEXT,
+      ip_address TEXT,
+      user_agent TEXT,
+      created_at TIMESTAMP NOT NULL DEFAULT now()
+    );
+
+    CREATE TABLE IF NOT EXISTS user_withdrawal_limits (
+      id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid(),
+      user_id VARCHAR NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      date TEXT NOT NULL,
+      total_withdrawn NUMERIC(18, 8) NOT NULL DEFAULT 0,
+      withdrawal_count INTEGER NOT NULL DEFAULT 0,
+      created_at TIMESTAMP NOT NULL DEFAULT now(),
+      updated_at TIMESTAMP NOT NULL DEFAULT now()
+    );
+
+    CREATE TABLE IF NOT EXISTS user_first_withdrawals (
+      id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid(),
+      user_id VARCHAR NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE,
+      has_withdrawn BOOLEAN NOT NULL DEFAULT false,
+      first_withdrawal_at TIMESTAMP,
+      last_password_change_at TIMESTAMP,
+      last_email_change_at TIMESTAMP,
+      created_at TIMESTAMP NOT NULL DEFAULT now()
+    );
+  `);
+
+  const existingControls = await pool.query(`SELECT id FROM platform_wallet_controls LIMIT 1`);
+  if (existingControls.rows.length === 0) {
+    await pool.query(`INSERT INTO platform_wallet_controls DEFAULT VALUES`);
+    console.log("Created default platform wallet controls");
+  }
+}
+
 async function runMigrations() {
   const migrations = [
     `ALTER TABLE users ADD COLUMN IF NOT EXISTS profile_picture TEXT;`,
@@ -649,6 +775,9 @@ export async function initializeDatabase(): Promise<void> {
     
     await createTablesIfNotExist();
     console.log("Tables created/verified.");
+    
+    await createBlockchainTables();
+    console.log("Blockchain wallet tables created/verified.");
     
     await runMigrations();
     console.log("Migrations applied.");

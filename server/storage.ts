@@ -29,6 +29,13 @@ import {
   loaderDisputes,
   loaderFeedback,
   loaderStats,
+  userDepositAddresses,
+  blockchainDeposits,
+  depositSweeps,
+  platformWalletControls,
+  blockchainAdminActions,
+  userWithdrawalLimits,
+  userFirstWithdrawals,
   type User,
   type InsertUser,
   type Kyc,
@@ -83,6 +90,19 @@ import {
   type InsertLoaderFeedback,
   type LoaderStats,
   type InsertLoaderStats,
+  type UserDepositAddress,
+  type InsertUserDepositAddress,
+  type BlockchainDeposit,
+  type InsertBlockchainDeposit,
+  type DepositSweep,
+  type InsertDepositSweep,
+  type PlatformWalletControls,
+  type BlockchainAdminAction,
+  type InsertBlockchainAdminAction,
+  type UserWithdrawalLimit,
+  type InsertUserWithdrawalLimit,
+  type UserFirstWithdrawal,
+  type InsertUserFirstWithdrawal,
 } from "@shared/schema";
 
 export interface IStorage {
@@ -284,6 +304,56 @@ export interface IStorage {
   getAllWallets(): Promise<Wallet[]>;
   getAllOrders(): Promise<Order[]>;
   deleteUser(id: string): Promise<void>;
+
+  // Blockchain Wallet - Deposit Addresses
+  getUserDepositAddress(userId: string, network?: string): Promise<UserDepositAddress | undefined>;
+  getUserDepositAddressByAddress(address: string): Promise<UserDepositAddress | undefined>;
+  createUserDepositAddress(address: InsertUserDepositAddress): Promise<UserDepositAddress>;
+  getNextDerivationIndex(): Promise<number>;
+
+  // Blockchain Wallet - Deposits
+  getBlockchainDeposit(id: string): Promise<BlockchainDeposit | undefined>;
+  getBlockchainDepositByTxHash(txHash: string): Promise<BlockchainDeposit | undefined>;
+  getBlockchainDepositsByUser(userId: string): Promise<BlockchainDeposit[]>;
+  getPendingBlockchainDeposits(): Promise<BlockchainDeposit[]>;
+  getConfirmedUncreditedDeposits(): Promise<BlockchainDeposit[]>;
+  getCreditedUnsweptDeposits(): Promise<BlockchainDeposit[]>;
+  createBlockchainDeposit(deposit: InsertBlockchainDeposit): Promise<BlockchainDeposit>;
+  updateBlockchainDeposit(id: string, updates: Partial<BlockchainDeposit>): Promise<BlockchainDeposit | undefined>;
+
+  // Blockchain Wallet - Sweeps
+  getDepositSweep(id: string): Promise<DepositSweep | undefined>;
+  getDepositSweepByDepositId(depositId: string): Promise<DepositSweep | undefined>;
+  getPendingSweeps(): Promise<DepositSweep[]>;
+  createDepositSweep(sweep: InsertDepositSweep): Promise<DepositSweep>;
+  updateDepositSweep(id: string, updates: Partial<DepositSweep>): Promise<DepositSweep | undefined>;
+
+  // Platform Wallet Controls
+  getPlatformWalletControls(): Promise<PlatformWalletControls | undefined>;
+  updatePlatformWalletControls(updates: Partial<PlatformWalletControls>): Promise<PlatformWalletControls>;
+  initPlatformWalletControls(): Promise<PlatformWalletControls>;
+
+  // Blockchain Admin Actions
+  createBlockchainAdminAction(action: InsertBlockchainAdminAction): Promise<BlockchainAdminAction>;
+  getBlockchainAdminActions(limit?: number): Promise<BlockchainAdminAction[]>;
+
+  // User Withdrawal Limits
+  getUserWithdrawalLimit(userId: string, date: string): Promise<UserWithdrawalLimit | undefined>;
+  createUserWithdrawalLimit(limit: InsertUserWithdrawalLimit): Promise<UserWithdrawalLimit>;
+  updateUserWithdrawalLimit(id: string, updates: Partial<UserWithdrawalLimit>): Promise<UserWithdrawalLimit | undefined>;
+  getOrCreateUserWithdrawalLimit(userId: string, date: string): Promise<UserWithdrawalLimit>;
+
+  // User First Withdrawals
+  getUserFirstWithdrawal(userId: string): Promise<UserFirstWithdrawal | undefined>;
+  createUserFirstWithdrawal(data: InsertUserFirstWithdrawal): Promise<UserFirstWithdrawal>;
+  updateUserFirstWithdrawal(userId: string, updates: Partial<UserFirstWithdrawal>): Promise<UserFirstWithdrawal | undefined>;
+  getOrCreateUserFirstWithdrawal(userId: string): Promise<UserFirstWithdrawal>;
+
+  // Extended Withdrawal Requests
+  getAllWithdrawalRequests(): Promise<WithdrawalRequest[]>;
+  getWithdrawalRequestsByUser(userId: string): Promise<WithdrawalRequest[]>;
+  getApprovedWithdrawalRequests(): Promise<WithdrawalRequest[]>;
+  getTodayPlatformWithdrawalTotal(): Promise<string>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1385,6 +1455,265 @@ export class DatabaseStorage implements IStorage {
 
   async deleteUser(id: string): Promise<void> {
     await db.delete(users).where(eq(users.id, id));
+  }
+
+  // Blockchain Wallet - Deposit Addresses
+  async getUserDepositAddress(userId: string, network: string = "BSC"): Promise<UserDepositAddress | undefined> {
+    const [address] = await db
+      .select()
+      .from(userDepositAddresses)
+      .where(and(eq(userDepositAddresses.userId, userId), eq(userDepositAddresses.network, network)));
+    return address || undefined;
+  }
+
+  async getUserDepositAddressByAddress(address: string): Promise<UserDepositAddress | undefined> {
+    const [result] = await db
+      .select()
+      .from(userDepositAddresses)
+      .where(eq(userDepositAddresses.address, address));
+    return result || undefined;
+  }
+
+  async createUserDepositAddress(address: InsertUserDepositAddress): Promise<UserDepositAddress> {
+    const [newAddress] = await db.insert(userDepositAddresses).values(address).returning();
+    return newAddress;
+  }
+
+  async getNextDerivationIndex(): Promise<number> {
+    const result = await db
+      .select({ maxIndex: sql<number>`COALESCE(MAX(${userDepositAddresses.derivationIndex}), -1)` })
+      .from(userDepositAddresses);
+    return (result[0]?.maxIndex || 0) + 1;
+  }
+
+  // Blockchain Wallet - Deposits
+  async getBlockchainDeposit(id: string): Promise<BlockchainDeposit | undefined> {
+    const [deposit] = await db.select().from(blockchainDeposits).where(eq(blockchainDeposits.id, id));
+    return deposit || undefined;
+  }
+
+  async getBlockchainDepositByTxHash(txHash: string): Promise<BlockchainDeposit | undefined> {
+    const [deposit] = await db.select().from(blockchainDeposits).where(eq(blockchainDeposits.txHash, txHash));
+    return deposit || undefined;
+  }
+
+  async getBlockchainDepositsByUser(userId: string): Promise<BlockchainDeposit[]> {
+    return await db
+      .select()
+      .from(blockchainDeposits)
+      .where(eq(blockchainDeposits.userId, userId))
+      .orderBy(desc(blockchainDeposits.createdAt));
+  }
+
+  async getPendingBlockchainDeposits(): Promise<BlockchainDeposit[]> {
+    return await db
+      .select()
+      .from(blockchainDeposits)
+      .where(or(eq(blockchainDeposits.status, "pending"), eq(blockchainDeposits.status, "confirming")));
+  }
+
+  async getConfirmedUncreditedDeposits(): Promise<BlockchainDeposit[]> {
+    return await db
+      .select()
+      .from(blockchainDeposits)
+      .where(eq(blockchainDeposits.status, "confirmed"));
+  }
+
+  async getCreditedUnsweptDeposits(): Promise<BlockchainDeposit[]> {
+    return await db
+      .select()
+      .from(blockchainDeposits)
+      .where(eq(blockchainDeposits.status, "credited"));
+  }
+
+  async createBlockchainDeposit(deposit: InsertBlockchainDeposit): Promise<BlockchainDeposit> {
+    const [newDeposit] = await db.insert(blockchainDeposits).values(deposit).returning();
+    return newDeposit;
+  }
+
+  async updateBlockchainDeposit(id: string, updates: Partial<BlockchainDeposit>): Promise<BlockchainDeposit | undefined> {
+    const [deposit] = await db
+      .update(blockchainDeposits)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(blockchainDeposits.id, id))
+      .returning();
+    return deposit || undefined;
+  }
+
+  // Blockchain Wallet - Sweeps
+  async getDepositSweep(id: string): Promise<DepositSweep | undefined> {
+    const [sweep] = await db.select().from(depositSweeps).where(eq(depositSweeps.id, id));
+    return sweep || undefined;
+  }
+
+  async getDepositSweepByDepositId(depositId: string): Promise<DepositSweep | undefined> {
+    const [sweep] = await db.select().from(depositSweeps).where(eq(depositSweeps.depositId, depositId));
+    return sweep || undefined;
+  }
+
+  async getPendingSweeps(): Promise<DepositSweep[]> {
+    return await db
+      .select()
+      .from(depositSweeps)
+      .where(or(eq(depositSweeps.status, "pending"), eq(depositSweeps.status, "failed")));
+  }
+
+  async createDepositSweep(sweep: InsertDepositSweep): Promise<DepositSweep> {
+    const [newSweep] = await db.insert(depositSweeps).values(sweep).returning();
+    return newSweep;
+  }
+
+  async updateDepositSweep(id: string, updates: Partial<DepositSweep>): Promise<DepositSweep | undefined> {
+    const [sweep] = await db
+      .update(depositSweeps)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(depositSweeps.id, id))
+      .returning();
+    return sweep || undefined;
+  }
+
+  // Platform Wallet Controls
+  async getPlatformWalletControls(): Promise<PlatformWalletControls | undefined> {
+    const [controls] = await db.select().from(platformWalletControls).limit(1);
+    return controls || undefined;
+  }
+
+  async updatePlatformWalletControls(updates: Partial<PlatformWalletControls>): Promise<PlatformWalletControls> {
+    const existing = await this.getPlatformWalletControls();
+    if (!existing) {
+      return await this.initPlatformWalletControls();
+    }
+    const [updated] = await db
+      .update(platformWalletControls)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(platformWalletControls.id, existing.id))
+      .returning();
+    return updated;
+  }
+
+  async initPlatformWalletControls(): Promise<PlatformWalletControls> {
+    const existing = await this.getPlatformWalletControls();
+    if (existing) return existing;
+    const [controls] = await db.insert(platformWalletControls).values({}).returning();
+    return controls;
+  }
+
+  // Blockchain Admin Actions
+  async createBlockchainAdminAction(action: InsertBlockchainAdminAction): Promise<BlockchainAdminAction> {
+    const [newAction] = await db.insert(blockchainAdminActions).values(action).returning();
+    return newAction;
+  }
+
+  async getBlockchainAdminActions(limit: number = 100): Promise<BlockchainAdminAction[]> {
+    return await db
+      .select()
+      .from(blockchainAdminActions)
+      .orderBy(desc(blockchainAdminActions.createdAt))
+      .limit(limit);
+  }
+
+  // User Withdrawal Limits
+  async getUserWithdrawalLimit(userId: string, date: string): Promise<UserWithdrawalLimit | undefined> {
+    const [limit] = await db
+      .select()
+      .from(userWithdrawalLimits)
+      .where(and(eq(userWithdrawalLimits.userId, userId), eq(userWithdrawalLimits.date, date)));
+    return limit || undefined;
+  }
+
+  async createUserWithdrawalLimit(limit: InsertUserWithdrawalLimit): Promise<UserWithdrawalLimit> {
+    const [newLimit] = await db.insert(userWithdrawalLimits).values(limit).returning();
+    return newLimit;
+  }
+
+  async updateUserWithdrawalLimit(id: string, updates: Partial<UserWithdrawalLimit>): Promise<UserWithdrawalLimit | undefined> {
+    const [limit] = await db
+      .update(userWithdrawalLimits)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(userWithdrawalLimits.id, id))
+      .returning();
+    return limit || undefined;
+  }
+
+  async getOrCreateUserWithdrawalLimit(userId: string, date: string): Promise<UserWithdrawalLimit> {
+    let limit = await this.getUserWithdrawalLimit(userId, date);
+    if (!limit) {
+      limit = await this.createUserWithdrawalLimit({ userId, date });
+    }
+    return limit;
+  }
+
+  // User First Withdrawals
+  async getUserFirstWithdrawal(userId: string): Promise<UserFirstWithdrawal | undefined> {
+    const [record] = await db
+      .select()
+      .from(userFirstWithdrawals)
+      .where(eq(userFirstWithdrawals.userId, userId));
+    return record || undefined;
+  }
+
+  async createUserFirstWithdrawal(data: InsertUserFirstWithdrawal): Promise<UserFirstWithdrawal> {
+    const [newRecord] = await db.insert(userFirstWithdrawals).values(data).returning();
+    return newRecord;
+  }
+
+  async updateUserFirstWithdrawal(userId: string, updates: Partial<UserFirstWithdrawal>): Promise<UserFirstWithdrawal | undefined> {
+    const [record] = await db
+      .update(userFirstWithdrawals)
+      .set(updates)
+      .where(eq(userFirstWithdrawals.userId, userId))
+      .returning();
+    return record || undefined;
+  }
+
+  async getOrCreateUserFirstWithdrawal(userId: string): Promise<UserFirstWithdrawal> {
+    let record = await this.getUserFirstWithdrawal(userId);
+    if (!record) {
+      record = await this.createUserFirstWithdrawal({ userId });
+    }
+    return record;
+  }
+
+  // Extended Withdrawal Requests
+  async getAllWithdrawalRequests(): Promise<WithdrawalRequest[]> {
+    return await db
+      .select()
+      .from(withdrawalRequests)
+      .orderBy(desc(withdrawalRequests.createdAt));
+  }
+
+  async getWithdrawalRequestsByUser(userId: string): Promise<WithdrawalRequest[]> {
+    return await db
+      .select()
+      .from(withdrawalRequests)
+      .where(eq(withdrawalRequests.userId, userId))
+      .orderBy(desc(withdrawalRequests.createdAt));
+  }
+
+  async getApprovedWithdrawalRequests(): Promise<WithdrawalRequest[]> {
+    return await db
+      .select()
+      .from(withdrawalRequests)
+      .where(eq(withdrawalRequests.status, "approved"))
+      .orderBy(desc(withdrawalRequests.createdAt));
+  }
+
+  async getTodayPlatformWithdrawalTotal(): Promise<string> {
+    const today = new Date().toISOString().split("T")[0];
+    const result = await db
+      .select({ total: sql<string>`COALESCE(SUM(${withdrawalRequests.amount}::numeric), 0)` })
+      .from(withdrawalRequests)
+      .where(
+        and(
+          gte(withdrawalRequests.createdAt, new Date(today)),
+          or(
+            eq(withdrawalRequests.status, "completed"),
+            eq(withdrawalRequests.status, "sent"),
+            eq(withdrawalRequests.status, "approved")
+          )
+        )
+      );
+    return result[0]?.total || "0";
   }
 }
 

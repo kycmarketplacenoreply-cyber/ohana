@@ -1452,31 +1452,440 @@ export async function registerRoutes(
     }
   });
 
-  // Mock deposit
-  app.post("/api/wallet/deposit", requireAuth, requireDepositsEnabled, async (req: AuthRequest, res) => {
+  // ==================== BLOCKCHAIN WALLET ROUTES ====================
+
+  // Get or create user deposit address
+  app.get("/api/wallet/deposit-address", requireAuth, requireDepositsEnabled, async (req: AuthRequest, res) => {
     try {
-      const { amount } = req.body;
-      const wallet = await storage.getWalletByUserId(req.user!.userId);
-      
-      if (!wallet) {
-        return res.status(404).json({ message: "Wallet not found" });
+      const controls = await storage.getPlatformWalletControls();
+      if (!controls?.depositsEnabled) {
+        return res.status(503).json({ message: "Deposits are currently disabled" });
       }
 
-      const newBalance = (parseFloat(wallet.availableBalance) + parseFloat(amount)).toFixed(8);
-      await storage.updateWalletBalance(wallet.id, newBalance, wallet.escrowBalance);
+      const { generateDepositAddress, encryptPrivateKey, isHdSeedConfigured } = await import("./utils/crypto");
+      
+      if (!isHdSeedConfigured()) {
+        return res.status(503).json({ message: "Deposit system is not configured. Please contact support." });
+      }
 
-      await storage.createTransaction({
+      let depositAddress = await storage.getUserDepositAddress(req.user!.userId, "BSC");
+      
+      if (!depositAddress) {
+        const derivationIndex = await storage.getNextDerivationIndex();
+        const { address, privateKey } = generateDepositAddress(derivationIndex);
+        const encryptedKey = encryptPrivateKey(privateKey);
+
+        depositAddress = await storage.createUserDepositAddress({
+          userId: req.user!.userId,
+          address,
+          network: "BSC",
+          derivationIndex,
+          encryptedPrivateKey: encryptedKey,
+        });
+      }
+
+      res.json({
+        address: depositAddress.address,
+        network: "BSC",
+        token: "USDT (BEP20)",
+        warning: "SEND ONLY USDT (BEP20) ON BNB SMART CHAIN. Sending other tokens or using wrong network will result in permanent loss of funds.",
+        minConfirmations: controls?.requiredConfirmations || 15,
+      });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Get user blockchain deposits
+  app.get("/api/wallet/blockchain-deposits", requireAuth, async (req: AuthRequest, res) => {
+    try {
+      const deposits = await storage.getBlockchainDepositsByUser(req.user!.userId);
+      res.json(deposits);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Create withdrawal request
+  app.post("/api/wallet/withdraw", requireAuth, requireWithdrawalsEnabled, async (req: AuthRequest, res) => {
+    try {
+      const { amount, walletAddress } = req.body;
+
+      if (!amount || !walletAddress) {
+        return res.status(400).json({ message: "Amount and wallet address are required" });
+      }
+
+      const user = await storage.getUser(req.user!.userId);
+      if (user?.isFrozen) {
+        return res.status(403).json({ message: "Account is frozen. Withdrawals are disabled." });
+      }
+
+      const { createWithdrawalRequest } = await import("./services/withdrawal");
+      const result = await createWithdrawalRequest(req.user!.userId, amount.toString(), walletAddress);
+
+      if (!result.success) {
+        return res.status(400).json({ message: result.error });
+      }
+
+      await storage.createAuditLog({
         userId: req.user!.userId,
-        walletId: wallet.id,
-        type: "deposit",
-        amount,
-        currency: "USDT",
-        description: "Mock deposit",
+        action: "withdrawal_requested",
+        resource: "withdrawals",
+        resourceId: result.withdrawalId,
+        changes: { amount, walletAddress: walletAddress.slice(0, 10) + "..." },
+        ipAddress: req.ip,
+        userAgent: req.headers["user-agent"],
       });
 
-      res.json({ message: "Deposit successful", newBalance });
+      res.json({
+        message: result.delayMinutes 
+          ? `Withdrawal request submitted. ${result.delayReason}. Processing will begin in ${result.delayMinutes} minutes.`
+          : "Withdrawal request submitted for approval",
+        withdrawalId: result.withdrawalId,
+        delayMinutes: result.delayMinutes,
+      });
     } catch (error: any) {
       res.status(400).json({ message: error.message });
+    }
+  });
+
+  // Get user withdrawal requests
+  app.get("/api/wallet/withdrawals", requireAuth, async (req: AuthRequest, res) => {
+    try {
+      const withdrawals = await storage.getWithdrawalRequestsByUser(req.user!.userId);
+      res.json(withdrawals);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Get platform wallet controls (public info only)
+  app.get("/api/wallet/controls", requireAuth, async (req: AuthRequest, res) => {
+    try {
+      const controls = await storage.getPlatformWalletControls();
+      if (!controls) {
+        return res.json({
+          depositsEnabled: true,
+          withdrawalsEnabled: true,
+          minWithdrawalAmount: "10",
+          withdrawalFeePercent: "0.1",
+          withdrawalFeeFixed: "1",
+        });
+      }
+
+      res.json({
+        depositsEnabled: controls.depositsEnabled,
+        withdrawalsEnabled: controls.withdrawalsEnabled,
+        minWithdrawalAmount: controls.minWithdrawalAmount,
+        withdrawalFeePercent: controls.withdrawalFeePercent,
+        withdrawalFeeFixed: controls.withdrawalFeeFixed,
+        perUserDailyLimit: controls.perUserDailyWithdrawalLimit,
+      });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Admin: Get all withdrawal requests
+  app.get("/api/admin/withdrawals", requireAuth, requireFinanceManager, async (req: AuthRequest, res) => {
+    try {
+      const withdrawals = await storage.getAllWithdrawalRequests();
+      const withdrawalsWithUsers = await Promise.all(
+        withdrawals.map(async (w) => {
+          const user = await storage.getUser(w.userId);
+          return { ...w, username: user?.username };
+        })
+      );
+      res.json(withdrawalsWithUsers);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Admin: Approve withdrawal
+  app.post("/api/admin/withdrawals/:id/approve", requireAuth, requireFinanceManager, async (req: AuthRequest, res) => {
+    try {
+      const withdrawal = await storage.getWithdrawalRequest(req.params.id);
+      if (!withdrawal) {
+        return res.status(404).json({ message: "Withdrawal not found" });
+      }
+
+      if (withdrawal.status !== "pending") {
+        return res.status(400).json({ message: "Withdrawal is not in pending status" });
+      }
+
+      await storage.updateWithdrawalRequest(req.params.id, {
+        status: "approved",
+        reviewedBy: req.user!.userId,
+        reviewedAt: new Date(),
+      });
+
+      await storage.createBlockchainAdminAction({
+        adminId: req.user!.userId,
+        action: "withdrawal_approved",
+        targetType: "withdrawal",
+        targetId: req.params.id,
+        newValue: { status: "approved" },
+        reason: req.body.reason,
+        ipAddress: req.ip,
+        userAgent: req.headers["user-agent"],
+      });
+
+      res.json({ message: "Withdrawal approved" });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Admin: Reject withdrawal
+  app.post("/api/admin/withdrawals/:id/reject", requireAuth, requireFinanceManager, async (req: AuthRequest, res) => {
+    try {
+      const withdrawal = await storage.getWithdrawalRequest(req.params.id);
+      if (!withdrawal) {
+        return res.status(404).json({ message: "Withdrawal not found" });
+      }
+
+      if (withdrawal.status !== "pending" && withdrawal.status !== "approved") {
+        return res.status(400).json({ message: "Cannot reject this withdrawal" });
+      }
+
+      const wallet = await storage.getWalletByUserId(withdrawal.userId);
+      if (wallet) {
+        const refundAmount = parseFloat(withdrawal.amount);
+        const newBalance = (parseFloat(wallet.availableBalance) + refundAmount).toFixed(8);
+        await storage.updateWalletBalance(wallet.id, newBalance, wallet.escrowBalance);
+
+        await storage.createTransaction({
+          userId: withdrawal.userId,
+          walletId: wallet.id,
+          type: "refund",
+          amount: withdrawal.amount,
+          currency: "USDT",
+          description: "Withdrawal rejected - funds refunded",
+        });
+      }
+
+      await storage.updateWithdrawalRequest(req.params.id, {
+        status: "rejected",
+        reviewedBy: req.user!.userId,
+        reviewedAt: new Date(),
+        adminNotes: req.body.reason || "Rejected by admin",
+      });
+
+      await storage.createBlockchainAdminAction({
+        adminId: req.user!.userId,
+        action: "withdrawal_rejected",
+        targetType: "withdrawal",
+        targetId: req.params.id,
+        newValue: { status: "rejected", reason: req.body.reason },
+        reason: req.body.reason,
+        ipAddress: req.ip,
+        userAgent: req.headers["user-agent"],
+      });
+
+      res.json({ message: "Withdrawal rejected and funds refunded" });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Admin: Process approved withdrawal (send on-chain)
+  app.post("/api/admin/withdrawals/:id/process", requireAuth, requireFinanceManager, async (req: AuthRequest, res) => {
+    try {
+      const { processApprovedWithdrawal } = await import("./services/withdrawal");
+      const result = await processApprovedWithdrawal(req.params.id);
+
+      if (!result.success) {
+        return res.status(400).json({ message: result.error });
+      }
+
+      await storage.createBlockchainAdminAction({
+        adminId: req.user!.userId,
+        action: "withdrawal_processed",
+        targetType: "withdrawal",
+        targetId: req.params.id,
+        newValue: { txHash: result.txHash },
+        ipAddress: req.ip,
+        userAgent: req.headers["user-agent"],
+      });
+
+      res.json({ message: "Withdrawal sent", txHash: result.txHash });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Admin: Get platform wallet controls
+  app.get("/api/admin/wallet-controls", requireAuth, requireFinanceManager, async (req: AuthRequest, res) => {
+    try {
+      let controls = await storage.getPlatformWalletControls();
+      if (!controls) {
+        controls = await storage.initPlatformWalletControls();
+      }
+
+      const { getMasterWalletBalance, getMasterWalletBnbBalance, isMasterWalletUnlocked, MASTER_WALLET_ADDRESS } = await import("./services/blockchain");
+      
+      res.json({
+        ...controls,
+        masterWalletAddress: MASTER_WALLET_ADDRESS,
+        masterWalletUsdtBalance: await getMasterWalletBalance(),
+        masterWalletBnbBalance: await getMasterWalletBnbBalance(),
+        isWalletUnlocked: isMasterWalletUnlocked(),
+      });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Admin: Update platform wallet controls
+  app.patch("/api/admin/wallet-controls", requireAuth, requireFinanceManager, async (req: AuthRequest, res) => {
+    try {
+      const allowedFields = [
+        "withdrawalsEnabled",
+        "depositsEnabled",
+        "sweepsEnabled",
+        "emergencyMode",
+        "hotWalletBalanceCap",
+        "perUserDailyWithdrawalLimit",
+        "platformDailyWithdrawalLimit",
+        "minWithdrawalAmount",
+        "withdrawalFeePercent",
+        "withdrawalFeeFixed",
+        "firstWithdrawalDelayMinutes",
+        "largeWithdrawalThreshold",
+        "largeWithdrawalDelayMinutes",
+        "requiredConfirmations",
+      ];
+
+      const updates: Record<string, any> = {};
+      for (const field of allowedFields) {
+        if (req.body[field] !== undefined) {
+          updates[field] = req.body[field];
+        }
+      }
+
+      const previousControls = await storage.getPlatformWalletControls();
+      updates.updatedBy = req.user!.userId;
+
+      const newControls = await storage.updatePlatformWalletControls(updates);
+
+      await storage.createBlockchainAdminAction({
+        adminId: req.user!.userId,
+        action: "wallet_controls_updated",
+        targetType: "platform_controls",
+        previousValue: previousControls,
+        newValue: updates,
+        reason: req.body.reason,
+        ipAddress: req.ip,
+        userAgent: req.headers["user-agent"],
+      });
+
+      res.json(newControls);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Admin: Unlock master wallet
+  app.post("/api/admin/wallet-controls/unlock", requireAuth, requireFinanceManager, async (req: AuthRequest, res) => {
+    try {
+      const { unlockMasterWallet } = await import("./services/blockchain");
+      const success = unlockMasterWallet();
+
+      if (!success) {
+        return res.status(500).json({ message: "Failed to unlock master wallet" });
+      }
+
+      await storage.updatePlatformWalletControls({
+        walletUnlocked: true,
+        unlockedAt: new Date(),
+        unlockedBy: req.user!.userId,
+      });
+
+      await storage.createBlockchainAdminAction({
+        adminId: req.user!.userId,
+        action: "master_wallet_unlocked",
+        targetType: "platform_controls",
+        ipAddress: req.ip,
+        userAgent: req.headers["user-agent"],
+      });
+
+      res.json({ message: "Master wallet unlocked" });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Admin: Lock master wallet
+  app.post("/api/admin/wallet-controls/lock", requireAuth, requireFinanceManager, async (req: AuthRequest, res) => {
+    try {
+      const { lockMasterWallet } = await import("./services/blockchain");
+      lockMasterWallet();
+
+      await storage.updatePlatformWalletControls({
+        walletUnlocked: false,
+      });
+
+      await storage.createBlockchainAdminAction({
+        adminId: req.user!.userId,
+        action: "master_wallet_locked",
+        targetType: "platform_controls",
+        reason: req.body.reason,
+        ipAddress: req.ip,
+        userAgent: req.headers["user-agent"],
+      });
+
+      res.json({ message: "Master wallet locked" });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Admin: Emergency kill switch
+  app.post("/api/admin/wallet-controls/emergency", requireAuth, requireFinanceManager, async (req: AuthRequest, res) => {
+    try {
+      const { enable } = req.body;
+      
+      const { lockMasterWallet } = await import("./services/blockchain");
+      if (enable) {
+        lockMasterWallet();
+      }
+
+      await storage.updatePlatformWalletControls({
+        emergencyMode: enable,
+        withdrawalsEnabled: !enable,
+        walletUnlocked: !enable,
+      });
+
+      await storage.createBlockchainAdminAction({
+        adminId: req.user!.userId,
+        action: enable ? "emergency_mode_enabled" : "emergency_mode_disabled",
+        targetType: "platform_controls",
+        newValue: { emergencyMode: enable },
+        reason: req.body.reason,
+        ipAddress: req.ip,
+        userAgent: req.headers["user-agent"],
+      });
+
+      res.json({ message: enable ? "Emergency mode activated" : "Emergency mode deactivated" });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Admin: Get blockchain admin action logs
+  app.get("/api/admin/blockchain-logs", requireAuth, requireFinanceManager, async (req: AuthRequest, res) => {
+    try {
+      const logs = await storage.getBlockchainAdminActions(100);
+      const logsWithAdmins = await Promise.all(
+        logs.map(async (log) => {
+          const admin = await storage.getUser(log.adminId);
+          return { ...log, adminUsername: admin?.username };
+        })
+      );
+      res.json(logsWithAdmins);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
     }
   });
 

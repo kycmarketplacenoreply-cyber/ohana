@@ -6,8 +6,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
 import { fetchWithAuth } from "@/lib/auth";
 import {
@@ -16,8 +17,12 @@ import {
   ArrowDownLeft,
   Lock,
   Clock,
-  Plus,
-  RefreshCw,
+  Copy,
+  AlertTriangle,
+  CheckCircle,
+  XCircle,
+  Loader2,
+  ExternalLink,
 } from "lucide-react";
 
 interface Transaction {
@@ -37,11 +42,41 @@ interface WalletData {
   currency: string;
 }
 
+interface DepositAddress {
+  address: string;
+  network: string;
+  token: string;
+  warning: string;
+  minConfirmations: number;
+}
+
+interface WalletControls {
+  depositsEnabled: boolean;
+  withdrawalsEnabled: boolean;
+  minWithdrawalAmount: string;
+  withdrawalFeePercent: string;
+  withdrawalFeeFixed: string;
+  perUserDailyLimit: string;
+}
+
+interface WithdrawalRequest {
+  id: string;
+  amount: string;
+  currency: string;
+  status: string;
+  walletAddress: string;
+  txHash: string | null;
+  createdAt: string;
+}
+
 export default function WalletPage() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const [depositAmount, setDepositAmount] = useState("");
   const [depositOpen, setDepositOpen] = useState(false);
+  const [withdrawOpen, setWithdrawOpen] = useState(false);
+  const [withdrawAmount, setWithdrawAmount] = useState("");
+  const [withdrawAddress, setWithdrawAddress] = useState("");
+  const [copied, setCopied] = useState(false);
 
   const { data: wallet, isLoading: walletLoading } = useQuery<WalletData>({
     queryKey: ["wallet"],
@@ -67,26 +102,74 @@ export default function WalletPage() {
     },
   });
 
-  const depositMutation = useMutation({
-    mutationFn: async (amount: string) => {
-      const res = await fetchWithAuth("/api/wallet/deposit", {
-        method: "POST",
-        body: JSON.stringify({ amount: parseFloat(amount) }),
-      });
-      if (!res.ok) throw new Error("Deposit failed");
+  const { data: depositAddress, isLoading: addressLoading } = useQuery<DepositAddress>({
+    queryKey: ["depositAddress"],
+    queryFn: async () => {
+      const res = await fetchWithAuth("/api/wallet/deposit-address");
       return res.json();
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["wallet"] });
-      queryClient.invalidateQueries({ queryKey: ["transactions"] });
-      setDepositOpen(false);
-      setDepositAmount("");
-      toast({ title: "Deposit successful", description: "Funds added to your wallet" });
-    },
-    onError: () => {
-      toast({ variant: "destructive", title: "Deposit failed" });
+    enabled: depositOpen,
+  });
+
+  const { data: controls } = useQuery<WalletControls>({
+    queryKey: ["walletControls"],
+    queryFn: async () => {
+      const res = await fetchWithAuth("/api/wallet/controls");
+      return res.json();
     },
   });
+
+  const { data: withdrawals } = useQuery<WithdrawalRequest[]>({
+    queryKey: ["withdrawals"],
+    queryFn: async () => {
+      const res = await fetchWithAuth("/api/wallet/withdrawals");
+      return res.json();
+    },
+  });
+
+  const withdrawMutation = useMutation({
+    mutationFn: async ({ amount, walletAddress }: { amount: string; walletAddress: string }) => {
+      const res = await fetchWithAuth("/api/wallet/withdraw", {
+        method: "POST",
+        body: JSON.stringify({ amount: parseFloat(amount), walletAddress }),
+      });
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.message);
+      }
+      return res.json();
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["wallet"] });
+      queryClient.invalidateQueries({ queryKey: ["transactions"] });
+      queryClient.invalidateQueries({ queryKey: ["withdrawals"] });
+      setWithdrawOpen(false);
+      setWithdrawAmount("");
+      setWithdrawAddress("");
+      toast({ 
+        title: "Withdrawal Requested", 
+        description: data.message,
+      });
+    },
+    onError: (error: Error) => {
+      toast({ variant: "destructive", title: "Withdrawal Failed", description: error.message });
+    },
+  });
+
+  const copyToClipboard = (text: string) => {
+    navigator.clipboard.writeText(text);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+    toast({ title: "Copied!", description: "Address copied to clipboard" });
+  };
+
+  const calculateFee = () => {
+    if (!controls || !withdrawAmount) return 0;
+    const amount = parseFloat(withdrawAmount) || 0;
+    const percentFee = amount * (parseFloat(controls.withdrawalFeePercent) / 100);
+    const fixedFee = parseFloat(controls.withdrawalFeeFixed);
+    return percentFee + fixedFee;
+  };
 
   const getTransactionIcon = (type: string) => {
     switch (type) {
@@ -99,7 +182,7 @@ export default function WalletPage() {
       case "escrow_release":
         return <ArrowDownLeft className="h-4 w-4 text-green-400" />;
       case "refund":
-        return <RefreshCw className="h-4 w-4 text-blue-400" />;
+        return <ArrowDownLeft className="h-4 w-4 text-blue-400" />;
       default:
         return <Clock className="h-4 w-4 text-gray-400" />;
     }
@@ -109,14 +192,33 @@ export default function WalletPage() {
     switch (type) {
       case "deposit":
       case "escrow_release":
+      case "refund":
         return "text-green-400";
       case "withdraw":
       case "escrow_hold":
+      case "fee":
         return "text-red-400";
-      case "refund":
-        return "text-blue-400";
       default:
         return "text-gray-400";
+    }
+  };
+
+  const getStatusBadge = (status: string) => {
+    switch (status) {
+      case "completed":
+        return <Badge className="bg-green-600"><CheckCircle className="h-3 w-3 mr-1" /> Completed</Badge>;
+      case "pending":
+        return <Badge className="bg-yellow-600"><Clock className="h-3 w-3 mr-1" /> Pending</Badge>;
+      case "approved":
+        return <Badge className="bg-blue-600"><Clock className="h-3 w-3 mr-1" /> Approved</Badge>;
+      case "processing":
+      case "sent":
+        return <Badge className="bg-purple-600"><Loader2 className="h-3 w-3 mr-1 animate-spin" /> Processing</Badge>;
+      case "rejected":
+      case "failed":
+        return <Badge className="bg-red-600"><XCircle className="h-3 w-3 mr-1" /> {status}</Badge>;
+      default:
+        return <Badge>{status}</Badge>;
     }
   };
 
@@ -171,14 +273,94 @@ export default function WalletPage() {
         <div className="flex gap-4">
           <Dialog open={depositOpen} onOpenChange={setDepositOpen}>
             <DialogTrigger asChild>
-              <Button className="bg-green-600 hover:bg-green-700 gap-2" data-testid="button-deposit">
-                <Plus className="h-4 w-4" />
+              <Button 
+                className="bg-green-600 hover:bg-green-700 gap-2" 
+                data-testid="button-deposit"
+                disabled={!controls?.depositsEnabled}
+              >
+                <ArrowDownLeft className="h-4 w-4" />
                 Deposit
               </Button>
             </DialogTrigger>
-            <DialogContent className="bg-gray-900 border-gray-800">
+            <DialogContent className="bg-gray-900 border-gray-800 max-w-md">
               <DialogHeader>
-                <DialogTitle className="text-white">Deposit Funds</DialogTitle>
+                <DialogTitle className="text-white">Deposit USDT (BEP20)</DialogTitle>
+                <DialogDescription className="text-gray-400">
+                  Send USDT on BNB Smart Chain to this address
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4 pt-4">
+                <Alert className="bg-red-900/30 border-red-700">
+                  <AlertTriangle className="h-4 w-4 text-red-400" />
+                  <AlertDescription className="text-red-300 text-sm">
+                    {depositAddress?.warning || "SEND ONLY USDT (BEP20) ON BNB SMART CHAIN"}
+                  </AlertDescription>
+                </Alert>
+
+                {addressLoading ? (
+                  <Skeleton className="h-20 bg-gray-800" />
+                ) : depositAddress ? (
+                  <div className="space-y-3">
+                    <div className="p-4 bg-gray-800 rounded-lg border border-gray-700">
+                      <Label className="text-gray-400 text-xs">Your Deposit Address</Label>
+                      <div className="flex items-center gap-2 mt-2">
+                        <code className="text-green-400 text-sm break-all flex-1">
+                          {depositAddress.address}
+                        </code>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => copyToClipboard(depositAddress.address)}
+                          data-testid="button-copy-address"
+                        >
+                          {copied ? <CheckCircle className="h-4 w-4 text-green-400" /> : <Copy className="h-4 w-4" />}
+                        </Button>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3 text-sm">
+                      <div className="p-3 bg-gray-800 rounded-lg">
+                        <p className="text-gray-400">Network</p>
+                        <p className="text-white font-medium">{depositAddress.network}</p>
+                      </div>
+                      <div className="p-3 bg-gray-800 rounded-lg">
+                        <p className="text-gray-400">Token</p>
+                        <p className="text-white font-medium">{depositAddress.token}</p>
+                      </div>
+                    </div>
+
+                    <div className="p-3 bg-blue-900/30 rounded-lg border border-blue-700">
+                      <p className="text-blue-300 text-sm">
+                        Deposits require {depositAddress.minConfirmations} confirmations before being credited to your account.
+                      </p>
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-red-400">Failed to generate deposit address</p>
+                )}
+              </div>
+            </DialogContent>
+          </Dialog>
+
+          <Dialog open={withdrawOpen} onOpenChange={setWithdrawOpen}>
+            <DialogTrigger asChild>
+              <Button 
+                variant="outline" 
+                className="gap-2" 
+                data-testid="button-withdraw"
+                disabled={userStatus?.isFrozen || !controls?.withdrawalsEnabled}
+                title={userStatus?.isFrozen ? "Withdrawals are disabled while your account is frozen" : undefined}
+              >
+                <ArrowUpRight className="h-4 w-4" />
+                Withdraw
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="bg-gray-900 border-gray-800 max-w-md">
+              <DialogHeader>
+                <DialogTitle className="text-white">Withdraw USDT (BEP20)</DialogTitle>
+                <DialogDescription className="text-gray-400">
+                  Withdraw to any BNB Smart Chain address
+                </DialogDescription>
               </DialogHeader>
               <div className="space-y-4 pt-4">
                 <div className="space-y-2">
@@ -187,37 +369,112 @@ export default function WalletPage() {
                     type="number"
                     placeholder="0.00"
                     className="bg-gray-800 border-gray-700 text-white"
-                    value={depositAmount}
-                    onChange={(e) => setDepositAmount(e.target.value)}
-                    data-testid="input-deposit-amount"
+                    value={withdrawAmount}
+                    onChange={(e) => setWithdrawAmount(e.target.value)}
+                    data-testid="input-withdraw-amount"
+                  />
+                  <p className="text-xs text-gray-500">
+                    Available: {parseFloat(wallet?.availableBalance || "0").toFixed(4)} USDT
+                    {controls && ` | Min: ${controls.minWithdrawalAmount} USDT`}
+                  </p>
+                </div>
+
+                <div className="space-y-2">
+                  <Label className="text-gray-300">Destination Address (BEP20)</Label>
+                  <Input
+                    placeholder="0x..."
+                    className="bg-gray-800 border-gray-700 text-white font-mono text-sm"
+                    value={withdrawAddress}
+                    onChange={(e) => setWithdrawAddress(e.target.value)}
+                    data-testid="input-withdraw-address"
                   />
                 </div>
+
+                {withdrawAmount && parseFloat(withdrawAmount) > 0 && (
+                  <div className="p-3 bg-gray-800 rounded-lg border border-gray-700 space-y-2">
+                    <div className="flex justify-between text-sm">
+                      <span className="text-gray-400">Amount</span>
+                      <span className="text-white">{parseFloat(withdrawAmount).toFixed(4)} USDT</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-gray-400">Fee</span>
+                      <span className="text-yellow-400">-{calculateFee().toFixed(4)} USDT</span>
+                    </div>
+                    <div className="border-t border-gray-700 pt-2 flex justify-between text-sm font-medium">
+                      <span className="text-gray-400">Total Deduction</span>
+                      <span className="text-white">{(parseFloat(withdrawAmount) + calculateFee()).toFixed(4)} USDT</span>
+                    </div>
+                  </div>
+                )}
+
                 <Button
-                  className="w-full bg-green-600 hover:bg-green-700"
-                  onClick={() => depositMutation.mutate(depositAmount)}
-                  disabled={!depositAmount || depositMutation.isPending}
-                  data-testid="button-confirm-deposit"
+                  className="w-full bg-purple-600 hover:bg-purple-700"
+                  onClick={() => withdrawMutation.mutate({ amount: withdrawAmount, walletAddress: withdrawAddress })}
+                  disabled={!withdrawAmount || !withdrawAddress || withdrawMutation.isPending}
+                  data-testid="button-confirm-withdraw"
                 >
-                  {depositMutation.isPending ? "Processing..." : "Confirm Deposit"}
+                  {withdrawMutation.isPending ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Processing...
+                    </>
+                  ) : (
+                    "Submit Withdrawal"
+                  )}
                 </Button>
+
                 <p className="text-xs text-gray-500 text-center">
-                  This is a demo deposit. In production, this would connect to a crypto wallet.
+                  Withdrawals require admin approval before processing
                 </p>
               </div>
             </DialogContent>
           </Dialog>
-
-          <Button 
-            variant="outline" 
-            className="gap-2" 
-            data-testid="button-withdraw"
-            disabled={userStatus?.isFrozen}
-            title={userStatus?.isFrozen ? "Withdrawals are disabled while your account is frozen" : undefined}
-          >
-            <ArrowUpRight className="h-4 w-4" />
-            Withdraw
-          </Button>
         </div>
+
+        {withdrawals && withdrawals.length > 0 && (
+          <Card className="bg-gray-900/50 border-gray-800">
+            <CardHeader>
+              <CardTitle className="text-white flex items-center gap-2">
+                <ArrowUpRight className="h-5 w-5" />
+                Withdrawal Requests
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                {withdrawals.map((w) => (
+                  <div
+                    key={w.id}
+                    className="flex items-center justify-between p-4 rounded-lg bg-gray-800/50 border border-gray-700"
+                    data-testid={`withdrawal-${w.id}`}
+                  >
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-1">
+                        <p className="text-white font-medium">{parseFloat(w.amount).toFixed(4)} USDT</p>
+                        {getStatusBadge(w.status)}
+                      </div>
+                      <p className="text-xs text-gray-400 font-mono">
+                        To: {w.walletAddress?.slice(0, 10)}...{w.walletAddress?.slice(-8)}
+                      </p>
+                      <p className="text-xs text-gray-500">
+                        {new Date(w.createdAt).toLocaleString()}
+                      </p>
+                    </div>
+                    {w.txHash && (
+                      <a
+                        href={`https://bscscan.com/tx/${w.txHash}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-blue-400 hover:text-blue-300"
+                      >
+                        <ExternalLink className="h-4 w-4" />
+                      </a>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         <Card className="bg-gray-900/50 border-gray-800">
           <CardHeader>
