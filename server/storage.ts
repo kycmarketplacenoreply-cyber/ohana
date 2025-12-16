@@ -36,6 +36,7 @@ import {
   blockchainAdminActions,
   userWithdrawalLimits,
   userFirstWithdrawals,
+  walletIndexCounter,
   type User,
   type InsertUser,
   type Kyc,
@@ -1478,6 +1479,23 @@ export class DatabaseStorage implements IStorage {
   async createUserDepositAddress(address: InsertUserDepositAddress): Promise<UserDepositAddress> {
     const [newAddress] = await db.insert(userDepositAddresses).values(address).returning();
     return newAddress;
+  }
+
+  async getAndIncrementDerivationIndex(): Promise<number> {
+    const result = await db.execute(sql`
+      INSERT INTO wallet_index_counter (id, next_index, updated_at)
+      VALUES ('singleton', 1, NOW())
+      ON CONFLICT (id) DO UPDATE SET
+        next_index = wallet_index_counter.next_index + 1,
+        updated_at = NOW()
+      RETURNING next_index - 1 AS current_index
+    `);
+    
+    const rows = result.rows as Array<{ current_index: number }>;
+    if (!rows || rows.length === 0) {
+      throw new Error("Failed to get atomic derivation index");
+    }
+    return rows[0].current_index;
   }
 
   async getNextDerivationIndex(): Promise<number> {

@@ -1462,7 +1462,7 @@ export async function registerRoutes(
         return res.status(503).json({ message: "Deposits are currently disabled" });
       }
 
-      const { generateDepositAddress, encryptPrivateKey, isHdSeedConfigured } = await import("./utils/crypto");
+      const { generateDepositAddress, encryptPrivateKey, isHdSeedConfigured, checkAddressHasTransactions } = await import("./utils/crypto");
       
       if (!isHdSeedConfigured()) {
         return res.status(503).json({ message: "Deposit system is not configured. Please contact support." });
@@ -1471,8 +1471,39 @@ export async function registerRoutes(
       let depositAddress = await storage.getUserDepositAddress(req.user!.userId, "BSC");
       
       if (!depositAddress) {
-        const derivationIndex = await storage.getNextDerivationIndex();
-        const { address, privateKey } = generateDepositAddress(derivationIndex);
+        const MAX_ATTEMPTS = 10;
+        let attempts = 0;
+        let foundCleanAddress = false;
+        let derivationIndex = -1;
+        let address = "";
+        let privateKey = "";
+
+        while (!foundCleanAddress && attempts < MAX_ATTEMPTS) {
+          attempts++;
+          derivationIndex = await storage.getAndIncrementDerivationIndex();
+          const generated = generateDepositAddress(derivationIndex);
+          address = generated.address;
+          privateKey = generated.privateKey;
+
+          const checkResult = await checkAddressHasTransactions(address);
+          
+          if (checkResult.error) {
+            console.warn(`BscScan validation failed for ${address}: ${checkResult.error} - treating as potentially polluted`);
+            continue;
+          }
+          
+          if (!checkResult.hasTransactions) {
+            foundCleanAddress = true;
+          } else {
+            console.warn(`Skipping address ${address} at index ${derivationIndex} - has prior transactions`);
+          }
+        }
+
+        if (!foundCleanAddress) {
+          console.error(`Failed to find clean address after ${MAX_ATTEMPTS} attempts`);
+          return res.status(503).json({ message: "Unable to generate deposit address. Please try again later." });
+        }
+
         const encryptedKey = encryptPrivateKey(privateKey);
 
         depositAddress = await storage.createUserDepositAddress({

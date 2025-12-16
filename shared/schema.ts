@@ -1112,13 +1112,20 @@ export const withdrawalStatusEnum = pgEnum("withdrawal_status", [
   "cancelled"
 ]);
 
+// Wallet Index Counter - Atomic counter for HD wallet derivation indexes
+export const walletIndexCounter = pgTable("wallet_index_counter", {
+  id: varchar("id").primaryKey().default("singleton"),
+  nextIndex: integer("next_index").notNull().default(0),
+  updatedAt: timestamp("updated_at").notNull().default(sql`now()`),
+});
+
 // User Deposit Addresses - Unique deposit address per user
 export const userDepositAddresses = pgTable("user_deposit_addresses", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
   address: text("address").notNull().unique(),
   network: text("network").notNull().default("BSC"),
-  derivationIndex: integer("derivation_index").notNull(),
+  derivationIndex: integer("derivation_index").notNull().unique(),
   encryptedPrivateKey: text("encrypted_private_key").notNull(),
   isActive: boolean("is_active").notNull().default(true),
   createdAt: timestamp("created_at").notNull().default(sql`now()`),
