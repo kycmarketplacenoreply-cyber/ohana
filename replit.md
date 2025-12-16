@@ -131,6 +131,65 @@ Tables include:
 - Admin-only endpoints protection
 - User-specific resource access control
 
+### Blockchain Wallet System (Added December 2025)
+
+**Architecture**
+- Real USDT (BEP20) on BNB Smart Chain mainnet
+- DIY wallets using HD derivation (no third-party custody)
+- Master hot wallet for withdrawals
+- Unique deposit addresses per user via BIP32/BIP44 HD derivation
+
+**Key Components**
+- `server/utils/crypto.ts`: AES-256-GCM encryption, HD wallet derivation, address validation
+- `server/services/blockchain.ts`: BSC RPC interaction via ethers.js, deposit monitoring, withdrawal processing
+- `server/services/withdrawal.ts`: Multi-stage approval workflow, security validations
+- `server/init-db.ts`: Blockchain tables auto-creation
+
+**Database Tables**
+- `user_deposit_addresses`: Per-user deposit addresses with encrypted private keys
+- `blockchain_deposits`: Deposit tracking with confirmation status
+- `deposit_sweeps`: Auto-sweep records from deposit addresses to master wallet
+- `platform_wallet_controls`: Kill switches, limits, fees, emergency mode
+- `blockchain_admin_actions`: Audit log for all admin wallet operations
+- `user_withdrawal_limits`: Per-user daily withdrawal tracking
+- `user_first_withdrawals`: First withdrawal delay tracking
+
+**Security Features**
+- Master wallet starts LOCKED on server startup - admin must manually unlock via API
+- HD_WALLET_SEED required for deposit address generation (hard fail if missing)
+- Withdrawals require admin approval before on-chain processing
+- Emergency mode freezes all operations
+- Daily limits: per-user and platform-wide
+- First withdrawal delay (configurable, default 60 min)
+- Large withdrawal delay (configurable, default 120 min for ≥1000 USDT)
+- 24-hour withdrawal lock after password change
+- BNB gas balance check before withdrawal broadcast
+
+**Environment Variables Required**
+- `BSC_RPC_URL`: BNB Smart Chain RPC endpoint
+- `MASTER_WALLET_ADDRESS`: Hot wallet address for withdrawals
+- `MASTER_WALLET_PRIVATE_KEY`: Hot wallet private key (or ENCRYPTED_MASTER_WALLET_KEY)
+- `ENCRYPTION_KEY`: 32-character key for AES-256-GCM encryption
+- `HD_WALLET_SEED`: BIP39 mnemonic (12+ words) for deterministic deposit addresses
+
+**Withdrawal Flow**
+1. User submits withdrawal request → balance immediately deducted
+2. Admin reviews and approves/rejects via admin panel
+3. Admin processes approved withdrawal → on-chain transaction sent
+4. Transaction hash recorded, status updated to "sent"
+5. If rejected, funds automatically refunded to user balance
+
+**Admin Endpoints**
+- `GET /api/admin/wallet-controls`: View all platform controls and master wallet balances
+- `PATCH /api/admin/wallet-controls`: Update limits, fees, enable/disable operations
+- `POST /api/admin/wallet-controls/unlock`: Unlock master wallet for withdrawals
+- `POST /api/admin/wallet-controls/lock`: Lock master wallet
+- `POST /api/admin/wallet-controls/emergency`: Enable/disable emergency mode
+- `GET /api/admin/withdrawals`: List all withdrawal requests
+- `POST /api/admin/withdrawals/:id/approve`: Approve withdrawal
+- `POST /api/admin/withdrawals/:id/reject`: Reject withdrawal (auto-refund)
+- `POST /api/admin/withdrawals/:id/process`: Send approved withdrawal on-chain
+
 ### Escrow System
 
 **Workflow**
