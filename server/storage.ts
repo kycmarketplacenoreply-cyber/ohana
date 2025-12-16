@@ -312,6 +312,7 @@ export interface IStorage {
   getUserDepositAddressById(id: string): Promise<UserDepositAddress | undefined>;
   createUserDepositAddress(address: InsertUserDepositAddress): Promise<UserDepositAddress>;
   getNextDerivationIndex(): Promise<number>;
+  getAndIncrementDerivationIndex(): Promise<number>;
   getAllActiveDepositAddresses(): Promise<UserDepositAddress[]>;
 
   // Blockchain Wallet - Deposits
