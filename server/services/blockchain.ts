@@ -119,6 +119,59 @@ export async function getCurrentBlockNumber(): Promise<number> {
 }
 
 const MIN_BNB_FOR_GAS = "0.005";
+const GAS_FUNDING_AMOUNT = "0.0015";
+
+export async function getAddressBnbBalance(address: string): Promise<string> {
+  try {
+    const balance = await getProvider().getBalance(address);
+    return ethers.formatEther(balance);
+  } catch (error) {
+    console.error("Failed to get BNB balance for address:", error);
+    return "0";
+  }
+}
+
+export async function fundAddressWithGas(
+  toAddress: string,
+  amount: string = GAS_FUNDING_AMOUNT
+): Promise<{ success: boolean; txHash?: string; error?: string }> {
+  if (!isWalletUnlocked || !masterWallet) {
+    return { success: false, error: "Master wallet is not unlocked. Admin must unlock the wallet first." };
+  }
+
+  if (!isValidBep20Address(toAddress)) {
+    return { success: false, error: "Invalid destination address" };
+  }
+
+  try {
+    const bnbBalance = await getProvider().getBalance(MASTER_WALLET_ADDRESS);
+    const amountWei = ethers.parseEther(amount);
+    const minRequired = amountWei + ethers.parseEther("0.001");
+    
+    if (bnbBalance < minRequired) {
+      return { success: false, error: `Insufficient BNB in master wallet. Need at least ${ethers.formatEther(minRequired)} BNB.` };
+    }
+
+    const tx = await masterWallet.sendTransaction({
+      to: toAddress,
+      value: amountWei,
+    });
+    const receipt = await tx.wait();
+
+    console.log(`Funded ${toAddress} with ${amount} BNB for gas (TX: ${receipt?.hash})`);
+
+    return {
+      success: true,
+      txHash: receipt?.hash,
+    };
+  } catch (error: any) {
+    console.error("Failed to fund address with gas:", error);
+    return {
+      success: false,
+      error: error.message || "Gas funding failed",
+    };
+  }
+}
 
 export async function sendUsdtFromMasterWallet(
   toAddress: string,
@@ -227,10 +280,12 @@ export async function monitorDepositAddress(
   }
 }
 
+const MIN_BNB_FOR_SWEEP = "0.0005";
+
 export async function sweepDepositToMaster(
   depositAddressPrivateKey: string,
   amount: string
-): Promise<{ success: boolean; txHash?: string; error?: string }> {
+): Promise<{ success: boolean; txHash?: string; error?: string; gasFundingTxHash?: string }> {
   const controls = await storage.getPlatformWalletControls();
   if (!controls?.sweepsEnabled) {
     return { success: false, error: "Sweeps are currently disabled" };
@@ -243,6 +298,29 @@ export async function sweepDepositToMaster(
   try {
     const decryptedKey = decryptPrivateKey(depositAddressPrivateKey);
     const depositWallet = new ethers.Wallet(decryptedKey, getProvider());
+    const depositAddress = depositWallet.address;
+
+    const bnbBalance = await getProvider().getBalance(depositAddress);
+    const minBnbWei = ethers.parseEther(MIN_BNB_FOR_SWEEP);
+    let gasFundingTxHash: string | undefined;
+
+    if (bnbBalance < minBnbWei) {
+      console.log(`[Sweep] Deposit address ${depositAddress} needs gas funding. Current BNB: ${ethers.formatEther(bnbBalance)}`);
+      
+      if (!isWalletUnlocked || !masterWallet) {
+        return { success: false, error: "Master wallet must be unlocked to fund gas for sweeps" };
+      }
+
+      const fundResult = await fundAddressWithGas(depositAddress);
+      if (!fundResult.success) {
+        return { success: false, error: `Failed to fund gas: ${fundResult.error}` };
+      }
+      
+      gasFundingTxHash = fundResult.txHash;
+      console.log(`[Sweep] Funded ${depositAddress} with gas (TX: ${gasFundingTxHash})`);
+      
+      await new Promise(resolve => setTimeout(resolve, 3000));
+    }
 
     const usdtContract = new ethers.Contract(USDT_BEP20_CONTRACT, ERC20_ABI, depositWallet);
     const amountWei = ethers.parseUnits(amount, 18);
@@ -250,11 +328,12 @@ export async function sweepDepositToMaster(
     const tx = await usdtContract.transfer(SWEEP_WALLET_ADDRESS, amountWei);
     const receipt = await tx.wait();
 
-    console.log(`Swept ${amount} USDT to ${SWEEP_WALLET_ADDRESS}`);
+    console.log(`[Sweep] Swept ${amount} USDT from ${depositAddress} to ${SWEEP_WALLET_ADDRESS} (TX: ${receipt.hash})`);
 
     return {
       success: true,
       txHash: receipt.hash,
+      gasFundingTxHash,
     };
   } catch (error: any) {
     console.error("Failed to sweep deposit:", error);
