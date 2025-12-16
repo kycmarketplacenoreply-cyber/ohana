@@ -4,6 +4,7 @@ import { USDT_BEP20_CONTRACT, BSC_CHAIN_ID, decryptPrivateKey, isValidBep20Addre
 
 const BSC_RPC_URL = process.env.BSC_RPC_URL!;
 const MASTER_WALLET_ADDRESS = process.env.MASTER_WALLET_ADDRESS!;
+const SWEEP_WALLET_ADDRESS = process.env.SWEEP_WALLET_ADDRESS || MASTER_WALLET_ADDRESS;
 const ENCRYPTED_MASTER_KEY = process.env.ENCRYPTED_MASTER_WALLET_KEY;
 const MASTER_WALLET_PRIVATE_KEY = process.env.MASTER_WALLET_PRIVATE_KEY;
 
@@ -13,6 +14,10 @@ if (!BSC_RPC_URL) {
 
 if (!MASTER_WALLET_ADDRESS) {
   console.warn("WARNING: MASTER_WALLET_ADDRESS environment variable is not set");
+}
+
+if (SWEEP_WALLET_ADDRESS !== MASTER_WALLET_ADDRESS) {
+  console.log("Sweep destination configured:", SWEEP_WALLET_ADDRESS);
 }
 
 const ERC20_ABI = [
@@ -242,8 +247,10 @@ export async function sweepDepositToMaster(
     const usdtContract = new ethers.Contract(USDT_BEP20_CONTRACT, ERC20_ABI, depositWallet);
     const amountWei = ethers.parseUnits(amount, 18);
 
-    const tx = await usdtContract.transfer(MASTER_WALLET_ADDRESS, amountWei);
+    const tx = await usdtContract.transfer(SWEEP_WALLET_ADDRESS, amountWei);
     const receipt = await tx.wait();
+
+    console.log(`Swept ${amount} USDT to ${SWEEP_WALLET_ADDRESS}`);
 
     return {
       success: true,
@@ -258,4 +265,4 @@ export async function sweepDepositToMaster(
   }
 }
 
-export { USDT_BEP20_CONTRACT, MASTER_WALLET_ADDRESS };
+export { USDT_BEP20_CONTRACT, MASTER_WALLET_ADDRESS, SWEEP_WALLET_ADDRESS };

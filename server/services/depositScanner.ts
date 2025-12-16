@@ -189,7 +189,7 @@ async function sweepCreditedDeposits(): Promise<void> {
         const sweep = await storage.createDepositSweep({
           depositId: deposit.id,
           fromAddress: depositAddress.address,
-          toAddress: process.env.MASTER_WALLET_ADDRESS || "",
+          toAddress: process.env.SWEEP_WALLET_ADDRESS || process.env.MASTER_WALLET_ADDRESS || "",
           amount: deposit.amount,
           status: "completed",
         });
@@ -208,7 +208,7 @@ async function sweepCreditedDeposits(): Promise<void> {
         await storage.createDepositSweep({
           depositId: deposit.id,
           fromAddress: depositAddress.address,
-          toAddress: process.env.MASTER_WALLET_ADDRESS || "",
+          toAddress: process.env.SWEEP_WALLET_ADDRESS || process.env.MASTER_WALLET_ADDRESS || "",
           amount: deposit.amount,
           status: "failed",
         });
