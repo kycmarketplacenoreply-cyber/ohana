@@ -1471,7 +1471,7 @@ export async function registerRoutes(
       let depositAddress = await storage.getUserDepositAddress(req.user!.userId, "BSC");
       
       if (!depositAddress) {
-        const MAX_ATTEMPTS = 10;
+        const MAX_ATTEMPTS = 50;
         let attempts = 0;
         let foundCleanAddress = false;
         let derivationIndex = -1;
