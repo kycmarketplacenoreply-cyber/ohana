@@ -1462,24 +1462,46 @@ export async function registerRoutes(
         return res.status(503).json({ message: "Deposits are currently disabled" });
       }
 
-      const { generateDepositAddress, encryptPrivateKey, isHdSeedConfigured } = await import("./utils/crypto");
+      const { generateDepositAddress, encryptPrivateKey, isHdSeedConfigured, checkAddressHasTransactions } = await import("./utils/crypto");
       
       if (!isHdSeedConfigured()) {
         return res.status(503).json({ message: "Deposit system is not configured. Please contact support." });
       }
 
-      // Always generate a fresh new deposit address with no prior transactions
-      const derivationIndex = await storage.getAndIncrementDerivationIndex();
-      const generated = generateDepositAddress(derivationIndex);
-      const encryptedKey = encryptPrivateKey(generated.privateKey);
-
-      const depositAddress = await storage.createUserDepositAddress({
-        userId: req.user!.userId,
-        address: generated.address,
-        network: "BSC",
-        derivationIndex,
-        encryptedPrivateKey: encryptedKey,
-      });
+      // Generate addresses until we find one with no prior transactions
+      const MAX_ATTEMPTS = 50;
+      let depositAddress = null;
+      
+      for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+        const derivationIndex = await storage.getAndIncrementDerivationIndex();
+        const generated = generateDepositAddress(derivationIndex);
+        
+        // Check if address has any prior transactions on the blockchain
+        const { hasTransactions } = await checkAddressHasTransactions(generated.address);
+        
+        if (!hasTransactions) {
+          // Found a clean address with no transactions
+          const encryptedKey = encryptPrivateKey(generated.privateKey);
+          
+          depositAddress = await storage.createUserDepositAddress({
+            userId: req.user!.userId,
+            address: generated.address,
+            network: "BSC",
+            derivationIndex,
+            encryptedPrivateKey: encryptedKey,
+          });
+          
+          console.log(`[Deposit] Generated clean address ${generated.address} at index ${derivationIndex} (attempt ${attempt + 1})`);
+          break;
+        } else {
+          console.log(`[Deposit] Skipping address ${generated.address} at index ${derivationIndex} - has prior transactions`);
+        }
+      }
+      
+      if (!depositAddress) {
+        console.error("[Deposit] Failed to find clean address after maximum attempts");
+        return res.status(503).json({ message: "Unable to generate a clean deposit address. Please try again later." });
+      }
 
       res.json({
         address: depositAddress.address,
