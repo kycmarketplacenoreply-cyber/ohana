@@ -309,6 +309,7 @@ export interface IStorage {
   // Blockchain Wallet - Deposit Addresses
   getUserDepositAddress(userId: string, network?: string): Promise<UserDepositAddress | undefined>;
   getUserDepositAddressByAddress(address: string): Promise<UserDepositAddress | undefined>;
+  getUserDepositAddressById(id: string): Promise<UserDepositAddress | undefined>;
   createUserDepositAddress(address: InsertUserDepositAddress): Promise<UserDepositAddress>;
   getNextDerivationIndex(): Promise<number>;
   getAllActiveDepositAddresses(): Promise<UserDepositAddress[]>;
@@ -1473,6 +1474,14 @@ export class DatabaseStorage implements IStorage {
       .select()
       .from(userDepositAddresses)
       .where(eq(userDepositAddresses.address, address));
+    return result || undefined;
+  }
+
+  async getUserDepositAddressById(id: string): Promise<UserDepositAddress | undefined> {
+    const [result] = await db
+      .select()
+      .from(userDepositAddresses)
+      .where(eq(userDepositAddresses.id, id));
     return result || undefined;
   }
 

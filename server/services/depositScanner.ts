@@ -1,5 +1,5 @@
 import { storage } from "../storage";
-import { monitorDepositAddress, checkDepositConfirmations, getCurrentBlockNumber } from "./blockchain";
+import { monitorDepositAddress, checkDepositConfirmations, getCurrentBlockNumber, sweepDepositToMaster } from "./blockchain";
 import { USDT_BEP20_CONTRACT } from "../utils/crypto";
 
 let isScanning = false;
@@ -28,6 +28,7 @@ export async function runDepositScanner(): Promise<void> {
     await scanForNewDeposits();
     await updatePendingDeposits();
     await creditConfirmedDeposits();
+    await sweepCreditedDeposits();
 
   } catch (error) {
     console.error("[DepositScanner] Error during scan:", error);
@@ -155,6 +156,75 @@ async function creditConfirmedDeposits(): Promise<void> {
 
     } catch (error) {
       console.error(`[DepositScanner] Error crediting deposit ${deposit.id}:`, error);
+    }
+  }
+}
+
+async function sweepCreditedDeposits(): Promise<void> {
+  const controls = await storage.getPlatformWalletControls();
+  if (!controls?.sweepsEnabled) {
+    return;
+  }
+
+  const creditedDeposits = await storage.getCreditedUnsweptDeposits();
+  
+  for (const deposit of creditedDeposits) {
+    try {
+      const depositAddress = await storage.getUserDepositAddressById(deposit.depositAddressId);
+      if (!depositAddress) {
+        console.error(`[DepositScanner] No deposit address found for deposit ${deposit.id}`);
+        continue;
+      }
+
+      await storage.updateBlockchainDeposit(deposit.id, {
+        status: "sweep_pending",
+      });
+
+      const result = await sweepDepositToMaster(
+        depositAddress.encryptedPrivateKey,
+        deposit.amount
+      );
+
+      if (result.success) {
+        const sweep = await storage.createDepositSweep({
+          depositId: deposit.id,
+          fromAddress: depositAddress.address,
+          toAddress: process.env.MASTER_WALLET_ADDRESS || "",
+          amount: deposit.amount,
+          status: "completed",
+        });
+
+        await storage.updateDepositSweep(sweep.id, {
+          txHash: result.txHash || null,
+          completedAt: new Date(),
+        });
+
+        await storage.updateBlockchainDeposit(deposit.id, {
+          status: "swept",
+        });
+
+        console.log(`[DepositScanner] Swept ${deposit.amount} USDT from ${depositAddress.address} to master wallet (TX: ${result.txHash})`);
+      } else {
+        await storage.createDepositSweep({
+          depositId: deposit.id,
+          fromAddress: depositAddress.address,
+          toAddress: process.env.MASTER_WALLET_ADDRESS || "",
+          amount: deposit.amount,
+          status: "failed",
+        });
+
+        await storage.updateBlockchainDeposit(deposit.id, {
+          status: "credited",
+        });
+
+        console.error(`[DepositScanner] Failed to sweep deposit ${deposit.id}: ${result.error}`);
+      }
+    } catch (error: any) {
+      console.error(`[DepositScanner] Error sweeping deposit ${deposit.id}:`, error);
+      
+      await storage.updateBlockchainDeposit(deposit.id, {
+        status: "credited",
+      });
     }
   }
 }
