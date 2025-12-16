@@ -1454,7 +1454,7 @@ export async function registerRoutes(
 
   // ==================== BLOCKCHAIN WALLET ROUTES ====================
 
-  // Get or create user deposit address
+  // Get or create user deposit address (always generates a fresh address with no prior transactions)
   app.get("/api/wallet/deposit-address", requireAuth, requireDepositsEnabled, async (req: AuthRequest, res) => {
     try {
       const controls = await storage.getPlatformWalletControls();
@@ -1468,21 +1468,18 @@ export async function registerRoutes(
         return res.status(503).json({ message: "Deposit system is not configured. Please contact support." });
       }
 
-      let depositAddress = await storage.getUserDepositAddress(req.user!.userId, "BSC");
-      
-      if (!depositAddress) {
-        const derivationIndex = await storage.getAndIncrementDerivationIndex();
-        const generated = generateDepositAddress(derivationIndex);
-        const encryptedKey = encryptPrivateKey(generated.privateKey);
+      // Always generate a fresh new deposit address with no prior transactions
+      const derivationIndex = await storage.getAndIncrementDerivationIndex();
+      const generated = generateDepositAddress(derivationIndex);
+      const encryptedKey = encryptPrivateKey(generated.privateKey);
 
-        depositAddress = await storage.createUserDepositAddress({
-          userId: req.user!.userId,
-          address: generated.address,
-          network: "BSC",
-          derivationIndex,
-          encryptedPrivateKey: encryptedKey,
-        });
-      }
+      const depositAddress = await storage.createUserDepositAddress({
+        userId: req.user!.userId,
+        address: generated.address,
+        network: "BSC",
+        derivationIndex,
+        encryptedPrivateKey: encryptedKey,
+      });
 
       res.json({
         address: depositAddress.address,
