@@ -442,6 +442,16 @@ async function createBlockchainTables() {
   }
 
   await pool.query(`
+    CREATE TABLE IF NOT EXISTS wallet_index_counter (
+      id VARCHAR PRIMARY KEY DEFAULT 'singleton',
+      next_index INTEGER NOT NULL DEFAULT 0,
+      updated_at TIMESTAMP NOT NULL DEFAULT now()
+    );
+
+    INSERT INTO wallet_index_counter (id, next_index, updated_at) 
+    VALUES ('singleton', 0, now()) 
+    ON CONFLICT (id) DO NOTHING;
+
     CREATE TABLE IF NOT EXISTS user_deposit_addresses (
       id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid(),
       user_id VARCHAR NOT NULL REFERENCES users(id) ON DELETE CASCADE,
