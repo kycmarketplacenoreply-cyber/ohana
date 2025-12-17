@@ -1089,6 +1089,7 @@ export const depositStatusEnum = pgEnum("deposit_status", [
   "credited",
   "sweep_pending",
   "swept",
+  "sweep_failed",
   "failed"
 ]);
 

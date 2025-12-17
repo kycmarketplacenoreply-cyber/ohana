@@ -160,6 +160,8 @@ async function creditConfirmedDeposits(): Promise<void> {
   }
 }
 
+const MAX_SWEEP_ATTEMPTS = 5;
+
 async function sweepCreditedDeposits(): Promise<void> {
   const controls = await storage.getPlatformWalletControls();
   if (!controls?.sweepsEnabled) {
@@ -176,9 +178,22 @@ async function sweepCreditedDeposits(): Promise<void> {
         continue;
       }
 
+      const existingSweep = await storage.getDepositSweepByDepositId(deposit.id);
+      const currentAttempts = existingSweep?.attempts || 0;
+      
+      if (currentAttempts >= MAX_SWEEP_ATTEMPTS) {
+        console.log(`[DepositScanner] Deposit ${deposit.id} has reached max sweep attempts (${MAX_SWEEP_ATTEMPTS}). Skipping until manual intervention.`);
+        await storage.updateBlockchainDeposit(deposit.id, {
+          status: "sweep_failed",
+        });
+        continue;
+      }
+
       await storage.updateBlockchainDeposit(deposit.id, {
         status: "sweep_pending",
       });
+
+      console.log(`[DepositScanner] Attempting sweep for deposit ${deposit.id} (attempt ${currentAttempts + 1}/${MAX_SWEEP_ATTEMPTS})`);
 
       const result = await sweepDepositToMaster(
         depositAddress.encryptedPrivateKey,
@@ -186,18 +201,29 @@ async function sweepCreditedDeposits(): Promise<void> {
       );
 
       if (result.success) {
-        const sweep = await storage.createDepositSweep({
-          depositId: deposit.id,
-          fromAddress: depositAddress.address,
-          toAddress: process.env.SWEEP_WALLET_ADDRESS || process.env.MASTER_WALLET_ADDRESS || "",
-          amount: deposit.amount,
-          status: "completed",
-        });
-
-        await storage.updateDepositSweep(sweep.id, {
-          txHash: result.txHash || null,
-          completedAt: new Date(),
-        });
+        if (existingSweep) {
+          await storage.updateDepositSweep(existingSweep.id, {
+            txHash: result.txHash || null,
+            status: "completed",
+            completedAt: new Date(),
+            attempts: currentAttempts + 1,
+            lastAttemptAt: new Date(),
+          });
+        } else {
+          const sweep = await storage.createDepositSweep({
+            depositId: deposit.id,
+            fromAddress: depositAddress.address,
+            toAddress: process.env.SWEEP_WALLET_ADDRESS || process.env.MASTER_WALLET_ADDRESS || "",
+            amount: deposit.amount,
+            status: "completed",
+          });
+          await storage.updateDepositSweep(sweep.id, {
+            txHash: result.txHash || null,
+            completedAt: new Date(),
+            attempts: 1,
+            lastAttemptAt: new Date(),
+          });
+        }
 
         await storage.updateBlockchainDeposit(deposit.id, {
           status: "swept",
@@ -205,19 +231,33 @@ async function sweepCreditedDeposits(): Promise<void> {
 
         console.log(`[DepositScanner] Swept ${deposit.amount} USDT from ${depositAddress.address} to master wallet (TX: ${result.txHash})`);
       } else {
-        await storage.createDepositSweep({
-          depositId: deposit.id,
-          fromAddress: depositAddress.address,
-          toAddress: process.env.SWEEP_WALLET_ADDRESS || process.env.MASTER_WALLET_ADDRESS || "",
-          amount: deposit.amount,
-          status: "failed",
-        });
+        if (existingSweep) {
+          await storage.updateDepositSweep(existingSweep.id, {
+            status: "failed",
+            attempts: currentAttempts + 1,
+            lastAttemptAt: new Date(),
+            errorMessage: result.error || "Unknown error",
+          });
+        } else {
+          const sweep = await storage.createDepositSweep({
+            depositId: deposit.id,
+            fromAddress: depositAddress.address,
+            toAddress: process.env.SWEEP_WALLET_ADDRESS || process.env.MASTER_WALLET_ADDRESS || "",
+            amount: deposit.amount,
+            status: "failed",
+          });
+          await storage.updateDepositSweep(sweep.id, {
+            attempts: 1,
+            lastAttemptAt: new Date(),
+            errorMessage: result.error || "Unknown error",
+          });
+        }
 
         await storage.updateBlockchainDeposit(deposit.id, {
           status: "credited",
         });
 
-        console.error(`[DepositScanner] Failed to sweep deposit ${deposit.id}: ${result.error}`);
+        console.error(`[DepositScanner] Failed to sweep deposit ${deposit.id} (attempt ${currentAttempts + 1}): ${result.error}`);
       }
     } catch (error: any) {
       console.error(`[DepositScanner] Error sweeping deposit ${deposit.id}:`, error);
