@@ -137,8 +137,8 @@ interface MaintenanceSettings {
 
 interface WalletDashboard {
   masterWalletAddress: string;
-  usdtBalance: string;
-  bnbBalance: string;
+  masterWalletUsdtBalance: string;
+  masterWalletBnbBalance: string;
   isWalletUnlocked: boolean;
 }
 
@@ -252,11 +252,11 @@ function WalletControlsSection() {
         </div>
         <div className="p-4 bg-gray-800 rounded-lg">
           <p className="text-gray-400 text-sm">USDT Balance</p>
-          <p className="text-white font-bold">{walletDashboard?.usdtBalance || "0.00"} USDT</p>
+          <p className="text-white font-bold">{walletDashboard?.masterWalletUsdtBalance || "0.00"} USDT</p>
         </div>
         <div className="p-4 bg-gray-800 rounded-lg">
           <p className="text-gray-400 text-sm">BNB Balance (Gas)</p>
-          <p className="text-white font-bold">{walletDashboard?.bnbBalance || "0.00"} BNB</p>
+          <p className="text-white font-bold">{walletDashboard?.masterWalletBnbBalance || "0.00"} BNB</p>
         </div>
       </div>
     </div>
