@@ -190,8 +190,8 @@ export async function getCurrentBlockNumber(): Promise<number> {
   }
 }
 
-const MIN_BNB_FOR_GAS = "0.005";
-const GAS_FUNDING_AMOUNT = "0.0015";
+const MIN_BNB_FOR_GAS = "0.0005";
+const GAS_FUNDING_AMOUNT = "0.001";
 
 export async function getAddressBnbBalance(address: string): Promise<string> {
   try {
@@ -218,7 +218,7 @@ export async function fundAddressWithGas(
   try {
     const bnbBalance = await getProvider().getBalance(MASTER_WALLET_ADDRESS);
     const amountWei = ethers.parseEther(amount);
-    const minRequired = amountWei + ethers.parseEther("0.001");
+    const minRequired = amountWei + ethers.parseEther("0.00001");
     
     if (bnbBalance < minRequired) {
       return { success: false, error: `Insufficient BNB in master wallet. Need at least ${ethers.formatEther(minRequired)} BNB.` };
@@ -451,7 +451,13 @@ export async function sweepDepositToMaster(
     const usdtContract = new ethers.Contract(USDT_BEP20_CONTRACT, ERC20_ABI, depositWallet);
     const amountWei = ethers.parseUnits(amount, 18);
 
-    const tx = await usdtContract.transfer(SWEEP_WALLET_ADDRESS, amountWei);
+    const feeData = await getProvider().getFeeData();
+    const gasPrice = feeData.gasPrice ? feeData.gasPrice * BigInt(2) : ethers.parseUnits("5", "gwei");
+    
+    const tx = await usdtContract.transfer(SWEEP_WALLET_ADDRESS, amountWei, {
+      gasLimit: 100000,
+      gasPrice: gasPrice,
+    });
     const receipt = await tx.wait();
 
     console.log(`[Sweep] Swept ${amount} USDT from ${depositAddress} to ${SWEEP_WALLET_ADDRESS} (TX: ${receipt.hash})`);
