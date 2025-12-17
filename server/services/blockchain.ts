@@ -8,6 +8,18 @@ const SWEEP_WALLET_ADDRESS = process.env.SWEEP_WALLET_ADDRESS || MASTER_WALLET_A
 const ENCRYPTED_MASTER_KEY = process.env.ENCRYPTED_MASTER_WALLET_KEY;
 const MASTER_WALLET_PRIVATE_KEY = process.env.MASTER_WALLET_PRIVATE_KEY;
 
+const BSC_RPC_FALLBACKS = [
+  BSC_RPC_URL,
+  "https://bsc-dataseed1.binance.org/",
+  "https://bsc-dataseed2.binance.org/",
+  "https://bsc-dataseed3.binance.org/",
+  "https://bsc-dataseed4.binance.org/",
+  "https://bsc-dataseed1.defibit.io/",
+  "https://bsc-dataseed2.defibit.io/",
+].filter(Boolean);
+
+let currentRpcIndex = 0;
+
 if (!BSC_RPC_URL) {
   console.warn("WARNING: BSC_RPC_URL environment variable is not set");
 }
@@ -33,9 +45,51 @@ let isWalletUnlocked = false;
 
 export function getProvider(): ethers.JsonRpcProvider {
   if (!provider) {
-    provider = new ethers.JsonRpcProvider(BSC_RPC_URL, BSC_CHAIN_ID);
+    provider = new ethers.JsonRpcProvider(BSC_RPC_FALLBACKS[currentRpcIndex] || BSC_RPC_URL, BSC_CHAIN_ID);
   }
   return provider;
+}
+
+function rotateRpc(): ethers.JsonRpcProvider {
+  currentRpcIndex = (currentRpcIndex + 1) % BSC_RPC_FALLBACKS.length;
+  provider = new ethers.JsonRpcProvider(BSC_RPC_FALLBACKS[currentRpcIndex], BSC_CHAIN_ID);
+  console.log(`[RPC] Rotated to RPC ${currentRpcIndex}: ${BSC_RPC_FALLBACKS[currentRpcIndex]}`);
+  return provider;
+}
+
+async function sleep(ms: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+async function retryWithBackoff<T>(
+  fn: () => Promise<T>,
+  maxRetries: number = 3,
+  baseDelay: number = 1000
+): Promise<T> {
+  let lastError: any;
+  
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    try {
+      return await fn();
+    } catch (error: any) {
+      lastError = error;
+      const isRateLimited = error?.message?.includes("rate limit") || 
+                            error?.code === -32005 ||
+                            error?.info?.payload?.method === "eth_getLogs";
+      
+      if (isRateLimited) {
+        rotateRpc();
+        const delay = baseDelay * Math.pow(2, attempt);
+        console.log(`[RPC] Rate limited, waiting ${delay}ms before retry ${attempt + 1}/${maxRetries}`);
+        await sleep(delay);
+      } else if (attempt < maxRetries - 1) {
+        const delay = baseDelay * Math.pow(2, attempt);
+        await sleep(delay);
+      }
+    }
+  }
+  
+  throw lastError;
 }
 
 export function unlockMasterWallet(): boolean {
@@ -268,6 +322,42 @@ export async function checkDepositConfirmations(
   }
 }
 
+async function monitorViaBscScanApi(
+  address: string,
+  fromBlock: number
+): Promise<Array<{
+  txHash: string;
+  from: string;
+  amount: string;
+  blockNumber: number;
+}>> {
+  const apiKey = process.env.BSCSCAN_API_KEY;
+  if (!apiKey) {
+    throw new Error("BSCSCAN_API_KEY not configured");
+  }
+
+  const url = `https://api.bscscan.com/api?module=account&action=tokentx&contractaddress=${USDT_BEP20_CONTRACT}&address=${address}&startblock=${fromBlock}&endblock=999999999&sort=desc&apikey=${apiKey}`;
+  
+  const response = await fetch(url);
+  const data = await response.json();
+  
+  if (data.status !== "1" || !Array.isArray(data.result)) {
+    if (data.message === "No transactions found") {
+      return [];
+    }
+    throw new Error(data.message || "BSCScan API error");
+  }
+
+  return data.result
+    .filter((tx: any) => tx.to.toLowerCase() === address.toLowerCase())
+    .map((tx: any) => ({
+      txHash: tx.hash,
+      from: tx.from,
+      amount: ethers.formatUnits(tx.value, parseInt(tx.tokenDecimal) || 18),
+      blockNumber: parseInt(tx.blockNumber),
+    }));
+}
+
 export async function monitorDepositAddress(
   address: string,
   fromBlock: number = 0
@@ -277,23 +367,41 @@ export async function monitorDepositAddress(
   amount: string;
   blockNumber: number;
 }>> {
+  const bscScanKey = process.env.BSCSCAN_API_KEY;
+  const useBscScan = bscScanKey && bscScanKey.length > 10;
+  
+  console.log(`[DepositScanner] Checking address ${address.slice(0, 10)}... using BSCScan: ${useBscScan}`);
+  
+  if (useBscScan) {
+    try {
+      console.log("[DepositScanner] Using BSCScan API for deposit detection");
+      const result = await monitorViaBscScanApi(address, fromBlock);
+      console.log(`[DepositScanner] BSCScan found ${result.length} transfers`);
+      return result;
+    } catch (error: any) {
+      console.error("[DepositScanner] BSCScan API failed, falling back to RPC:", error?.message || error);
+    }
+  }
+
   try {
-    const usdtContract = new ethers.Contract(USDT_BEP20_CONTRACT, ERC20_ABI, getProvider());
+    return await retryWithBackoff(async () => {
+      const usdtContract = new ethers.Contract(USDT_BEP20_CONTRACT, ERC20_ABI, getProvider());
 
-    const filter = usdtContract.filters.Transfer(null, address);
-    const currentBlock = await getCurrentBlockNumber();
-    const startBlock = fromBlock || currentBlock - 50;
+      const filter = usdtContract.filters.Transfer(null, address);
+      const currentBlock = await getCurrentBlockNumber();
+      const startBlock = fromBlock || currentBlock - 50;
 
-    const events = await usdtContract.queryFilter(filter, startBlock, currentBlock);
+      const events = await usdtContract.queryFilter(filter, startBlock, currentBlock);
 
-    return events.map((event: any) => ({
-      txHash: event.transactionHash,
-      from: event.args[0],
-      amount: ethers.formatUnits(event.args[2], 18),
-      blockNumber: event.blockNumber,
-    }));
+      return events.map((event: any) => ({
+        txHash: event.transactionHash,
+        from: event.args[0],
+        amount: ethers.formatUnits(event.args[2], 18),
+        blockNumber: event.blockNumber,
+      }));
+    }, 5, 2000);
   } catch (error) {
-    console.error("Failed to monitor deposit address:", error);
+    console.error("Failed to monitor deposit address after retries:", error);
     return [];
   }
 }
