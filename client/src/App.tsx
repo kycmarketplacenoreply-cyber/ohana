@@ -23,6 +23,7 @@ const LoaderOrderPage = lazy(() => import("@/pages/LoaderOrderPage"));
 const SupportPage = lazy(() => import("@/pages/SupportPage"));
 const FinancePage = lazy(() => import("@/pages/FinancePage"));
 const MaintenancePage = lazy(() => import("@/pages/MaintenancePage"));
+const ProfilePage = lazy(() => import("@/pages/ProfilePage"));
 const NotFound = lazy(() => import("@/pages/not-found"));
 
 interface MaintenanceStatus {
@@ -114,6 +115,7 @@ function Router() {
         <Route path="/trade/:id" component={TradePage} />
         <Route path="/notifications" component={NotificationsPage} />
         <Route path="/settings" component={SettingsPage} />
+        <Route path="/profile" component={() => <ProtectedRoute component={ProfilePage} allowedRoles={["customer", "vendor"]} />} />
         <Route path="/vendor" component={() => <ProtectedRoute component={VendorPage} allowedRoles={["customer", "vendor"]} />} />
         <Route path="/admin" component={() => <ProtectedRoute component={AdminPage} allowedRoles={["admin"]} />} />
         <Route path="/disputes" component={() => <ProtectedRoute component={DisputeAdminPage} allowedRoles={["admin", "dispute_admin"]} />} />

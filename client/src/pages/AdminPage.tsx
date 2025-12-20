@@ -723,18 +723,38 @@ export default function AdminPage() {
                             <TableCell>
                               <Select
                                 value={userData.role}
-                                onValueChange={(role) => changeRoleMutation.mutate({ userId: userData.id, role })}
+                                onValueChange={(role) => {
+                                  // Prevent demoting admins or changing admin status
+                                  if (userData.role === "admin") {
+                                    toast({ variant: "destructive", title: "Error", description: "Admin accounts cannot be demoted" });
+                                    return;
+                                  }
+                                  changeRoleMutation.mutate({ userId: userData.id, role });
+                                }}
+                                disabled={userData.role === "admin"}
                               >
-                                <SelectTrigger className="w-32 bg-gray-800 border-gray-700">
+                                <SelectTrigger className={`w-32 ${userData.role === "admin" ? "bg-gray-700 border-gray-600 cursor-not-allowed opacity-70" : "bg-gray-800 border-gray-700"}`}>
                                   <SelectValue />
                                 </SelectTrigger>
                                 <SelectContent className="bg-gray-800 border-gray-700">
-                                  <SelectItem value="customer">Customer</SelectItem>
-                                  <SelectItem value="vendor">Vendor</SelectItem>
-                                  <SelectItem value="support">Support</SelectItem>
-                                  <SelectItem value="finance_manager">Finance</SelectItem>
-                                  <SelectItem value="dispute_admin">Dispute Admin</SelectItem>
-                                  <SelectItem value="admin">Admin</SelectItem>
+                                  {userData.role === "customer" && (
+                                    <>
+                                      <SelectItem value="customer">Customer</SelectItem>
+                                      <SelectItem value="vendor">Vendor</SelectItem>
+                                    </>
+                                  )}
+                                  {userData.role !== "customer" && userData.role !== "admin" && (
+                                    <>
+                                      <SelectItem value="customer">Customer</SelectItem>
+                                      <SelectItem value="vendor">Vendor</SelectItem>
+                                      <SelectItem value="support">Support</SelectItem>
+                                      <SelectItem value="finance_manager">Finance</SelectItem>
+                                      <SelectItem value="dispute_admin">Dispute Admin</SelectItem>
+                                    </>
+                                  )}
+                                  {userData.role === "admin" && (
+                                    <SelectItem value="admin" disabled>Admin (Cannot Change)</SelectItem>
+                                  )}
                                 </SelectContent>
                               </Select>
                             </TableCell>

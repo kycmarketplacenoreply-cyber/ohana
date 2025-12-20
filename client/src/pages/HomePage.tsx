@@ -135,7 +135,7 @@ export default function HomePage() {
       case "feed":
         return "Feed";
       case "p2p":
-        return "P2P";
+        return "KYC Marketplace";
       case "loaders":
         return "Loaders";
       default:
@@ -196,7 +196,7 @@ export default function HomePage() {
               data-testid="section-p2p"
             >
               <Store className="h-4 w-4" />
-              P2P Marketplace
+              KYC Marketplace
             </button>
             <button
               onClick={() => setMainSection("loaders")}
