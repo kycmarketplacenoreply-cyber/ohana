@@ -274,9 +274,9 @@ export default function VendorPage() {
                   New Ad
                 </Button>
               </DialogTrigger>
-              <DialogContent className="bg-gray-900 border-gray-800 max-w-lg">
+              <DialogContent className="bg-card border-border max-w-lg">
                 <DialogHeader>
-                  <DialogTitle className="text-white">Create New Offer</DialogTitle>
+                  <DialogTitle className="text-foreground">Create New Offer</DialogTitle>
                 </DialogHeader>
                 <div className="space-y-4 py-4">
                   <div className="grid grid-cols-2 gap-4">
@@ -286,7 +286,7 @@ export default function VendorPage() {
                         value={newOffer.type}
                         onValueChange={(v) => setNewOffer({ ...newOffer, type: v })}
                       >
-                        <SelectTrigger className="bg-gray-800 border-gray-700" data-testid="select-offer-type">
+                        <SelectTrigger className="bg-muted border-border" data-testid="select-offer-type">
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
@@ -300,7 +300,7 @@ export default function VendorPage() {
                       <Input
                         type="text"
                         value="USD"
-                        className="bg-gray-800 border-gray-700 opacity-60"
+                        className="bg-muted border-border opacity-60"
                         data-testid="input-offer-currency"
                         readOnly
                         disabled
@@ -315,7 +315,7 @@ export default function VendorPage() {
                       min="0"
                       value={newOffer.pricePerUnit}
                       onChange={(e) => handlePriceChange(e.target.value)}
-                      className="bg-gray-800 border-gray-700"
+                      className="bg-muted border-border"
                       placeholder="e.g. 100"
                       data-testid="input-price"
                     />
@@ -328,7 +328,7 @@ export default function VendorPage() {
                       min="1"
                       value={newOffer.availableAmount}
                       onChange={(e) => handleAvailableChange(e.target.value)}
-                      className="bg-gray-800 border-gray-700"
+                      className="bg-muted border-border"
                       placeholder="Number of accounts for sale"
                       data-testid="input-available"
                     />
@@ -341,7 +341,7 @@ export default function VendorPage() {
                         min="0"
                         value={newOffer.minLimit}
                         onChange={(e) => handleMinLimitChange(e.target.value)}
-                        className="bg-gray-800 border-gray-700"
+                        className="bg-muted border-border"
                         data-testid="input-min-limit"
                       />
                     </div>
@@ -350,7 +350,7 @@ export default function VendorPage() {
                       <Input
                         type="number"
                         value={newOffer.maxLimit}
-                        className="bg-gray-800 border-gray-700 opacity-60"
+                        className="bg-muted border-border opacity-60"
                         data-testid="input-max-limit"
                         readOnly
                         disabled
@@ -363,7 +363,7 @@ export default function VendorPage() {
                       type="text"
                       value={newOffer.accountType}
                       onChange={(e) => setNewOffer({ ...newOffer, accountType: e.target.value })}
-                      className="bg-gray-800 border-gray-700"
+                      className="bg-muted border-border"
                       placeholder="e.g. Binance, OKX, MEXC, Bybit, Custom..."
                       data-testid="input-account-type"
                     />
@@ -373,7 +373,7 @@ export default function VendorPage() {
                     <Textarea
                       value={newOffer.terms}
                       onChange={(e) => setNewOffer({ ...newOffer, terms: e.target.value })}
-                      className="bg-gray-800 border-gray-700"
+                      className="bg-muted border-border"
                       placeholder="Trade terms and conditions..."
                       data-testid="input-terms"
                     />
@@ -381,7 +381,7 @@ export default function VendorPage() {
 
 
                   <Button
-                    className="w-full bg-purple-600 hover:bg-purple-700"
+                    className="w-full bg-primary hover:bg-primary/90"
                     onClick={() => createOfferMutation.mutate(newOffer)}
                     disabled={createOfferMutation.isPending}
                     data-testid="button-submit-offer"

@@ -66,21 +66,21 @@ export default function AuthPage() {
   });
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 p-4">
+    <div className="min-h-screen flex items-center justify-center bg-background p-4">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
           <div className="flex justify-center mb-4">
-            <div className="p-3 bg-purple-600 rounded-xl">
-              <Shield className="h-8 w-8 text-white" />
+            <div className="p-3 bg-primary rounded-xl">
+              <Shield className="h-8 w-8 text-primary-foreground" />
             </div>
           </div>
-          <h1 className="text-3xl font-bold text-white">KYC Marketplace</h1>
-          <p className="text-gray-400 mt-2">Secure peer-to-peer trading platform</p>
+          <h1 className="text-3xl font-bold text-foreground">KYC Marketplace</h1>
+          <p className="text-muted-foreground mt-2">Secure peer-to-peer trading platform</p>
         </div>
 
-        <Card className="border-gray-800 bg-gray-900/50 backdrop-blur">
+        <Card className="border-border bg-card/50 backdrop-blur">
           <CardHeader>
-            <CardTitle className="text-white">Get Started</CardTitle>
+            <CardTitle className="text-foreground">Get Started</CardTitle>
             <CardDescription>Sign in or create an account to start trading</CardDescription>
           </CardHeader>
           <CardContent>
@@ -99,29 +99,29 @@ export default function AuthPage() {
                   className="space-y-4"
                 >
                   <div className="space-y-2">
-                    <Label htmlFor="login-username" className="text-gray-300">Username</Label>
+                    <Label htmlFor="login-username" className="text-foreground">Username</Label>
                     <div className="relative">
-                      <User className="absolute left-3 top-2.5 h-5 w-5 text-gray-500" />
+                      <User className="absolute left-3 top-2.5 h-5 w-5 text-muted-foreground" />
                       <Input
                         id="login-username"
                         data-testid="input-login-username"
                         placeholder="Enter username"
-                        className="pl-10 bg-gray-800 border-gray-700 text-white"
+                        className="pl-10 bg-muted border-border text-foreground"
                         value={loginForm.username}
                         onChange={(e) => setLoginForm({ ...loginForm, username: e.target.value })}
                       />
                     </div>
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="login-password" className="text-gray-300">Password</Label>
+                    <Label htmlFor="login-password" className="text-foreground">Password</Label>
                     <div className="relative">
-                      <Lock className="absolute left-3 top-2.5 h-5 w-5 text-gray-500" />
+                      <Lock className="absolute left-3 top-2.5 h-5 w-5 text-muted-foreground" />
                       <Input
                         id="login-password"
                         data-testid="input-login-password"
                         type="password"
                         placeholder="Enter password"
-                        className="pl-10 bg-gray-800 border-gray-700 text-white"
+                        className="pl-10 bg-muted border-border text-foreground"
                         value={loginForm.password}
                         onChange={(e) => setLoginForm({ ...loginForm, password: e.target.value })}
                       />
