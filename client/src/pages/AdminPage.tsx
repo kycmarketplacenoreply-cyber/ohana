@@ -724,9 +724,9 @@ export default function AdminPage() {
                               <Select
                                 value={userData.role}
                                 onValueChange={(role) => {
-                                  // Prevent demoting admins or changing admin status
+                                  // Prevent demoting admins
                                   if (userData.role === "admin") {
-                                    toast({ variant: "destructive", title: "Error", description: "Admin accounts cannot be demoted" });
+                                    toast({ variant: "destructive", title: "Error", description: "Admin accounts cannot be demoted or changed" });
                                     return;
                                   }
                                   changeRoleMutation.mutate({ userId: userData.id, role });
@@ -743,7 +743,13 @@ export default function AdminPage() {
                                       <SelectItem value="vendor">Vendor</SelectItem>
                                     </>
                                   )}
-                                  {userData.role !== "customer" && userData.role !== "admin" && (
+                                  {userData.role === "vendor" && (
+                                    <>
+                                      <SelectItem value="customer">Customer</SelectItem>
+                                      <SelectItem value="vendor">Vendor</SelectItem>
+                                    </>
+                                  )}
+                                  {userData.role !== "customer" && userData.role !== "vendor" && userData.role !== "admin" && (
                                     <>
                                       <SelectItem value="customer">Customer</SelectItem>
                                       <SelectItem value="vendor">Vendor</SelectItem>

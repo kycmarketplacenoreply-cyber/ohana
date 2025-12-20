@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ThemeToggle } from "@/components/marketplace/ThemeToggle";
 import {
   CheckCircle,
   Mail,
@@ -18,6 +19,11 @@ import {
   User,
   Store,
   Clock,
+  ThumbsUp,
+  Lock,
+  Users,
+  Eye,
+  Ban,
 } from "lucide-react";
 
 interface UserProfile {
@@ -153,15 +159,18 @@ export default function ProfilePage() {
     <div className="min-h-screen bg-background pb-20">
       {/* Header */}
       <div className="sticky top-0 z-40 bg-background border-b border-border">
-        <div className="max-w-4xl mx-auto px-4 py-3 flex items-center gap-4">
-          <button
-            onClick={() => window.history.back()}
-            className="p-1"
-            data-testid="button-back"
-          >
-            <ChevronLeft className="h-6 w-6 text-foreground" />
-          </button>
-          <h1 className="text-lg font-semibold text-foreground">User Profile</h1>
+        <div className="max-w-4xl mx-auto px-4 py-3 flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <button
+              onClick={() => window.history.back()}
+              className="p-1"
+              data-testid="button-back"
+            >
+              <ChevronLeft className="h-6 w-6 text-foreground" />
+            </button>
+            <h1 className="text-lg font-semibold text-foreground">User Profile</h1>
+          </div>
+          <ThemeToggle />
         </div>
       </div>
 
@@ -237,48 +246,49 @@ export default function ProfilePage() {
 
         {/* Stats Cards */}
         {tradeStats && (
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <Card className="bg-card border-border">
-              <CardContent className="pt-4">
-                <p className="text-3xl font-bold text-foreground">
-                  {tradeStats.totalTrades}
-                </p>
-                <p className="text-xs text-muted-foreground mt-1">
-                  Total Trades
-                </p>
-              </CardContent>
-            </Card>
-            <Card className="bg-card border-border">
-              <CardContent className="pt-4">
-                <p className="text-3xl font-bold text-foreground">
-                  {tradeStats.completionRate}%
-                </p>
-                <p className="text-xs text-muted-foreground mt-1">
-                  Completion Rate
-                </p>
-              </CardContent>
-            </Card>
-            <Card className="bg-card border-border">
-              <CardContent className="pt-4">
-                <p className="text-3xl font-bold text-foreground">
-                  {tradeStats.avgReleaseTime || "—"}
-                </p>
-                <p className="text-xs text-muted-foreground mt-1">
-                  Avg. Release Time
-                </p>
-              </CardContent>
-            </Card>
-            <Card className="bg-card border-border">
-              <CardContent className="pt-4">
-                <p className="text-3xl font-bold text-foreground">
-                  {tradeStats.avgPayTime || "—"}
-                </p>
-                <p className="text-xs text-muted-foreground mt-1">
-                  Avg. Pay Time
-                </p>
-              </CardContent>
-            </Card>
-          </div>
+          <Card className="bg-card border-border">
+            <CardContent className="pt-6">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="border-r border-border pr-4">
+                  <p className="text-3xl font-bold text-foreground">
+                    {tradeStats.totalTrades}
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    30d Trades
+                  </p>
+                </div>
+                <div>
+                  <p className="text-3xl font-bold text-foreground">
+                    {tradeStats.completionRate}%
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    30d Completion Rate
+                  </p>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4 mt-4 border-t border-border pt-4">
+                <div className="border-r border-border pr-4">
+                  <p className="text-xl font-bold text-foreground">
+                    {tradeStats.avgReleaseTime || "—"}
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Avg. Release Time
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xl font-bold text-foreground">
+                    {tradeStats.avgPayTime || "—"}
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Avg. Pay Time
+                  </p>
+                </div>
+              </div>
+              <button className="w-full text-center text-sm text-muted-foreground hover:text-foreground mt-4 py-2">
+                More ▼
+              </button>
+            </CardContent>
+          </Card>
         )}
 
         {/* Vendor Info */}
@@ -329,12 +339,18 @@ export default function ProfilePage() {
 
         {/* Tabs */}
         <Tabs defaultValue="trades" className="w-full">
-          <TabsList className="grid w-full grid-cols-2 bg-muted">
-            <TabsTrigger value="trades" data-testid="tab-trades">
-              Active Ads
+          <TabsList className="grid w-full grid-cols-3 bg-transparent border-b border-border rounded-none">
+            <TabsTrigger value="trades" data-testid="tab-trades" className="rounded-none border-b-2 border-transparent data-[state=active]:border-foreground">
+              <ThumbsUp className="h-4 w-4 mr-2" />
+              Trade
             </TabsTrigger>
-            <TabsTrigger value="feedback" data-testid="tab-feedback">
+            <TabsTrigger value="feedback" data-testid="tab-feedback" className="rounded-none border-b-2 border-transparent data-[state=active]:border-foreground">
+              <MessageSquare className="h-4 w-4 mr-2" />
               Feedback
+            </TabsTrigger>
+            <TabsTrigger value="others" className="rounded-none border-b-2 border-transparent data-[state=active]:border-foreground">
+              <Eye className="h-4 w-4 mr-2" />
+              Others
             </TabsTrigger>
           </TabsList>
 
@@ -383,53 +399,88 @@ export default function ProfilePage() {
           </TabsContent>
 
           <TabsContent value="feedback" className="space-y-4">
+            <div className="space-y-3">
+              <div className="flex items-center justify-between p-4 bg-card border border-border rounded-lg">
+                <div className="flex items-center gap-2">
+                  <ThumbsUp className="h-5 w-5 text-foreground" />
+                  <span className="font-medium text-foreground">Received Feedback</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-foreground font-bold">{feedbacks?.length || 0}</span>
+                  <ChevronLeft className="h-4 w-4 text-muted-foreground rotate-180" />
+                </div>
+              </div>
+            </div>
+
             {feedbacks && feedbacks.length > 0 ? (
-              feedbacks.map((feedback: Feedback) => (
-                <Card
-                  key={feedback.id}
-                  className="bg-card border-border"
-                  data-testid={`feedback-card-${feedback.id}`}
-                >
-                  <CardContent className="pt-4">
-                    <div className="flex items-start justify-between mb-2">
-                      <div className="flex items-center gap-2">
-                        <div className="w-8 h-8 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-full flex items-center justify-center text-white text-sm font-bold">
-                          {feedback.createdBy[0].toUpperCase()}
-                        </div>
-                        <div>
-                          <p className="text-sm font-medium text-foreground">
-                            {feedback.createdBy}
-                          </p>
-                          <p className="text-xs text-muted-foreground">
-                            {new Date(feedback.createdAt).toLocaleDateString()}
-                          </p>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-1">
-                        {[...Array(5)].map((_, i) => (
-                          <Star
-                            key={i}
-                            className={`h-4 w-4 ${
-                              i < feedback.rating
-                                ? "text-yellow-400 fill-yellow-400"
-                                : "text-gray-600"
-                            }`}
-                          />
-                        ))}
-                      </div>
+              <div className="space-y-3">
+                {feedbacks.map((feedback: Feedback) => (
+                  <div
+                    key={feedback.id}
+                    className="flex items-start gap-3 p-4 bg-card border border-border rounded-lg"
+                    data-testid={`feedback-card-${feedback.id}`}
+                  >
+                    <div className="w-8 h-8 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-full flex-shrink-0 flex items-center justify-center text-white text-sm font-bold">
+                      {feedback.createdBy[0].toUpperCase()}
                     </div>
-                    <p className="text-sm text-foreground">{feedback.comment}</p>
-                  </CardContent>
-                </Card>
-              ))
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-foreground truncate">
+                        {feedback.createdBy}
+                      </p>
+                      <div className="flex items-center gap-2 mt-1">
+                        <div className="flex items-center gap-0.5">
+                          {[...Array(5)].map((_, i) => (
+                            <Star
+                              key={i}
+                              className={`h-3 w-3 ${
+                                i < feedback.rating
+                                  ? "text-yellow-400 fill-yellow-400"
+                                  : "text-gray-600"
+                              }`}
+                            />
+                          ))}
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                          {new Date(feedback.createdAt).toLocaleDateString()}
+                        </p>
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-2 line-clamp-2">{feedback.comment}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
             ) : (
-              <Card className="bg-card border-border">
-                <CardContent className="py-12 text-center">
-                  <MessageSquare className="h-12 w-12 text-muted-foreground/50 mx-auto mb-4" />
-                  <p className="text-muted-foreground">No feedback yet</p>
-                </CardContent>
-              </Card>
+              <div className="text-center py-8">
+                <MessageSquare className="h-12 w-12 text-muted-foreground/50 mx-auto mb-4" />
+                <p className="text-muted-foreground">No feedback yet</p>
+              </div>
             )}
+          </TabsContent>
+
+          <TabsContent value="others" className="space-y-3">
+            <div className="space-y-3">
+              <div className="flex items-center justify-between p-4 bg-card border border-border rounded-lg">
+                <div className="flex items-center gap-2">
+                  <Lock className="h-5 w-5 text-foreground" />
+                  <span className="font-medium text-foreground">Restrictions Removal Center</span>
+                </div>
+                <ChevronLeft className="h-4 w-4 text-muted-foreground rotate-180" />
+              </div>
+              <div className="flex items-center justify-between p-4 bg-card border border-border rounded-lg">
+                <div className="flex items-center gap-2">
+                  <Users className="h-5 w-5 text-foreground" />
+                  <span className="font-medium text-foreground">Follows</span>
+                </div>
+                <ChevronLeft className="h-4 w-4 text-muted-foreground rotate-180" />
+              </div>
+              <div className="flex items-center justify-between p-4 bg-card border border-border rounded-lg">
+                <div className="flex items-center gap-2">
+                  <Ban className="h-5 w-5 text-foreground" />
+                  <span className="font-medium text-foreground">Blocked Users</span>
+                </div>
+                <ChevronLeft className="h-4 w-4 text-muted-foreground rotate-180" />
+              </div>
+            </div>
           </TabsContent>
         </Tabs>
       </main>
