@@ -124,8 +124,8 @@ export default function LoadersZone() {
       return; // Reject invalid input silently
     }
     const num = parseInt(value);
-    // Minimum receiver upfront requirement is 10%
-    if (!isNaN(num) && num >= 10 && num <= 100) {
+    // Allow typing any value 0-100
+    if (!isNaN(num) && num >= 0 && num <= 100) {
       setUpfrontPercentage(value);
     }
   };
@@ -269,7 +269,9 @@ export default function LoadersZone() {
   const upfrontAmount = (dealAmountNum * upfrontPct) / 100;
   const isLowUpfront = upfrontPct < 50;
   const needsLowUpfrontConfirmation = isLowUpfront && dealAmountNum > 0;
-  const canPost = dealAmount && dealAmountNum > 0 && paymentMethodsInput.trim().length > 0 && availableBalance >= totalRequired && (!needsLowUpfrontConfirmation || lowUpfrontConfirmed);
+  // Minimum receiver upfront is 10%
+  const isValidUpfront = upfrontPct >= 10;
+  const canPost = dealAmount && dealAmountNum >= 1 && paymentMethodsInput.trim().length > 0 && availableBalance >= totalRequired && isValidUpfront && (!needsLowUpfrontConfirmation || lowUpfrontConfirmed);
 
   const filteredAndSortedAds = useMemo(() => {
     if (!activeAds) return [];
