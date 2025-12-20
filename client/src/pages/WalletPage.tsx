@@ -395,18 +395,21 @@ export default function WalletPage() {
                   <div className="space-y-2">
                     <Label className="text-gray-300 text-xs">Amount (USDT)</Label>
                     <Input
-                      type="number"
+                      type="text"
                       placeholder="0.00"
                       className="bg-gray-800 border-gray-700 text-white"
                       value={withdrawAmount}
                       onChange={(e) => {
                         const val = e.target.value;
-                        if (val === "" || !isNaN(parseFloat(val))) {
+                        // Only allow positive decimal numbers (e.g., 5, 5.5, 10.25)
+                        if (val === "") {
+                          setWithdrawAmount("");
+                        } else if (/^\d+(\.\d{0,8})?$/.test(val)) {
                           setWithdrawAmount(val);
                         }
+                        // Invalid input is silently rejected (e.g., -5, 8.w7, -5.+)
                       }}
                       data-testid="input-withdraw-amount"
-                      min="0"
                     />
                     <p className="text-xs text-gray-500">
                       Available: {parseFloat(wallet?.availableBalance || "0").toFixed(4)} USDT
