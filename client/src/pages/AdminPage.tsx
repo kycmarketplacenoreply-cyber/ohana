@@ -1280,22 +1280,22 @@ export default function AdminPage() {
             {loadingVendors ? (
               <div className="space-y-4">
                 {[1, 2, 3].map((i) => (
-                  <Skeleton key={i} className="h-32 bg-gray-800" />
+                  <Skeleton key={i} className="h-32" />
                 ))}
               </div>
             ) : pendingVendors?.length === 0 ? (
-              <Card className="bg-gray-900/50 border-gray-800">
+              <Card>
                 <CardContent className="py-12 text-center">
                   <Check className="h-12 w-12 text-green-500 mx-auto mb-4" />
-                  <p className="text-gray-400">No pending vendor applications</p>
+                  <p className="text-muted-foreground">No pending vendor applications</p>
                 </CardContent>
               </Card>
             ) : (
               pendingVendors?.map((vendor: VendorProfile) => (
-                <Card key={vendor.id} className="bg-gray-900/50 border-gray-800" data-testid={`vendor-card-${vendor.id}`}>
+                <Card key={vendor.id} data-testid={`vendor-card-${vendor.id}`}>
                   <CardHeader>
                     <div className="flex items-center justify-between">
-                      <CardTitle className="text-white flex items-center gap-2">
+                      <CardTitle className="text-foreground flex items-center gap-2">
                         <Store className="h-5 w-5" />
                         {vendor.businessName || "Unnamed Vendor"}
                       </CardTitle>
@@ -1307,20 +1307,20 @@ export default function AdminPage() {
                   <CardContent className="space-y-4">
                     <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
                       <div>
-                        <p className="text-gray-400">Country</p>
-                        <p className="text-white">{vendor.country}</p>
+                        <p className="text-muted-foreground">Country</p>
+                        <p className="text-foreground">{vendor.country}</p>
                       </div>
                       <div>
-                        <p className="text-gray-400">Applied</p>
-                        <p className="text-white">{new Date(vendor.createdAt).toLocaleDateString()}</p>
+                        <p className="text-muted-foreground">Applied</p>
+                        <p className="text-foreground">{new Date(vendor.createdAt).toLocaleDateString()}</p>
                       </div>
                       <div className="md:col-span-1 col-span-2">
-                        <p className="text-gray-400">Bio</p>
-                        <p className="text-white">{vendor.bio || "No bio provided"}</p>
+                        <p className="text-muted-foreground">Bio</p>
+                        <p className="text-foreground">{vendor.bio || "No bio provided"}</p>
                       </div>
                     </div>
 
-                    <div className="flex gap-2 pt-4 border-t border-gray-800">
+                    <div className="flex gap-2 pt-4 border-t border-border">
                       <Button 
                         className="bg-green-600 hover:bg-green-700"
                         onClick={() => approveVendorMutation.mutate(vendor.id)}
@@ -1338,35 +1338,35 @@ export default function AdminPage() {
           </TabsContent>
 
           <TabsContent value="maintenance" className="space-y-4">
-            <Card className="bg-gray-900/50 border-gray-800">
+            <Card>
               <CardHeader>
-                <CardTitle className="text-white flex items-center gap-2">
+                <CardTitle className="text-foreground flex items-center gap-2">
                   <Settings className="h-5 w-5" />
                   Platform Maintenance Settings
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-6">
                 {loadingMaintenance ? (
-                  <Skeleton className="h-64 bg-gray-800" />
+                  <Skeleton className="h-64" />
                 ) : (
                   <>
                     {/* Current Status Banner */}
                     <div className={`p-4 rounded-lg border ${
                       maintenanceSettings?.mode === "none" 
-                        ? "bg-green-900/20 border-green-700" 
-                        : "bg-red-900/20 border-red-700"
+                        ? "bg-green-950/30 border-green-700" 
+                        : "bg-destructive/10 border-destructive"
                     }`}>
                       <div className="flex items-center gap-3">
                         {maintenanceSettings?.mode === "none" ? (
-                          <Unlock className="h-6 w-6 text-green-400" />
+                          <Unlock className="h-6 w-6 text-green-600" />
                         ) : (
-                          <Lock className="h-6 w-6 text-red-400" />
+                          <Lock className="h-6 w-6 text-destructive" />
                         )}
                         <div>
-                          <p className={`font-bold ${maintenanceSettings?.mode === "none" ? "text-green-400" : "text-red-400"}`}>
+                          <p className={`font-bold ${maintenanceSettings?.mode === "none" ? "text-green-600" : "text-destructive"}`}>
                             {maintenanceSettings?.mode === "none" ? "Platform is ONLINE" : "Platform is in MAINTENANCE MODE"}
                           </p>
-                          <p className="text-gray-400 text-sm">
+                          <p className="text-muted-foreground text-sm">
                             {maintenanceSettings?.mode === "none" 
                               ? "All features are operational" 
                               : `Mode: ${maintenanceSettings?.mode?.toUpperCase()} - ${maintenanceSettings?.customReason || "No reason specified"}`}
@@ -1377,7 +1377,7 @@ export default function AdminPage() {
 
                     {/* Maintenance Mode Selection with Confirmation */}
                     <div className="space-y-3">
-                      <Label className="text-white text-lg font-semibold">Maintenance Mode</Label>
+                      <Label className="text-foreground text-lg font-semibold">Maintenance Mode</Label>
                       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-3">
                         {[
                           { value: "none", label: "None (Online)", desc: "Everything works normally", color: "green" },
@@ -1398,15 +1398,15 @@ export default function AdminPage() {
                             disabled={updateMaintenanceMutation.isPending}
                             className={`p-4 rounded-lg border-2 text-left transition-all ${
                               maintenanceSettings?.mode === mode.value
-                                ? mode.value === "none" ? "border-green-500 bg-green-900/30" : "border-red-500 bg-red-900/30"
-                                : "border-gray-700 bg-gray-800/50 hover:border-gray-600"
+                                ? mode.value === "none" ? "border-green-500 bg-green-950/30" : "border-red-500 bg-destructive/10"
+                                : "border-border bg-card/50 hover:border-primary"
                             }`}
                             data-testid={`maintenance-mode-${mode.value}`}
                           >
-                            <p className={`font-bold ${maintenanceSettings?.mode === mode.value ? (mode.value === "none" ? "text-green-400" : "text-red-400") : "text-white"}`}>
+                            <p className={`font-bold ${maintenanceSettings?.mode === mode.value ? (mode.value === "none" ? "text-green-600" : "text-destructive") : "text-foreground"}`}>
                               {mode.label}
                             </p>
-                            <p className="text-gray-400 text-xs mt-1">{mode.desc}</p>
+                            <p className="text-muted-foreground text-xs mt-1">{mode.desc}</p>
                           </button>
                         ))}
                       </div>
@@ -1414,10 +1414,9 @@ export default function AdminPage() {
 
                     {/* Custom Message */}
                     <div className="space-y-3">
-                      <Label className="text-white">Custom Reason / Message for Users</Label>
+                      <Label className="text-foreground">Custom Reason / Message for Users</Label>
                       <Textarea
                         placeholder="We are upgrading our systems to improve security and performance..."
-                        className="bg-gray-800 border-gray-700 text-white min-h-[100px]"
                         value={maintenanceCustomReason || maintenanceSettings?.customReason || ""}
                         onChange={(e) => {
                           setMaintenanceCustomReason(e.target.value);
@@ -1429,11 +1428,11 @@ export default function AdminPage() {
 
                     {/* Expected Downtime */}
                     <div className="space-y-3">
-                      <Label className="text-white">Expected Downtime</Label>
+                      <Label className="text-foreground">Expected Downtime</Label>
                       <div className="flex gap-2">
                         <Input
                           placeholder="e.g., 2 hours, 30 minutes"
-                          className="bg-gray-800 border-gray-700 text-white max-w-xs"
+                          className="max-w-xs"
                           value={maintenanceDowntime || maintenanceSettings?.expectedDowntime || ""}
                           onChange={(e) => {
                             setMaintenanceDowntime(e.target.value);
@@ -1441,7 +1440,7 @@ export default function AdminPage() {
                           }}
                           data-testid="maintenance-expected-downtime"
                         />
-                        <Clock className="h-10 w-10 text-gray-500" />
+                        <Clock className="h-10 w-10 text-muted-foreground" />
                       </div>
                     </div>
 
@@ -1472,7 +1471,7 @@ export default function AdminPage() {
 
                     {/* Feature Toggles */}
                     <div className="space-y-4">
-                      <Label className="text-white text-lg font-semibold">Feature Controls</Label>
+                      <Label className="text-foreground text-lg font-semibold">Feature Controls</Label>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         {[
                           { key: "loginEnabled", label: "Login Enabled", desc: "Allow users to log in" },
@@ -1480,10 +1479,10 @@ export default function AdminPage() {
                           { key: "withdrawalsEnabled", label: "Withdrawals Enabled", desc: "Allow withdrawals from wallets" },
                           { key: "tradingEnabled", label: "Trading Enabled", desc: "Allow creating new orders" },
                         ].map((feature) => (
-                          <div key={feature.key} className="flex items-center justify-between p-4 bg-gray-800/50 rounded-lg border border-gray-700">
+                          <div key={feature.key} className="flex items-center justify-between p-4 bg-muted rounded-lg border border-border">
                             <div>
-                              <p className="text-white font-medium">{feature.label}</p>
-                              <p className="text-gray-400 text-sm">{feature.desc}</p>
+                              <p className="text-foreground font-medium">{feature.label}</p>
+                              <p className="text-muted-foreground text-sm">{feature.desc}</p>
                             </div>
                             <Switch
                               checked={(maintenanceSettings as any)?.[feature.key] ?? true}
@@ -1498,12 +1497,12 @@ export default function AdminPage() {
                     {/* Preview Message */}
                     {maintenanceSettings?.mode !== "none" && (
                       <div className="space-y-3">
-                        <Label className="text-white text-lg font-semibold">User Preview</Label>
-                        <div className="p-6 bg-gradient-to-br from-gray-800 to-gray-900 rounded-lg border border-gray-700">
+                        <Label className="text-foreground text-lg font-semibold">User Preview</Label>
+                        <div className="p-6 bg-card rounded-lg border border-border">
                           <div className="text-center space-y-4">
                             <div className="text-5xl">🚧</div>
-                            <h3 className="text-2xl font-bold text-white">Platform Under Maintenance</h3>
-                            <p className="text-gray-300">{maintenanceCustomReason || maintenanceSettings?.customReason || "We are upgrading our systems to improve security and performance."}</p>
+                            <h3 className="text-2xl font-bold text-foreground">Platform Under Maintenance</h3>
+                            <p className="text-muted-foreground">{maintenanceCustomReason || maintenanceSettings?.customReason || "We are upgrading our systems to improve security and performance."}</p>
                             {(maintenanceDowntime || maintenanceSettings?.expectedDowntime) && (
                               <div className="flex items-center justify-center gap-2 text-yellow-400">
                                 <Clock className="h-5 w-5" />

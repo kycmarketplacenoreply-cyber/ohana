@@ -1183,7 +1183,7 @@ export const platformWalletControls = pgTable("platform_wallet_controls", {
   hotWalletBalanceCap: numeric("hot_wallet_balance_cap", { precision: 18, scale: 8 }).notNull().default("100000"),
   perUserDailyWithdrawalLimit: numeric("per_user_daily_withdrawal_limit", { precision: 18, scale: 8 }).notNull().default("10000"),
   platformDailyWithdrawalLimit: numeric("platform_daily_withdrawal_limit", { precision: 18, scale: 8 }).notNull().default("100000"),
-  minDepositAmount: numeric("min_deposit_amount", { precision: 18, scale: 8 }).notNull().default("5"),
+  minDepositAmount: numeric("min_deposit_amount", { precision: 18, scale: 8 }).notNull().default("5"), // Database column added via migration 0001
   minWithdrawalAmount: numeric("min_withdrawal_amount", { precision: 18, scale: 8 }).notNull().default("5"),
   withdrawalFeePercent: numeric("withdrawal_fee_percent", { precision: 5, scale: 2 }).notNull().default("0"),
   withdrawalFeeFixed: numeric("withdrawal_fee_fixed", { precision: 18, scale: 8 }).notNull().default("0.5"),
