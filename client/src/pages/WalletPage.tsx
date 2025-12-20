@@ -475,7 +475,7 @@ export default function WalletPage() {
                   </Button>
 
                   <p className="text-xs text-gray-500 text-center">
-                    Withdrawals require admin approval before processing
+                    Withdrawals require approval before processing,expect a delay up to 24 hours.
                   </p>
                 </div>
               </div>

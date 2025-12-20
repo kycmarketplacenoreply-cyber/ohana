@@ -346,7 +346,7 @@ export default function VendorPage() {
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label>Max Limit (USD) - Auto calculated</Label>
+                      <Label>Max Limit (USD)</Label>
                       <Input
                         type="number"
                         value={newOffer.maxLimit}
