@@ -193,28 +193,28 @@ function WalletControlsSection() {
   });
 
   if (isLoading) {
-    return <Skeleton className="h-32 bg-gray-800" />;
+    return <Skeleton className="h-32" />;
   }
 
   return (
     <div className="space-y-4">
       <div className={`p-4 rounded-lg border ${
         walletDashboard?.isWalletUnlocked 
-          ? "bg-green-900/20 border-green-700" 
-          : "bg-red-900/20 border-red-700"
+          ? "bg-green-950/30 border-green-700" 
+          : "bg-destructive/10 border-destructive"
       }`}>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             {walletDashboard?.isWalletUnlocked ? (
-              <Unlock className="h-6 w-6 text-green-400" />
+              <Unlock className="h-6 w-6 text-green-600" />
             ) : (
-              <Lock className="h-6 w-6 text-red-400" />
+              <Lock className="h-6 w-6 text-destructive" />
             )}
             <div>
-              <p className={`font-bold ${walletDashboard?.isWalletUnlocked ? "text-green-400" : "text-red-400"}`}>
+              <p className={`font-bold ${walletDashboard?.isWalletUnlocked ? "text-green-600" : "text-destructive"}`}>
                 {walletDashboard?.isWalletUnlocked ? "Wallet UNLOCKED" : "Wallet LOCKED"}
               </p>
-              <p className="text-gray-400 text-sm">
+              <p className="text-muted-foreground text-sm">
                 {walletDashboard?.isWalletUnlocked 
                   ? "Withdrawals can be processed" 
                   : "Withdrawals are disabled until wallet is unlocked"}
@@ -223,7 +223,7 @@ function WalletControlsSection() {
           </div>
           {walletDashboard?.isWalletUnlocked ? (
             <Button
-              className="bg-red-600 hover:bg-red-700"
+              className="bg-destructive hover:bg-destructive/90"
               onClick={() => lockWalletMutation.mutate()}
               disabled={lockWalletMutation.isPending}
               data-testid="button-lock-wallet"
@@ -246,17 +246,17 @@ function WalletControlsSection() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="p-4 bg-gray-800 rounded-lg">
-          <p className="text-gray-400 text-sm">Master Wallet Address</p>
-          <p className="text-white font-mono text-xs break-all">{walletDashboard?.masterWalletAddress || "Not configured"}</p>
+        <div className="p-4 bg-card rounded-lg border border-border">
+          <p className="text-muted-foreground text-sm">Master Wallet Address</p>
+          <p className="text-foreground font-mono text-xs break-all">{walletDashboard?.masterWalletAddress || "Not configured"}</p>
         </div>
-        <div className="p-4 bg-gray-800 rounded-lg">
-          <p className="text-gray-400 text-sm">USDT Balance</p>
-          <p className="text-white font-bold">{walletDashboard?.masterWalletUsdtBalance || "0.00"} USDT</p>
+        <div className="p-4 bg-card rounded-lg border border-border">
+          <p className="text-muted-foreground text-sm">USDT Balance</p>
+          <p className="text-foreground font-bold">{walletDashboard?.masterWalletUsdtBalance || "0.00"} USDT</p>
         </div>
-        <div className="p-4 bg-gray-800 rounded-lg">
-          <p className="text-gray-400 text-sm">BNB Balance (Gas)</p>
-          <p className="text-white font-bold">{walletDashboard?.masterWalletBnbBalance || "0.00"} BNB</p>
+        <div className="p-4 bg-card rounded-lg border border-border">
+          <p className="text-muted-foreground text-sm">BNB Balance (Gas)</p>
+          <p className="text-foreground font-bold">{walletDashboard?.masterWalletBnbBalance || "0.00"} BNB</p>
         </div>
       </div>
     </div>
@@ -324,8 +324,8 @@ export default function AdminPage() {
         <div className="flex items-center justify-center h-64">
           <div className="text-center">
             <AlertTriangle className="h-16 w-16 text-yellow-500 mx-auto mb-4" />
-            <h2 className="text-xl font-bold text-white">Access Denied</h2>
-            <p className="text-gray-400">You don't have permission to access this page.</p>
+            <h2 className="text-xl font-bold text-foreground">Access Denied</h2>
+            <p className="text-muted-foreground">You don't have permission to access this page.</p>
           </div>
         </div>
       </Layout>
@@ -587,12 +587,12 @@ export default function AdminPage() {
     <Layout>
       <div className="space-y-6" data-testid="admin-page">
         <div className="flex items-center gap-3">
-          <Shield className="h-8 w-8 text-blue-500" />
-          <h1 className="text-3xl font-bold text-white">Admin Dashboard</h1>
+          <Shield className="h-8 w-8 text-primary" />
+          <h1 className="text-3xl font-bold text-foreground">Admin Dashboard</h1>
         </div>
 
         <Tabs defaultValue="stats" className="space-y-4">
-          <TabsList className="bg-gray-800 flex-wrap h-auto gap-1 p-1">
+          <TabsList className="flex-wrap h-auto gap-1 p-1">
             <TabsTrigger value="stats" data-testid="tab-stats">
               <BarChart3 className="h-4 w-4 mr-2" />
               Platform Stats
@@ -627,62 +627,62 @@ export default function AdminPage() {
             {loadingStats ? (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
                 {[1, 2, 3, 4, 5].map((i) => (
-                  <Skeleton key={i} className="h-32 bg-gray-800" />
+                  <Skeleton key={i} className="h-32" />
                 ))}
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-                <Card className="bg-gradient-to-br from-blue-900/40 to-blue-800/30 border-blue-700">
+                <Card className="bg-primary/5 border-primary/20">
                   <CardContent className="pt-6">
                     <div className="flex items-center gap-3">
-                      <Users className="h-10 w-10 text-blue-400" />
+                      <Users className="h-10 w-10 text-primary" />
                       <div>
-                        <p className="text-blue-300 text-sm">Total Users</p>
-                        <p className="text-3xl font-bold text-white" data-testid="stat-total-users">{platformStats?.totalUsers || 0}</p>
+                        <p className="text-muted-foreground text-sm">Total Users</p>
+                        <p className="text-3xl font-bold text-foreground" data-testid="stat-total-users">{platformStats?.totalUsers || 0}</p>
                       </div>
                     </div>
                   </CardContent>
                 </Card>
-                <Card className="bg-gradient-to-br from-green-900/40 to-green-800/30 border-green-700">
+                <Card className="bg-green-50/10 border-green-200/20 dark:bg-green-950/30 dark:border-green-800">
                   <CardContent className="pt-6">
                     <div className="flex items-center gap-3">
-                      <User className="h-10 w-10 text-green-400" />
+                      <User className="h-10 w-10 text-green-600 dark:text-green-400" />
                       <div>
-                        <p className="text-green-300 text-sm">Today</p>
-                        <p className="text-3xl font-bold text-white" data-testid="stat-today-users">{platformStats?.todayUsers || 0}</p>
+                        <p className="text-muted-foreground text-sm">Today</p>
+                        <p className="text-3xl font-bold text-foreground" data-testid="stat-today-users">{platformStats?.todayUsers || 0}</p>
                       </div>
                     </div>
                   </CardContent>
                 </Card>
-                <Card className="bg-gradient-to-br from-purple-900/40 to-purple-800/30 border-purple-700">
+                <Card className="bg-purple-50/10 border-purple-200/20 dark:bg-purple-950/30 dark:border-purple-800">
                   <CardContent className="pt-6">
                     <div className="flex items-center gap-3">
-                      <User className="h-10 w-10 text-purple-400" />
+                      <User className="h-10 w-10 text-purple-600 dark:text-purple-400" />
                       <div>
-                        <p className="text-purple-300 text-sm">This Week</p>
-                        <p className="text-3xl font-bold text-white" data-testid="stat-week-users">{platformStats?.weekUsers || 0}</p>
+                        <p className="text-muted-foreground text-sm">This Week</p>
+                        <p className="text-3xl font-bold text-foreground" data-testid="stat-week-users">{platformStats?.weekUsers || 0}</p>
                       </div>
                     </div>
                   </CardContent>
                 </Card>
-                <Card className="bg-gradient-to-br from-orange-900/40 to-orange-800/30 border-orange-700">
+                <Card className="bg-orange-50/10 border-orange-200/20 dark:bg-orange-950/30 dark:border-orange-800">
                   <CardContent className="pt-6">
                     <div className="flex items-center gap-3">
-                      <User className="h-10 w-10 text-orange-400" />
+                      <User className="h-10 w-10 text-orange-600 dark:text-orange-400" />
                       <div>
-                        <p className="text-orange-300 text-sm">This Month</p>
-                        <p className="text-3xl font-bold text-white" data-testid="stat-month-users">{platformStats?.monthUsers || 0}</p>
+                        <p className="text-muted-foreground text-sm">This Month</p>
+                        <p className="text-3xl font-bold text-foreground" data-testid="stat-month-users">{platformStats?.monthUsers || 0}</p>
                       </div>
                     </div>
                   </CardContent>
                 </Card>
-                <Card className="bg-gradient-to-br from-yellow-900/40 to-yellow-800/30 border-yellow-700">
+                <Card className="bg-cyan-50/10 border-cyan-200/20 dark:bg-cyan-950/30 dark:border-cyan-800">
                   <CardContent className="pt-6">
                     <div className="flex items-center gap-3">
-                      <DollarSign className="h-10 w-10 text-yellow-400" />
+                      <DollarSign className="h-10 w-10 text-cyan-600 dark:text-cyan-400" />
                       <div>
-                        <p className="text-yellow-300 text-sm">Total Balance</p>
-                        <p className="text-2xl font-bold text-white" data-testid="stat-total-balance">${platformStats?.totalBalance || "0.00"}</p>
+                        <p className="text-muted-foreground text-sm">Total Balance</p>
+                        <p className="text-2xl font-bold text-foreground" data-testid="stat-total-balance">${platformStats?.totalBalance || "0.00"}</p>
                       </div>
                     </div>
                   </CardContent>
@@ -692,34 +692,34 @@ export default function AdminPage() {
           </TabsContent>
 
           <TabsContent value="users" className="space-y-4">
-            <Card className="bg-gray-900/50 border-gray-800">
+            <Card>
               <CardHeader>
-                <CardTitle className="text-white flex items-center gap-2">
+                <CardTitle className="text-foreground flex items-center gap-2">
                   <Users className="h-5 w-5" />
                   User Management
                 </CardTitle>
               </CardHeader>
               <CardContent>
                 {loadingUsers ? (
-                  <Skeleton className="h-64 bg-gray-800" />
+                  <Skeleton className="h-64" />
                 ) : (
                   <div className="overflow-x-auto">
                     <Table>
                       <TableHeader>
-                        <TableRow className="border-gray-700">
-                          <TableHead className="text-gray-400">Username</TableHead>
-                          <TableHead className="text-gray-400">Email</TableHead>
-                          <TableHead className="text-gray-400">Role</TableHead>
-                          <TableHead className="text-gray-400">Status</TableHead>
-                          <TableHead className="text-gray-400">Joined</TableHead>
-                          <TableHead className="text-gray-400">Actions</TableHead>
+                        <TableRow>
+                          <TableHead className="text-muted-foreground">Username</TableHead>
+                          <TableHead className="text-muted-foreground">Email</TableHead>
+                          <TableHead className="text-muted-foreground">Role</TableHead>
+                          <TableHead className="text-muted-foreground">Status</TableHead>
+                          <TableHead className="text-muted-foreground">Joined</TableHead>
+                          <TableHead className="text-muted-foreground">Actions</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
                         {allUsers?.map((userData: UserData) => (
-                          <TableRow key={userData.id} className="border-gray-700" data-testid={`user-row-${userData.id}`}>
-                            <TableCell className="text-white font-medium">{userData.username}</TableCell>
-                            <TableCell className="text-gray-300">{userData.email}</TableCell>
+                          <TableRow key={userData.id} data-testid={`user-row-${userData.id}`}>
+                            <TableCell className="text-foreground font-medium">{userData.username}</TableCell>
+                            <TableCell className="text-muted-foreground">{userData.email}</TableCell>
                             <TableCell>
                               <Select
                                 value={userData.role}
