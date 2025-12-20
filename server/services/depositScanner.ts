@@ -122,6 +122,8 @@ async function updatePendingDeposits(): Promise<void> {
 
 async function creditConfirmedDeposits(): Promise<void> {
   const confirmedDeposits = await storage.getConfirmedUncreditedDeposits();
+  const controls = await storage.getPlatformWalletControls();
+  const minDepositAmount = controls ? parseFloat(controls.minDepositAmount) : 5;
   
   for (const deposit of confirmedDeposits) {
     try {
@@ -133,6 +135,16 @@ async function creditConfirmedDeposits(): Promise<void> {
 
       const currentBalance = parseFloat(wallet.availableBalance);
       const depositAmount = parseFloat(deposit.amount);
+
+      if (depositAmount < minDepositAmount) {
+        console.log(`[DepositScanner] Deposit ${deposit.id}: ${depositAmount} USDT is below minimum (${minDepositAmount} USDT), not crediting to account`);
+        await storage.updateBlockchainDeposit(deposit.id, {
+          status: "credited",
+          creditedAt: new Date(),
+        });
+        continue;
+      }
+
       const newBalance = (currentBalance + depositAmount).toFixed(8);
 
       await storage.updateWalletBalance(wallet.id, newBalance, wallet.escrowBalance);

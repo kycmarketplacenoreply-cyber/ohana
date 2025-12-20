@@ -38,7 +38,7 @@ export async function validateWithdrawalRequest(
   const amountNum = parseFloat(amount);
   const minWithdrawal = parseFloat(controls.minWithdrawalAmount);
   if (amountNum < minWithdrawal) {
-    return { valid: false, error: `Minimum withdrawal is ${minWithdrawal} USDT` };
+    return { valid: false, error: `Minimum withdrawal is ${minWithdrawal} USDT. You will receive ${(amountNum - 0.5).toFixed(2)} USDT after 0.5 USDT gas fee.` };
   }
 
   const wallet = await storage.getWalletByUserId(userId);

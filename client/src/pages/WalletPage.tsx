@@ -284,57 +284,74 @@ export default function WalletPage() {
             </DialogTrigger>
             <DialogContent className="bg-gray-900 border-gray-800 max-w-md">
               <DialogHeader>
-                <DialogTitle className="text-white">Deposit USDT (BEP20)</DialogTitle>
+                <DialogTitle className="text-white">Deposit USDT</DialogTitle>
                 <DialogDescription className="text-gray-400">
-                  Send USDT on BNB Smart Chain to this address
+                  Send USDT on BNB Smart Chain
                 </DialogDescription>
               </DialogHeader>
               <div className="space-y-4 pt-4">
-                <Alert className="bg-red-900/30 border-red-700">
-                  <AlertTriangle className="h-4 w-4 text-red-400" />
-                  <AlertDescription className="text-red-300 text-sm">
-                    {depositAddress?.warning || "SEND ONLY USDT (BEP20) ON BNB SMART CHAIN"}
-                  </AlertDescription>
-                </Alert>
-
                 {addressLoading ? (
-                  <Skeleton className="h-20 bg-gray-800" />
+                  <Skeleton className="h-48 bg-gray-800" />
                 ) : depositAddress ? (
-                  <div className="space-y-3">
-                    <div className="p-4 bg-gray-800 rounded-lg border border-gray-700">
-                      <Label className="text-gray-400 text-xs">Your Deposit Address</Label>
-                      <div className="flex items-center gap-2 mt-2">
-                        <code className="text-green-400 text-sm break-all flex-1">
-                          {depositAddress.address}
-                        </code>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => copyToClipboard(depositAddress.address)}
-                          data-testid="button-copy-address"
-                        >
-                          {copied ? <CheckCircle className="h-4 w-4 text-green-400" /> : <Copy className="h-4 w-4" />}
-                        </Button>
+                  <>
+                    <div className="flex justify-center">
+                      <div className="p-4 bg-white rounded-lg">
+                        <svg width="200" height="200" viewBox="0 0 200 200" className="w-48 h-48">
+                          <rect width="200" height="200" fill="white" />
+                          <rect x="10" y="10" width="180" height="180" fill="white" stroke="#ccc" strokeWidth="1" />
+                        </svg>
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-3 text-sm">
+                    <div className="space-y-3">
                       <div className="p-3 bg-gray-800 rounded-lg">
-                        <p className="text-gray-400">Network</p>
-                        <p className="text-white font-medium">{depositAddress.network}</p>
+                        <p className="text-gray-400 text-xs">Network</p>
+                        <p className="text-white font-medium">BSC</p>
+                        <p className="text-gray-500 text-xs">BNB Smart Chain (BEP20)</p>
                       </div>
-                      <div className="p-3 bg-gray-800 rounded-lg">
-                        <p className="text-gray-400">Token</p>
-                        <p className="text-white font-medium">{depositAddress.token}</p>
-                      </div>
-                    </div>
 
-                    <div className="p-3 bg-blue-900/30 rounded-lg border border-blue-700">
-                      <p className="text-blue-300 text-sm">
-                        Deposits require {depositAddress.minConfirmations} confirmations before being credited to your account.
-                      </p>
+                      <div className="p-3 bg-gray-800 rounded-lg">
+                        <p className="text-gray-400 text-xs">Contract Information</p>
+                        <p className="text-white font-medium text-xs">**97955</p>
+                        <p className="text-gray-500 text-xs">USDT Contract</p>
+                      </div>
+
+                      <div className="p-3 bg-gray-800 rounded-lg">
+                        <p className="text-gray-400 text-xs mb-2">Deposit Address</p>
+                        <div className="flex items-center gap-2">
+                          <code className="text-green-400 text-xs break-all flex-1 font-mono">
+                            {depositAddress.address}
+                          </code>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => copyToClipboard(depositAddress.address)}
+                            data-testid="button-copy-address"
+                          >
+                            {copied ? <CheckCircle className="h-4 w-4 text-green-400" /> : <Copy className="h-4 w-4" />}
+                          </Button>
+                        </div>
+                      </div>
+
+                      <Alert className="bg-blue-900/30 border-blue-700">
+                        <AlertTriangle className="h-4 w-4 text-blue-400" />
+                        <AlertDescription className="text-blue-300 text-xs">
+                          Minimum deposit: 5 USDT. Deposits below this amount won't be credited to your account. {depositAddress.minConfirmations} confirmations required.
+                        </AlertDescription>
+                      </Alert>
+
+                      <Alert className="bg-red-900/30 border-red-700">
+                        <AlertTriangle className="h-4 w-4 text-red-400" />
+                        <AlertDescription className="text-red-300 text-xs">
+                          SEND ONLY USDT (BEP20) ON BNB SMART CHAIN. Other tokens or networks will result in permanent loss.
+                        </AlertDescription>
+                      </Alert>
+
+                      <Button className="w-full bg-yellow-500 hover:bg-yellow-600 text-black font-medium">
+                        Save and Share Address
+                      </Button>
                     </div>
-                  </div>
+                  </>
                 ) : (
                   <p className="text-red-400">Failed to generate deposit address</p>
                 )}
@@ -410,7 +427,7 @@ export default function WalletPage() {
                 <Button
                   className="w-full bg-purple-600 hover:bg-purple-700"
                   onClick={() => withdrawMutation.mutate({ amount: withdrawAmount, walletAddress: withdrawAddress })}
-                  disabled={!withdrawAmount || !withdrawAddress || withdrawMutation.isPending}
+                  disabled={!withdrawAmount || !withdrawAddress || withdrawMutation.isPending || parseFloat(withdrawAmount) < 5}
                   data-testid="button-confirm-withdraw"
                 >
                   {withdrawMutation.isPending ? (
