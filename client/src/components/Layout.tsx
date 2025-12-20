@@ -109,16 +109,16 @@ export default function Layout({ children }: LayoutProps) {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900">
-      <nav className="sticky top-0 z-50 border-b border-gray-800 bg-gray-900/80 backdrop-blur-lg">
+    <div className="min-h-screen bg-background">
+      <nav className="sticky top-0 z-50 border-b border-border bg-background/80 backdrop-blur-lg">
         <div className="max-w-7xl mx-auto px-4">
           <div className="flex items-center justify-between h-16">
             <div className="flex items-center gap-8">
               <Link href={isDisputeAdmin ? "/disputes" : isAdmin ? "/wallet" : "/"} className="flex items-center gap-2">
-                <div className="p-2 bg-purple-600 rounded-lg">
-                  <Shield className="h-5 w-5 text-white" />
+                <div className="p-2 bg-primary rounded-lg">
+                  <Shield className="h-5 w-5 text-primary-foreground" />
                 </div>
-                <span className="font-bold text-white text-lg hidden sm:block">KYC Marketplace</span>
+                <span className="font-bold text-foreground text-lg hidden sm:block">KYC Marketplace</span>
               </Link>
 
               {authenticated && (
@@ -128,7 +128,7 @@ export default function Layout({ children }: LayoutProps) {
                       <Button
                         variant={location === item.href ? "secondary" : "ghost"}
                         size="sm"
-                        className="gap-2 text-gray-300 hover:text-white relative"
+                        className="gap-2 relative"
                         data-testid={`nav-${item.label.toLowerCase()}`}
                       >
                         <item.icon className="h-4 w-4" />
@@ -150,9 +150,9 @@ export default function Layout({ children }: LayoutProps) {
               {authenticated ? (
                 <>
                   {wallet && !isDisputeAdmin && (
-                    <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 bg-gray-800 rounded-lg">
-                      <Wallet className="h-4 w-4 text-green-400" />
-                      <span className="text-white font-medium">
+                    <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 bg-card rounded-lg border border-border">
+                      <Wallet className="h-4 w-4 text-green-500" />
+                      <span className="text-foreground font-medium">
                         {parseFloat(wallet.availableBalance || "0").toFixed(2)} USDT
                       </span>
                     </div>
@@ -160,7 +160,7 @@ export default function Layout({ children }: LayoutProps) {
 
                   <Link href="/notifications">
                     <Button variant="ghost" size="icon" className="relative" data-testid="button-notifications">
-                      <Bell className="h-5 w-5 text-gray-300" />
+                      <Bell className="h-5 w-5" />
                       {unreadCount > 0 && (
                         <Badge className="absolute -top-1 -right-1 h-5 w-5 p-0 flex items-center justify-center bg-red-500">
                           {unreadCount > 9 ? "9+" : unreadCount}
@@ -172,10 +172,10 @@ export default function Layout({ children }: LayoutProps) {
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                       <Button variant="ghost" className="gap-2" data-testid="button-user-menu">
-                        <div className="h-8 w-8 rounded-full bg-purple-600 flex items-center justify-center">
-                          <User className="h-4 w-4 text-white" />
+                        <div className="h-8 w-8 rounded-full bg-primary flex items-center justify-center">
+                          <User className="h-4 w-4 text-primary-foreground" />
                         </div>
-                        <span className="hidden sm:block text-white">{user?.username}</span>
+                        <span className="hidden sm:block text-foreground">{user?.username}</span>
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end" className="w-48">
@@ -202,7 +202,7 @@ export default function Layout({ children }: LayoutProps) {
                 </>
               ) : (
                 <Link href="/auth">
-                  <Button className="bg-purple-600 hover:bg-purple-700" data-testid="button-signin">
+                  <Button className="bg-primary hover:bg-primary/90" data-testid="button-signin">
                     Sign In
                   </Button>
                 </Link>
@@ -211,7 +211,7 @@ export default function Layout({ children }: LayoutProps) {
           </div>
 
           {mobileMenuOpen && authenticated && (
-            <div className="md:hidden py-4 border-t border-gray-800">
+            <div className="md:hidden py-4 border-t border-border">
               <div className="flex flex-col gap-2">
                 {navItems.map((item) => (
                   <Link key={item.href} href={item.href}>
@@ -237,13 +237,13 @@ export default function Layout({ children }: LayoutProps) {
       </nav>
 
       {userStatus?.isFrozen && (
-        <div className="bg-red-900/90 border-b border-red-700">
+        <div className="bg-destructive/10 border-b border-destructive/20">
           <div className="max-w-7xl mx-auto px-4 py-3">
-            <div className="flex items-center gap-3 text-red-100">
-              <AlertTriangle className="h-5 w-5 text-red-300 flex-shrink-0" />
+            <div className="flex items-center gap-3 text-destructive">
+              <AlertTriangle className="h-5 w-5 flex-shrink-0" />
               <div>
                 <p className="font-semibold">Account Frozen</p>
-                <p className="text-sm text-red-200">
+                <p className="text-sm text-destructive/90">
                   {userStatus.frozenReason || "Your account has been frozen. You cannot make transactions or post ads."} Please contact support for assistance.
                 </p>
               </div>
