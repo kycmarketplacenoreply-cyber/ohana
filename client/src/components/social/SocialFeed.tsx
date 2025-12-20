@@ -84,7 +84,7 @@ function AuthorAvatar({ author }: { author: Author }) {
   }
   return (
     <div className="w-10 h-10 bg-gradient-to-br from-primary to-primary/60 rounded-full flex items-center justify-center text-primary-foreground font-bold">
-      {author.username[0].toUpperCase()}
+      {author.username && author.username.length > 0 ? author.username[0].toUpperCase() : "U"}
     </div>
   );
 }
@@ -101,7 +101,7 @@ function SmallAuthorAvatar({ author }: { author: Author }) {
   }
   return (
     <div className="w-8 h-8 bg-gradient-to-br from-primary to-primary/60 rounded-full flex items-center justify-center text-primary-foreground text-sm font-bold">
-      {author.username[0].toUpperCase()}
+      {author.username && author.username.length > 0 ? author.username[0].toUpperCase() : "U"}
     </div>
   );
 }
