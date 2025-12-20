@@ -358,7 +358,7 @@ export default function WalletPage() {
                     </div>
                   </>
                 ) : (
-                  <p className="text-red-400">Failed to generate deposit address</p>
+                  <p className="text-destructive">Failed to generate deposit address</p>
                 )}
               </div>
             </DialogContent>

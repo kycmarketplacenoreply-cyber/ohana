@@ -136,9 +136,9 @@ export default function OrdersPage() {
     if (!orders || orders.length === 0) {
       return (
         <div className="text-center py-12">
-          <ShoppingCart className="h-12 w-12 text-gray-600 mx-auto mb-4" />
-          <p className="text-gray-400">No orders yet</p>
-          <p className="text-gray-500 text-sm">
+          <ShoppingCart className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+          <p className="text-muted-foreground">No orders yet</p>
+          <p className="text-muted-foreground/70 text-sm">
             {role === "buyer" ? "Start trading to see your orders here" : "Your customer orders will appear here"}
           </p>
         </div>
@@ -150,22 +150,22 @@ export default function OrdersPage() {
         {orders.map((order) => (
           <div
             key={order.id}
-            className="p-4 rounded-xl bg-gray-800/50 border border-gray-700 hover:border-purple-600 transition-colors"
+            className="p-4 rounded-xl bg-card border border-border hover:border-primary transition-colors"
             data-testid={`order-card-${order.id}`}
           >
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
               <div className="flex items-center gap-4">
-                <div className="p-2 rounded-lg bg-gray-700">
+                <div className="p-2 rounded-lg bg-muted">
                   {getStatusIcon(order.status)}
                 </div>
                 <div>
                   <div className="flex items-center gap-2">
-                    <span className="text-white font-medium">
+                    <span className="text-foreground font-medium">
                       Order #{order.id.slice(0, 8)}
                     </span>
                     {getStatusBadge(order.status)}
                   </div>
-                  <p className="text-sm text-gray-400">
+                  <p className="text-sm text-muted-foreground">
                     {new Date(order.createdAt).toLocaleDateString()} at{" "}
                     {new Date(order.createdAt).toLocaleTimeString()}
                   </p>
@@ -174,10 +174,10 @@ export default function OrdersPage() {
 
               <div className="flex flex-wrap items-center gap-4">
                 <div className="text-right">
-                  <p className="text-xl font-bold text-white">
+                  <p className="text-xl font-bold text-foreground">
                     {Math.floor(parseFloat(order.amount))} account{Math.floor(parseFloat(order.amount)) !== 1 ? 's' : ''}
                   </p>
-                  <p className="text-sm text-gray-400">
+                  <p className="text-sm text-muted-foreground">
                     ${Math.floor(parseFloat(order.fiatAmount))} • {order.paymentMethod}
                   </p>
                 </div>
@@ -199,9 +199,9 @@ export default function OrdersPage() {
     if (!orders || orders.length === 0) {
       return (
         <div className="text-center py-12">
-          <Shield className="h-12 w-12 text-gray-600 mx-auto mb-4" />
-          <p className="text-gray-400">No loader orders yet</p>
-          <p className="text-gray-500 text-sm">
+          <Shield className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+          <p className="text-muted-foreground">No loader orders yet</p>
+          <p className="text-muted-foreground/70 text-sm">
             Your Loaders Zone orders will appear here
           </p>
         </div>
@@ -213,26 +213,26 @@ export default function OrdersPage() {
         {orders.map((order) => (
           <div
             key={order.id}
-            className="p-4 rounded-xl bg-gray-800/50 border border-gray-700 hover:border-purple-600 transition-colors"
+            className="p-4 rounded-xl bg-card border border-border hover:border-primary transition-colors"
             data-testid={`loader-order-card-${order.id}`}
           >
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
               <div className="flex items-center gap-4">
-                <div className="p-2 rounded-lg bg-purple-700">
-                  <Shield className="h-5 w-5 text-white" />
+                <div className="p-2 rounded-lg bg-primary/10">
+                  <Shield className="h-5 w-5 text-primary" />
                 </div>
                 <div>
                   <div className="flex items-center gap-2">
-                    <span className="text-white font-medium">
+                    <span className="text-foreground font-medium">
                       {order.role === "loader" ? "Loading to" : "Receiving from"}{" "}
                       {order.role === "loader" ? order.receiverUsername : order.loaderUsername}
                     </span>
                     {getLoaderStatusBadge(order.status)}
-                    <Badge variant="outline" className="text-purple-400 border-purple-400">
+                    <Badge variant="outline" className="text-primary border-primary">
                       Loaders Zone
                     </Badge>
                   </div>
-                  <p className="text-sm text-gray-400">
+                  <p className="text-sm text-muted-foreground">
                     {new Date(order.createdAt).toLocaleDateString()} at{" "}
                     {new Date(order.createdAt).toLocaleTimeString()}
                   </p>
@@ -241,10 +241,10 @@ export default function OrdersPage() {
 
               <div className="flex flex-wrap items-center gap-4">
                 <div className="text-right">
-                  <p className="text-xl font-bold text-white">
+                  <p className="text-xl font-bold text-foreground">
                     ${parseFloat(order.dealAmount).toLocaleString()}
                   </p>
-                  <p className="text-sm text-gray-400">
+                  <p className="text-sm text-muted-foreground">
                     {order.role === "loader" ? "Loader" : "Receiver"}
                   </p>
                 </div>
@@ -265,11 +265,11 @@ export default function OrdersPage() {
   return (
     <Layout>
       <div className="space-y-8">
-        <h1 className="text-3xl font-bold text-white">My Orders</h1>
+        <h1 className="text-3xl font-bold text-foreground">My Orders</h1>
 
-        <Card className="bg-gray-900/50 border-gray-800">
+        <Card>
           <CardHeader>
-            <CardTitle className="text-white flex items-center gap-2">
+            <CardTitle className="text-foreground flex items-center gap-2">
               <ShoppingCart className="h-5 w-5" />
               Order History
             </CardTitle>
@@ -278,7 +278,7 @@ export default function OrdersPage() {
             {isLoading ? (
               <div className="space-y-4">
                 {[1, 2, 3].map((i) => (
-                  <Skeleton key={i} className="h-24 bg-gray-800" />
+                  <Skeleton key={i} className="h-24" />
                 ))}
               </div>
             ) : (
