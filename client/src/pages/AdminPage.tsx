@@ -733,10 +733,10 @@ export default function AdminPage() {
                                 }}
                                 disabled={userData.role === "admin"}
                               >
-                                <SelectTrigger className={`w-32 ${userData.role === "admin" ? "bg-gray-700 border-gray-600 cursor-not-allowed opacity-70" : "bg-gray-800 border-gray-700"}`}>
+                                <SelectTrigger className={`w-32 ${userData.role === "admin" ? "bg-muted border-border cursor-not-allowed opacity-70" : "bg-card border-border"}`}>
                                   <SelectValue />
                                 </SelectTrigger>
-                                <SelectContent className="bg-gray-800 border-gray-700">
+                                <SelectContent>
                                   {userData.role === "customer" && (
                                     <>
                                       <SelectItem value="customer">Customer</SelectItem>
@@ -771,7 +771,7 @@ export default function AdminPage() {
                                 <Badge className="bg-green-600">Active</Badge>
                               )}
                             </TableCell>
-                            <TableCell className="text-gray-300">
+                            <TableCell className="text-muted-foreground">
                               {new Date(userData.createdAt).toLocaleDateString()}
                             </TableCell>
                             <TableCell>
@@ -799,27 +799,26 @@ export default function AdminPage() {
                                         <Ban className="h-4 w-4" />
                                       </Button>
                                     </DialogTrigger>
-                                    <DialogContent className="bg-gray-900 border-gray-800">
+                                    <DialogContent>
                                       <DialogHeader>
-                                        <DialogTitle className="text-white">Freeze User: {userData.username}</DialogTitle>
-                                        <DialogDescription className="text-gray-400">
+                                        <DialogTitle className="text-foreground">Freeze User: {userData.username}</DialogTitle>
+                                        <DialogDescription className="text-muted-foreground">
                                           This will prevent the user from logging in or performing any actions.
                                         </DialogDescription>
                                       </DialogHeader>
                                       <div className="space-y-4">
                                         <div className="space-y-2">
-                                          <Label className="text-gray-400">Reason for freezing</Label>
+                                          <Label className="text-muted-foreground">Reason for freezing</Label>
                                           <Textarea
                                             value={freezeReason}
                                             onChange={(e) => setFreezeReason(e.target.value)}
                                             placeholder="Enter reason..."
-                                            className="bg-gray-800 border-gray-700"
                                           />
                                         </div>
                                       </div>
                                       <DialogFooter>
                                         <DialogClose asChild>
-                                          <Button variant="outline" className="border-gray-700">Cancel</Button>
+                                          <Button variant="outline">Cancel</Button>
                                         </DialogClose>
                                         <Button
                                           variant="destructive"
@@ -843,16 +842,16 @@ export default function AdminPage() {
                                       <Trash2 className="h-4 w-4" />
                                     </Button>
                                   </DialogTrigger>
-                                  <DialogContent className="bg-gray-900 border-gray-800">
+                                  <DialogContent>
                                     <DialogHeader>
-                                      <DialogTitle className="text-white">Delete User: {userData.username}</DialogTitle>
-                                      <DialogDescription className="text-gray-400">
+                                      <DialogTitle className="text-foreground">Delete User: {userData.username}</DialogTitle>
+                                      <DialogDescription className="text-muted-foreground">
                                         This action cannot be undone. The user and all associated data will be permanently deleted.
                                       </DialogDescription>
                                     </DialogHeader>
                                     <DialogFooter>
                                       <DialogClose asChild>
-                                        <Button variant="outline" className="border-gray-700">Cancel</Button>
+                                        <Button variant="outline">Cancel</Button>
                                       </DialogClose>
                                       <Button
                                         variant="destructive"
@@ -876,35 +875,35 @@ export default function AdminPage() {
           </TabsContent>
 
           <TabsContent value="transactions" className="space-y-4">
-            <Card className="bg-gray-900/50 border-gray-800">
+            <Card>
               <CardHeader>
-                <CardTitle className="text-white flex items-center gap-2">
+                <CardTitle className="text-foreground flex items-center gap-2">
                   <CreditCard className="h-5 w-5" />
                   All Transactions
                 </CardTitle>
               </CardHeader>
               <CardContent>
                 {loadingTransactions ? (
-                  <Skeleton className="h-64 bg-gray-800" />
+                  <Skeleton className="h-64" />
                 ) : allTransactions?.length === 0 ? (
-                  <p className="text-gray-400 text-center py-8">No transactions found</p>
+                  <p className="text-muted-foreground text-center py-8">No transactions found</p>
                 ) : (
                   <div className="overflow-x-auto">
                     <Table>
                       <TableHeader>
-                        <TableRow className="border-gray-700">
-                          <TableHead className="text-gray-400">ID</TableHead>
-                          <TableHead className="text-gray-400">Type</TableHead>
-                          <TableHead className="text-gray-400">Amount</TableHead>
-                          <TableHead className="text-gray-400">Status</TableHead>
-                          <TableHead className="text-gray-400">Description</TableHead>
-                          <TableHead className="text-gray-400">Date</TableHead>
+                        <TableRow>
+                          <TableHead className="text-muted-foreground">ID</TableHead>
+                          <TableHead className="text-muted-foreground">Type</TableHead>
+                          <TableHead className="text-muted-foreground">Amount</TableHead>
+                          <TableHead className="text-muted-foreground">Status</TableHead>
+                          <TableHead className="text-muted-foreground">Description</TableHead>
+                          <TableHead className="text-muted-foreground">Date</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
                         {allTransactions?.slice(0, 50).map((tx: TransactionData) => (
-                          <TableRow key={tx.id} className="border-gray-700" data-testid={`tx-row-${tx.id}`}>
-                            <TableCell className="text-gray-300 font-mono text-xs">{tx.id.slice(0, 8)}...</TableCell>
+                          <TableRow key={tx.id} data-testid={`tx-row-${tx.id}`}>
+                            <TableCell className="text-muted-foreground font-mono text-xs">{tx.id.slice(0, 8)}...</TableCell>
                             <TableCell>
                               <Badge variant="outline" className={
                                 tx.type === "deposit" ? "bg-green-500/10 text-green-400 border-green-500" :
@@ -914,7 +913,7 @@ export default function AdminPage() {
                                 {tx.type}
                               </Badge>
                             </TableCell>
-                            <TableCell className="text-white font-medium">${tx.amount}</TableCell>
+                            <TableCell className="text-foreground font-medium">${tx.amount}</TableCell>
                             <TableCell>
                               <Badge className={
                                 tx.status === "completed" ? "bg-green-600" :
@@ -924,8 +923,8 @@ export default function AdminPage() {
                                 {tx.status}
                               </Badge>
                             </TableCell>
-                            <TableCell className="text-gray-300 max-w-xs truncate">{tx.description || "-"}</TableCell>
-                            <TableCell className="text-gray-300">
+                            <TableCell className="text-muted-foreground max-w-xs truncate">{tx.description || "-"}</TableCell>
+                            <TableCell className="text-muted-foreground">
                               {new Date(tx.createdAt).toLocaleString()}
                             </TableCell>
                           </TableRow>
@@ -939,34 +938,34 @@ export default function AdminPage() {
           </TabsContent>
 
           <TabsContent value="wallets" className="space-y-4">
-            <Card className="bg-gray-900/50 border-gray-800">
+            <Card>
               <CardHeader>
-                <CardTitle className="text-white flex items-center gap-2">
+                <CardTitle className="text-foreground flex items-center gap-2">
                   <Wallet className="h-5 w-5" />
                   All Wallets
                 </CardTitle>
               </CardHeader>
               <CardContent>
                 {loadingWallets ? (
-                  <Skeleton className="h-64 bg-gray-800" />
+                  <Skeleton className="h-64" />
                 ) : allWallets?.length === 0 ? (
-                  <p className="text-gray-400 text-center py-8">No wallets found</p>
+                  <p className="text-muted-foreground text-center py-8">No wallets found</p>
                 ) : (
                   <div className="overflow-x-auto">
                     <Table>
                       <TableHeader>
-                        <TableRow className="border-gray-700">
-                          <TableHead className="text-gray-400">Wallet ID</TableHead>
-                          <TableHead className="text-gray-400">Currency</TableHead>
-                          <TableHead className="text-gray-400">Available</TableHead>
-                          <TableHead className="text-gray-400">In Escrow</TableHead>
-                          <TableHead className="text-gray-400">Total</TableHead>
+                        <TableRow>
+                          <TableHead className="text-muted-foreground">Wallet ID</TableHead>
+                          <TableHead className="text-muted-foreground">Currency</TableHead>
+                          <TableHead className="text-muted-foreground">Available</TableHead>
+                          <TableHead className="text-muted-foreground">In Escrow</TableHead>
+                          <TableHead className="text-muted-foreground">Total</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
                         {allWallets?.map((wallet: WalletData) => (
-                          <TableRow key={wallet.id} className="border-gray-700" data-testid={`wallet-row-${wallet.id}`}>
-                            <TableCell className="text-gray-300 font-mono text-xs">{wallet.id.slice(0, 8)}...</TableCell>
+                          <TableRow key={wallet.id} data-testid={`wallet-row-${wallet.id}`}>
+                            <TableCell className="text-muted-foreground font-mono text-xs">{wallet.id.slice(0, 8)}...</TableCell>
                             <TableCell>
                               <Badge variant="outline" className="bg-blue-500/10 text-blue-400 border-blue-500">
                                 {wallet.currency}
@@ -974,7 +973,7 @@ export default function AdminPage() {
                             </TableCell>
                             <TableCell className="text-green-400 font-medium">${wallet.availableBalance}</TableCell>
                             <TableCell className="text-yellow-400 font-medium">${wallet.escrowBalance}</TableCell>
-                            <TableCell className="text-white font-bold">
+                            <TableCell className="text-foreground font-bold">
                               ${(parseFloat(wallet.availableBalance) + parseFloat(wallet.escrowBalance)).toFixed(2)}
                             </TableCell>
                           </TableRow>
@@ -991,22 +990,22 @@ export default function AdminPage() {
             {loadingKyc ? (
               <div className="space-y-4">
                 {[1, 2, 3].map((i) => (
-                  <Skeleton key={i} className="h-48 bg-gray-800" />
+                  <Skeleton key={i} className="h-48" />
                 ))}
               </div>
             ) : pendingKyc?.length === 0 ? (
-              <Card className="bg-gray-900/50 border-gray-800">
+              <Card>
                 <CardContent className="py-12 text-center">
                   <Check className="h-12 w-12 text-green-500 mx-auto mb-4" />
-                  <p className="text-gray-400">No pending KYC applications</p>
+                  <p className="text-muted-foreground">No pending KYC applications</p>
                 </CardContent>
               </Card>
             ) : (
               pendingKyc?.map((kyc: KycApplication) => (
-                <Card key={kyc.id} className="bg-gray-900/50 border-gray-800" data-testid={`kyc-card-${kyc.id}`}>
+                <Card key={kyc.id} data-testid={`kyc-card-${kyc.id}`}>
                   <CardHeader>
                     <div className="flex items-center justify-between">
-                      <CardTitle className="text-white flex items-center gap-2">
+                      <CardTitle className="text-foreground flex items-center gap-2">
                         <User className="h-5 w-5" />
                         KYC Application
                         {kyc.isStarVerified && (
@@ -1024,26 +1023,26 @@ export default function AdminPage() {
                   <CardContent className="space-y-4">
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
                       <div>
-                        <p className="text-gray-400">ID Type</p>
-                        <p className="text-white">{kyc.idType || "Not provided"}</p>
+                        <p className="text-muted-foreground">ID Type</p>
+                        <p className="text-foreground">{kyc.idType || "Not provided"}</p>
                       </div>
                       <div>
-                        <p className="text-gray-400">ID Number</p>
-                        <p className="text-white">{kyc.idNumber || "Not provided"}</p>
+                        <p className="text-muted-foreground">ID Number</p>
+                        <p className="text-foreground">{kyc.idNumber || "Not provided"}</p>
                       </div>
                       <div>
-                        <p className="text-gray-400">Face Match Score</p>
-                        <p className="text-white">{kyc.faceMatchScore ? `${kyc.faceMatchScore}%` : "N/A"}</p>
+                        <p className="text-muted-foreground">Face Match Score</p>
+                        <p className="text-foreground">{kyc.faceMatchScore ? `${kyc.faceMatchScore}%` : "N/A"}</p>
                       </div>
                       <div>
-                        <p className="text-gray-400">Submitted</p>
-                        <p className="text-white">{new Date(kyc.submittedAt).toLocaleDateString()}</p>
+                        <p className="text-muted-foreground">Submitted</p>
+                        <p className="text-foreground">{new Date(kyc.submittedAt).toLocaleDateString()}</p>
                       </div>
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                       <div className="space-y-2">
-                        <p className="text-gray-400 text-sm flex items-center gap-1">
+                        <p className="text-muted-foreground text-sm flex items-center gap-1">
                           <Image className="h-4 w-4" />
                           ID Front
                         </p>
@@ -1055,7 +1054,7 @@ export default function AdminPage() {
                             <img 
                               src={kyc.idFrontUrl} 
                               alt="ID Front" 
-                              className="w-full h-40 object-cover rounded-lg border border-gray-700 transition-all group-hover:opacity-80"
+                              className="w-full h-40 object-cover rounded-lg border border-border transition-all group-hover:opacity-80"
                               data-testid={`kyc-id-front-${kyc.id}`}
                             />
                             <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
@@ -1065,13 +1064,13 @@ export default function AdminPage() {
                             </div>
                           </div>
                         ) : (
-                          <div className="w-full h-40 bg-gray-800 rounded-lg flex items-center justify-center border border-gray-700">
-                            <p className="text-gray-500 text-sm">Not uploaded</p>
+                          <div className="w-full h-40 bg-muted rounded-lg flex items-center justify-center border border-border">
+                            <p className="text-muted-foreground text-sm">Not uploaded</p>
                           </div>
                         )}
                       </div>
                       <div className="space-y-2">
-                        <p className="text-gray-400 text-sm flex items-center gap-1">
+                        <p className="text-muted-foreground text-sm flex items-center gap-1">
                           <Image className="h-4 w-4" />
                           ID Back
                         </p>
@@ -1083,7 +1082,7 @@ export default function AdminPage() {
                             <img 
                               src={kyc.idBackUrl} 
                               alt="ID Back" 
-                              className="w-full h-40 object-cover rounded-lg border border-gray-700 transition-all group-hover:opacity-80"
+                              className="w-full h-40 object-cover rounded-lg border border-border transition-all group-hover:opacity-80"
                               data-testid={`kyc-id-back-${kyc.id}`}
                             />
                             <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
@@ -1093,8 +1092,8 @@ export default function AdminPage() {
                             </div>
                           </div>
                         ) : (
-                          <div className="w-full h-40 bg-gray-800 rounded-lg flex items-center justify-center border border-gray-700">
-                            <p className="text-gray-500 text-sm">Not uploaded</p>
+                          <div className="w-full h-40 bg-muted rounded-lg flex items-center justify-center border border-border">
+                            <p className="text-muted-foreground text-sm">Not uploaded</p>
                           </div>
                         )}
                       </div>
