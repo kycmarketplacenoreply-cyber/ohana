@@ -284,6 +284,7 @@ export default function AdminPage() {
 
   const getDocuments = (kyc: KycApplication): DocumentImage[] => {
     const docs: DocumentImage[] = [];
+    if (kyc.idDocumentUrl) docs.push({ url: kyc.idDocumentUrl, label: "ID Document" });
     if (kyc.idFrontUrl) docs.push({ url: kyc.idFrontUrl, label: "ID Front" });
     if (kyc.idBackUrl) docs.push({ url: kyc.idBackUrl, label: "ID Back" });
     if (kyc.selfieUrl) docs.push({ url: kyc.selfieUrl, label: "Selfie" });
@@ -1040,7 +1041,31 @@ export default function AdminPage() {
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                      {kyc.idDocumentUrl && (
+                        <div className="space-y-2">
+                          <p className="text-muted-foreground text-sm flex items-center gap-1">
+                            <Image className="h-4 w-4" />
+                            ID Document
+                          </p>
+                          <div 
+                            className="relative group cursor-pointer"
+                            onClick={() => openDocumentViewer(kyc, 0)}
+                          >
+                            <img 
+                              src={kyc.idDocumentUrl} 
+                              alt="ID Document" 
+                              className="w-full h-40 object-cover rounded-lg border border-border transition-all group-hover:opacity-80"
+                              data-testid={`kyc-id-document-${kyc.id}`}
+                            />
+                            <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                              <div className="bg-black/60 rounded-full p-3">
+                                <ZoomIn className="h-6 w-6 text-white" />
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      )}
                       <div className="space-y-2">
                         <p className="text-muted-foreground text-sm flex items-center gap-1">
                           <Image className="h-4 w-4" />
@@ -1049,7 +1074,7 @@ export default function AdminPage() {
                         {kyc.idFrontUrl ? (
                           <div 
                             className="relative group cursor-pointer"
-                            onClick={() => openDocumentViewer(kyc, 0)}
+                            onClick={() => openDocumentViewer(kyc, kyc.idDocumentUrl ? 1 : 0)}
                           >
                             <img 
                               src={kyc.idFrontUrl} 
@@ -1077,7 +1102,12 @@ export default function AdminPage() {
                         {kyc.idBackUrl ? (
                           <div 
                             className="relative group cursor-pointer"
-                            onClick={() => openDocumentViewer(kyc, kyc.idFrontUrl ? 1 : 0)}
+                            onClick={() => {
+                              let idx = 0;
+                              if (kyc.idDocumentUrl) idx++;
+                              if (kyc.idFrontUrl) idx++;
+                              openDocumentViewer(kyc, idx);
+                            }}
                           >
                             <img 
                               src={kyc.idBackUrl} 
@@ -1098,7 +1128,7 @@ export default function AdminPage() {
                         )}
                       </div>
                       <div className="space-y-2">
-                        <p className="text-gray-400 text-sm flex items-center gap-1">
+                        <p className="text-muted-foreground text-sm flex items-center gap-1">
                           <User className="h-4 w-4" />
                           Selfie
                         </p>
@@ -1107,6 +1137,7 @@ export default function AdminPage() {
                             className="relative group cursor-pointer"
                             onClick={() => {
                               let idx = 0;
+                              if (kyc.idDocumentUrl) idx++;
                               if (kyc.idFrontUrl) idx++;
                               if (kyc.idBackUrl) idx++;
                               openDocumentViewer(kyc, idx);
@@ -1115,7 +1146,7 @@ export default function AdminPage() {
                             <img 
                               src={kyc.selfieUrl} 
                               alt="Selfie" 
-                              className="w-full h-40 object-cover rounded-lg border border-gray-700 transition-all group-hover:opacity-80"
+                              className="w-full h-40 object-cover rounded-lg border border-border transition-all group-hover:opacity-80"
                               data-testid={`kyc-selfie-${kyc.id}`}
                             />
                             <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
@@ -1125,8 +1156,8 @@ export default function AdminPage() {
                             </div>
                           </div>
                         ) : (
-                          <div className="w-full h-40 bg-gray-800 rounded-lg flex items-center justify-center border border-gray-700">
-                            <p className="text-gray-500 text-sm">Not uploaded</p>
+                          <div className="w-full h-40 bg-muted rounded-lg flex items-center justify-center border border-border">
+                            <p className="text-muted-foreground text-sm">Not uploaded</p>
                           </div>
                         )}
                       </div>
