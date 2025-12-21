@@ -255,7 +255,7 @@ export default function ProfilePage() {
                     {tradeStats.totalTrades}
                   </p>
                   <p className="text-xs text-muted-foreground mt-1">
-                    30d Trades
+                    Total Trades
                   </p>
                 </div>
                 <div>
@@ -263,17 +263,17 @@ export default function ProfilePage() {
                     {tradeStats.completionRate}%
                   </p>
                   <p className="text-xs text-muted-foreground mt-1">
-                    30d Completion Rate
+                    Completion Rate
                   </p>
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-4 mt-4 border-t border-border pt-4">
                 <div className="border-r border-border pr-4">
                   <p className="text-xl font-bold text-foreground">
-                    {tradeStats.avgReleaseTime || "—"}
+                    ${tradeStats.totalTradeVolume || "0"}
                   </p>
                   <p className="text-xs text-muted-foreground mt-1">
-                    Avg. Release Time
+                    Trade Volume (USDT)
                   </p>
                 </div>
                 <div>
@@ -285,9 +285,72 @@ export default function ProfilePage() {
                   </p>
                 </div>
               </div>
-              <button className="w-full text-center text-sm text-muted-foreground hover:text-foreground mt-4 py-2">
-                More ▼
-              </button>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Apply for Verified Badge - Visible on Main Profile */}
+        {isOwnProfile && tradeStats && (
+          <Card className="bg-card border-border border-green-200 bg-green-50/20">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-base">
+                <Shield className="h-5 w-5 text-green-600" />
+                Verified Badge Application
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {userProfile.hasVerifyBadge ? (
+                <div className="text-center py-2">
+                  <div className="flex items-center justify-center gap-2 mb-2">
+                    <CheckCircle className="h-5 w-5 text-green-600" />
+                    <p className="font-medium text-green-700">
+                      You have the Verified Badge!
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <div className="space-y-3">
+                    <p className="text-sm text-muted-foreground font-medium">
+                      Requirements to qualify:
+                    </p>
+                    <div className="space-y-2">
+                      <div className={`flex items-center gap-2 p-2 rounded ${tradeStats.totalTrades >= 10 ? "bg-green-100/30" : "bg-gray-100/30"}`}>
+                        <div className={`w-5 h-5 rounded-full flex items-center justify-center ${tradeStats.totalTrades >= 10 ? "bg-green-600 text-white" : "border border-gray-400"}`}>
+                          {tradeStats.totalTrades >= 10 ? "✓" : ""}
+                        </div>
+                        <span className={tradeStats.totalTrades >= 10 ? "text-green-700 font-medium" : "text-muted-foreground"}>
+                          More than 10 trades ({tradeStats.totalTrades})
+                        </span>
+                      </div>
+                      <div className={`flex items-center gap-2 p-2 rounded ${parseFloat(tradeStats.totalTradeVolume || "0") > 700 ? "bg-green-100/30" : "bg-gray-100/30"}`}>
+                        <div className={`w-5 h-5 rounded-full flex items-center justify-center ${parseFloat(tradeStats.totalTradeVolume || "0") > 700 ? "bg-green-600 text-white" : "border border-gray-400"}`}>
+                          {parseFloat(tradeStats.totalTradeVolume || "0") > 700 ? "✓" : ""}
+                        </div>
+                        <span className={parseFloat(tradeStats.totalTradeVolume || "0") > 700 ? "text-green-700 font-medium" : "text-muted-foreground"}>
+                          Trade volume above 700 USDT (${tradeStats.totalTradeVolume})
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                  <Button
+                    disabled={
+                      tradeStats.totalTrades < 10 ||
+                      parseFloat(tradeStats.totalTradeVolume || "0") <= 700
+                    }
+                    className="w-full bg-green-600 hover:bg-green-700"
+                    data-testid="button-apply-verify-badge"
+                    onClick={() => {
+                      console.log("Applying for verify badge");
+                    }}
+                  >
+                    Apply for Verified Badge
+                  </Button>
+                  <p className="text-xs text-center text-muted-foreground">
+                    Once approved by admin, the badge will appear next to your name
+                  </p>
+                </>
+              )}
             </CardContent>
           </Card>
         )}
@@ -460,64 +523,12 @@ export default function ProfilePage() {
 
           <TabsContent value="others" className="space-y-3">
             <div className="space-y-4">
-              {/* Total Trades Volume */}
               <Card className="bg-card border-border">
-                <CardContent className="pt-6">
-                  <div className="text-center">
-                    <p className="text-4xl font-bold text-foreground mb-2">
-                      ${tradeStats?.totalTradeVolume || "0"}
-                    </p>
-                    <p className="text-sm text-muted-foreground">
-                      Total Trade Volume (USDT)
-                    </p>
-                  </div>
+                <CardContent className="py-12 text-center">
+                  <Eye className="h-12 w-12 text-muted-foreground/50 mx-auto mb-4" />
+                  <p className="text-muted-foreground">Additional features coming soon</p>
                 </CardContent>
               </Card>
-
-              {/* Verify Badge Application */}
-              {isOwnProfile && userProfile.role !== "vendor" && !userProfile.hasVerifyBadge && (
-                <Card className="bg-card border-border">
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2 text-base">
-                      <Shield className="h-5 w-5" />
-                      Apply for Verified Badge
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="space-y-2">
-                      <p className="text-sm text-muted-foreground">
-                        Requirements to qualify:
-                      </p>
-                      <ul className="text-sm space-y-1">
-                        <li className={tradeStats && tradeStats.totalTrades >= 10 ? "text-green-600" : "text-muted-foreground"}>
-                          ✓ More than 10 trades: {tradeStats?.totalTrades || 0} trades
-                        </li>
-                        <li className={tradeStats && parseFloat(tradeStats.totalTradeVolume || "0") > 700 ? "text-green-600" : "text-muted-foreground"}>
-                          ✓ Trade volume above 700 USDT: ${tradeStats?.totalTradeVolume || "0"}
-                        </li>
-                      </ul>
-                    </div>
-                    <Button
-                      disabled={
-                        !tradeStats ||
-                        tradeStats.totalTrades < 10 ||
-                        parseFloat(tradeStats.totalTradeVolume || "0") <= 700
-                      }
-                      className="w-full"
-                      data-testid="button-apply-verify-badge"
-                      onClick={() => {
-                        // Handle badge application
-                        console.log("Applying for verify badge");
-                      }}
-                    >
-                      Apply for Badge
-                    </Button>
-                    <p className="text-xs text-muted-foreground text-center">
-                      Admin approval required after application
-                    </p>
-                  </CardContent>
-                </Card>
-              )}
             </div>
           </TabsContent>
         </Tabs>
