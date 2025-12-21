@@ -35,6 +35,7 @@ interface UserProfile {
   role: string;
   isVerified?: boolean;
   tier?: string;
+  hasVerifyBadge?: boolean;
 }
 
 interface TradeStats {
@@ -42,6 +43,7 @@ interface TradeStats {
   completionRate: number;
   avgReleaseTime?: number;
   avgPayTime?: number;
+  totalTradeVolume?: string;
 }
 
 interface Feedback {
@@ -214,11 +216,14 @@ export default function ProfilePage() {
                     {userProfile.role === "customer" && (
                       <Badge className="bg-blue-600">Customer</Badge>
                     )}
+                    {userProfile.hasVerifyBadge && (
+                      <Badge className="bg-yellow-600 flex items-center gap-1">
+                        <CheckCircle className="h-3 w-3" />
+                        Verified
+                      </Badge>
+                    )}
                   </div>
 
-                  <p className="text-sm text-muted-foreground">
-                    Chat ID: {userProfile.id?.slice(0, 6)}
-                  </p>
                   <p className="text-sm text-muted-foreground">
                     Joined {new Date(userProfile.createdAt).toLocaleDateString()}
                   </p>
@@ -229,10 +234,6 @@ export default function ProfilePage() {
                   <div className="flex items-center gap-1 text-xs">
                     <CheckCircle className="h-4 w-4 text-green-500" />
                     <span className="text-muted-foreground">Email</span>
-                  </div>
-                  <div className="flex items-center gap-1 text-xs">
-                    <CheckCircle className="h-4 w-4 text-green-500" />
-                    <span className="text-muted-foreground">SMS</span>
                   </div>
                   <div className="flex items-center gap-1 text-xs">
                     <CheckCircle className="h-4 w-4 text-green-500" />
@@ -458,28 +459,65 @@ export default function ProfilePage() {
           </TabsContent>
 
           <TabsContent value="others" className="space-y-3">
-            <div className="space-y-3">
-              <div className="flex items-center justify-between p-4 bg-card border border-border rounded-lg">
-                <div className="flex items-center gap-2">
-                  <Lock className="h-5 w-5 text-foreground" />
-                  <span className="font-medium text-foreground">Restrictions Removal Center</span>
-                </div>
-                <ChevronLeft className="h-4 w-4 text-muted-foreground rotate-180" />
-              </div>
-              <div className="flex items-center justify-between p-4 bg-card border border-border rounded-lg">
-                <div className="flex items-center gap-2">
-                  <Users className="h-5 w-5 text-foreground" />
-                  <span className="font-medium text-foreground">Follows</span>
-                </div>
-                <ChevronLeft className="h-4 w-4 text-muted-foreground rotate-180" />
-              </div>
-              <div className="flex items-center justify-between p-4 bg-card border border-border rounded-lg">
-                <div className="flex items-center gap-2">
-                  <Ban className="h-5 w-5 text-foreground" />
-                  <span className="font-medium text-foreground">Blocked Users</span>
-                </div>
-                <ChevronLeft className="h-4 w-4 text-muted-foreground rotate-180" />
-              </div>
+            <div className="space-y-4">
+              {/* Total Trades Volume */}
+              <Card className="bg-card border-border">
+                <CardContent className="pt-6">
+                  <div className="text-center">
+                    <p className="text-4xl font-bold text-foreground mb-2">
+                      ${tradeStats?.totalTradeVolume || "0"}
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      Total Trade Volume (USDT)
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Verify Badge Application */}
+              {isOwnProfile && userProfile.role !== "vendor" && !userProfile.hasVerifyBadge && (
+                <Card className="bg-card border-border">
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2 text-base">
+                      <Shield className="h-5 w-5" />
+                      Apply for Verified Badge
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="space-y-2">
+                      <p className="text-sm text-muted-foreground">
+                        Requirements to qualify:
+                      </p>
+                      <ul className="text-sm space-y-1">
+                        <li className={tradeStats && tradeStats.totalTrades >= 10 ? "text-green-600" : "text-muted-foreground"}>
+                          ✓ More than 10 trades: {tradeStats?.totalTrades || 0} trades
+                        </li>
+                        <li className={tradeStats && parseFloat(tradeStats.totalTradeVolume || "0") > 700 ? "text-green-600" : "text-muted-foreground"}>
+                          ✓ Trade volume above 700 USDT: ${tradeStats?.totalTradeVolume || "0"}
+                        </li>
+                      </ul>
+                    </div>
+                    <Button
+                      disabled={
+                        !tradeStats ||
+                        tradeStats.totalTrades < 10 ||
+                        parseFloat(tradeStats.totalTradeVolume || "0") <= 700
+                      }
+                      className="w-full"
+                      data-testid="button-apply-verify-badge"
+                      onClick={() => {
+                        // Handle badge application
+                        console.log("Applying for verify badge");
+                      }}
+                    >
+                      Apply for Badge
+                    </Button>
+                    <p className="text-xs text-muted-foreground text-center">
+                      Admin approval required after application
+                    </p>
+                  </CardContent>
+                </Card>
+              )}
             </div>
           </TabsContent>
         </Tabs>

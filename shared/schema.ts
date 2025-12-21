@@ -130,6 +130,7 @@ export const vendorProfiles = pgTable("vendor_profiles", {
   averageRating: numeric("average_rating", { precision: 3, scale: 2 }).default("0"),
   totalRatings: integer("total_ratings").notNull().default(0),
   suspiciousActivityScore: integer("suspicious_activity_score").notNull().default(0),
+  hasVerifyBadge: boolean("has_verify_badge").notNull().default(false),
   createdAt: timestamp("created_at").notNull().default(sql`now()`),
   updatedAt: timestamp("updated_at").notNull().default(sql`now()`),
 });

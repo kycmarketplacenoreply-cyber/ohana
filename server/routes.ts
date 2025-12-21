@@ -3162,11 +3162,77 @@ export async function registerRoutes(
       if (!user) {
         return res.status(404).json({ message: "User not found" });
       }
+      const vendorProfile = await storage.getVendorProfileByUserId(req.params.id);
       res.json({
         id: user.id,
         username: user.username,
         profilePicture: user.profilePicture,
         createdAt: user.createdAt,
+        role: user.role,
+        hasVerifyBadge: vendorProfile?.hasVerifyBadge || false,
+        isVerified: user.emailVerified,
+        tier: vendorProfile?.subscriptionPlan,
+      });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Get user trades stats
+  app.get("/api/users/:id/trades", async (req, res) => {
+    try {
+      const user = await storage.getUser(req.params.id);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      const vendorProfile = await storage.getVendorProfileByUserId(req.params.id);
+      const userOrders = vendorProfile 
+        ? await storage.getOrdersByVendor(vendorProfile.id)
+        : [];
+
+      const completedOrders = userOrders.filter(o => o.status === "completed");
+      const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+      const recentOrders = completedOrders.filter(o => new Date(o.createdAt) > thirtyDaysAgo);
+
+      const completionRate = userOrders.length > 0
+        ? Math.round((completedOrders.length / userOrders.length) * 100)
+        : 0;
+
+      const totalVolume = recentOrders.reduce((sum, order) => {
+        return sum + parseFloat(order.fiatAmount?.toString() || "0");
+      }, 0);
+
+      const avgReleaseTime = completedOrders.length > 0
+        ? Math.round(
+            completedOrders.reduce((sum, order) => {
+              if (order.vendorConfirmedAt && order.createdAt) {
+                const ms = new Date(order.vendorConfirmedAt).getTime() - new Date(order.createdAt).getTime();
+                return sum + ms;
+              }
+              return sum;
+            }, 0) / completedOrders.length / 1000 / 60
+          )
+        : 0;
+
+      const avgPayTime = completedOrders.length > 0
+        ? Math.round(
+            completedOrders.reduce((sum, order) => {
+              if (order.buyerPaidAt && order.createdAt) {
+                const ms = new Date(order.buyerPaidAt).getTime() - new Date(order.createdAt).getTime();
+                return sum + ms;
+              }
+              return sum;
+            }, 0) / completedOrders.length / 1000 / 60
+          )
+        : 0;
+
+      res.json({
+        totalTrades: recentOrders.length,
+        completionRate,
+        avgReleaseTime: avgReleaseTime > 0 ? `${avgReleaseTime}m` : undefined,
+        avgPayTime: avgPayTime > 0 ? `${avgPayTime}m` : undefined,
+        totalTradeVolume: totalVolume.toFixed(2),
       });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
