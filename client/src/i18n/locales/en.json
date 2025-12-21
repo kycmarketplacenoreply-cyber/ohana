@@ -155,5 +155,12 @@
   "loaders": {
     "title": "Loaders Zone",
     "shortTitle": "Loaders"
+  },
+  "navigation": {
+    "home": "Home",
+    "orders": "Orders",
+    "ads": "Ads",
+    "chat": "Chat",
+    "profile": "Profile"
   }
 }

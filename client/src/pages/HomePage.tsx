@@ -388,13 +388,13 @@ export default function HomePage() {
           <Link href="/">
             <button className="flex flex-col items-center gap-1 px-4 py-2" data-testid="nav-home">
               <Home className={`h-6 w-6 ${location === "/" ? "text-foreground" : "text-muted-foreground"}`} />
-              <span className={`text-xs ${location === "/" ? "text-foreground" : "text-muted-foreground"}`}>Home</span>
+              <span className={`text-xs ${location === "/" ? "text-foreground" : "text-muted-foreground"}`}>{t('navigation.home')}</span>
             </button>
           </Link>
           <Link href="/orders">
             <button className="flex flex-col items-center gap-1 px-4 py-2" data-testid="nav-orders">
               <ShoppingCart className={`h-6 w-6 ${location === "/orders" ? "text-foreground" : "text-muted-foreground"}`} />
-              <span className={`text-xs ${location === "/orders" ? "text-foreground" : "text-muted-foreground"}`}>Orders</span>
+              <span className={`text-xs ${location === "/orders" ? "text-foreground" : "text-muted-foreground"}`}>{t('navigation.orders')}</span>
             </button>
           </Link>
           <button 
@@ -403,7 +403,7 @@ export default function HomePage() {
             onClick={() => setShowAdsModal(true)}
           >
             <Megaphone className="h-6 w-6 text-muted-foreground" />
-            <span className="text-xs text-muted-foreground">Ads</span>
+            <span className="text-xs text-muted-foreground">{t('navigation.ads')}</span>
           </button>
           <Link href="/notifications">
             <button className="flex flex-col items-center gap-1 px-4 py-2 relative" data-testid="nav-chat">
@@ -413,13 +413,13 @@ export default function HomePage() {
                   {unreadCount > 9 ? "9+" : unreadCount}
                 </span>
               )}
-              <span className={`text-xs ${location === "/notifications" ? "text-foreground" : "text-muted-foreground"}`}>Chat</span>
+              <span className={`text-xs ${location === "/notifications" ? "text-foreground" : "text-muted-foreground"}`}>{t('navigation.chat')}</span>
             </button>
           </Link>
           <Link href="/settings">
             <button className="flex flex-col items-center gap-1 px-4 py-2" data-testid="nav-profile">
               <User className={`h-6 w-6 ${location === "/settings" ? "text-foreground" : "text-muted-foreground"}`} />
-              <span className={`text-xs ${location === "/settings" ? "text-foreground" : "text-muted-foreground"}`}>Profile</span>
+              <span className={`text-xs ${location === "/settings" ? "text-foreground" : "text-muted-foreground"}`}>{t('navigation.profile')}</span>
             </button>
           </Link>
         </div>

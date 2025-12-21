@@ -155,5 +155,12 @@
   "loaders": {
     "title": "加载者专区",
     "shortTitle": "加载者"
+  },
+  "navigation": {
+    "home": "首页",
+    "orders": "订单",
+    "ads": "广告",
+    "chat": "消息",
+    "profile": "资料"
   }
 }
