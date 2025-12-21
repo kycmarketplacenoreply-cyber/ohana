@@ -119,7 +119,7 @@ function Router() {
         <Route path="/vendor" component={() => <ProtectedRoute component={VendorPage} allowedRoles={["customer", "vendor"]} />} />
         <Route path="/admin" component={() => <ProtectedRoute component={AdminPage} allowedRoles={["admin"]} />} />
         <Route path="/disputes" component={() => <ProtectedRoute component={DisputeAdminPage} allowedRoles={["admin", "dispute_admin"]} />} />
-        <Route path="/support" component={() => <ProtectedRoute component={SupportPage} allowedRoles={["admin", "support"]} />} />
+        <Route path="/support" component={() => <ProtectedRoute component={SupportPage} />} />
         <Route path="/finance" component={() => <ProtectedRoute component={FinancePage} allowedRoles={["admin", "finance_manager"]} />} />
         <Route path="/loader-order/:id" component={() => <ProtectedRoute component={LoaderOrderPage} allowedRoles={["customer", "vendor"]} />} />
         <Route path="/maintenance" component={MaintenancePage} />
