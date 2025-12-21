@@ -4,15 +4,11 @@ import { initReactI18next } from "react-i18next";
 import en from "./locales/en.json";
 import zh from "./locales/zh.json";
 import ru from "./locales/ru.json";
-import sw from "./locales/sw.json";
-import fr from "./locales/fr.json";
 
 const resources = {
   en: { translation: en },
   zh: { translation: zh },
   ru: { translation: ru },
-  sw: { translation: sw },
-  fr: { translation: fr },
 };
 
 let savedLanguage = "en";
@@ -37,8 +33,6 @@ export const languages = [
   { code: "en", name: "English", flag: "🇺🇸" },
   { code: "zh", name: "中文", flag: "🇨🇳" },
   { code: "ru", name: "Русский", flag: "🇷🇺" },
-  { code: "sw", name: "Kiswahili", flag: "🇰🇪" },
-  { code: "fr", name: "Français", flag: "🇫🇷" },
 ];
 
 export const changeLanguage = (lang: string) => {
