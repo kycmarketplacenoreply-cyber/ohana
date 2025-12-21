@@ -99,6 +99,7 @@ interface OrderData {
 }
 
 export default function SupportPage() {
+  const { t } = useTranslation();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const user = getUser();

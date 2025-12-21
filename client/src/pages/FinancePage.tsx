@@ -92,6 +92,7 @@ interface PlatformStats {
 }
 
 export default function FinancePage() {
+  const { t } = useTranslation();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const user = getUser();

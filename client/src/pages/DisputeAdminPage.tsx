@@ -128,6 +128,7 @@ interface DisputeDetails {
 }
 
 export default function DisputeAdminPage() {
+  const { t } = useTranslation();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const user = getUser();

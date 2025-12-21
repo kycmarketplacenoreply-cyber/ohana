@@ -101,6 +101,7 @@ interface FeedbackData {
 }
 
 export default function LoaderOrderPage() {
+  const { t } = useTranslation();
   const [, params] = useRoute("/loader-order/:id");
   const [, setLocation] = useLocation();
   const orderId = params?.id;
