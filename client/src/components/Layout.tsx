@@ -148,7 +148,7 @@ export default function Layout({ children }: LayoutProps) {
             </div>
 
             <div className="flex items-center gap-4">
-              <LanguageSelector />
+              {authenticated && user?.role !== "admin" && user?.role !== "support" && user?.role !== "dispute_admin" && user?.role !== "finance_manager" && <LanguageSelector />}
               <ThemeToggle />
               {authenticated ? (
                 <>
