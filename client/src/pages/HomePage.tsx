@@ -466,6 +466,17 @@ export default function HomePage() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Floating Support Button */}
+      <Link href="/support">
+        <button
+          className="fixed bottom-6 right-6 w-14 h-14 rounded-full bg-primary hover:bg-primary/90 shadow-lg flex items-center justify-center text-white z-40 transition-all hover:scale-110"
+          data-testid="button-floating-support"
+          title="Report Issue or Contact Support"
+        >
+          <Headphones className="h-6 w-6" />
+        </button>
+      </Link>
     </div>
   );
 }
