@@ -150,11 +150,11 @@ export default function HomePage() {
   return (
     <div className="min-h-screen bg-background flex flex-col">
       <header className="sticky top-0 z-50 bg-background border-b border-border">
-        <div className="flex items-center justify-between px-2 sm:px-4 py-3 gap-2">
+        <div className="flex items-center justify-between px-2 sm:px-4 py-3 gap-1 sm:gap-2">
           <button className="p-1 flex-shrink-0" data-testid="button-back">
-            <ChevronLeft className="h-5 sm:h-6 w-5 sm:w-6 text-foreground" />
+            <ChevronLeft className="h-4 w-4 sm:h-5 sm:w-5 md:h-6 md:w-6 text-foreground" />
           </button>
-          <span className="text-sm sm:text-base text-foreground font-semibold border-b-2 border-foreground pb-1 truncate">
+          <span className="text-xs sm:text-sm md:text-base text-foreground font-semibold border-b-2 border-foreground pb-1 truncate min-w-0">
             {getSectionTitle()}
           </span>
           <div className="flex items-center gap-1 flex-shrink-0">

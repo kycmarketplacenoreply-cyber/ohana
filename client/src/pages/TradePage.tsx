@@ -172,13 +172,13 @@ export default function TradePage() {
 
   return (
     <Layout>
-      <div className="max-w-2xl mx-auto space-y-4 sm:space-y-6 px-2 sm:px-0">
+      <div className="max-w-2xl mx-auto space-y-4 sm:space-y-6 px-2 sm:px-4">
         <Card className="bg-gray-900/50 border-gray-800">
           <CardHeader>
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-white flex items-center gap-2">
-                <ArrowLeftRight className="h-5 w-5" />
-                {offer.type === "buy" ? "Sell" : "Buy"} {offer.currency}
+            <div className="flex items-center justify-between gap-2">
+              <CardTitle className="text-white flex items-center gap-2 truncate min-w-0">
+                <ArrowLeftRight className="h-4 w-4 sm:h-5 sm:w-5 flex-shrink-0" />
+                <span className="truncate">{offer.type === "buy" ? "Sell" : "Buy"} {offer.currency}</span>
               </CardTitle>
               <Badge className={offer.type === "buy" ? "bg-green-600" : "bg-red-600"}>
                 {offer.type.toUpperCase()} Offer

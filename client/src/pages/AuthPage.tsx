@@ -68,16 +68,16 @@ export default function AuthPage() {
   });
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background p-4">
+    <div className="min-h-screen flex items-center justify-center bg-background p-3 sm:p-4">
       <div className="w-full max-w-md">
-        <div className="text-center mb-8">
+        <div className="text-center mb-6 sm:mb-8">
           <div className="flex justify-center mb-4">
             <div className="p-3 bg-primary rounded-xl">
-              <Shield className="h-8 w-8 text-primary-foreground" />
+              <Shield className="h-7 sm:h-8 w-7 sm:w-8 text-primary-foreground" />
             </div>
           </div>
-          <h1 className="text-3xl font-bold text-foreground">KYC Marketplace</h1>
-          <p className="text-muted-foreground mt-2">Secure peer-to-peer trading platform</p>
+          <h1 className="text-2xl sm:text-3xl font-bold text-foreground truncate">KYC Marketplace</h1>
+          <p className="text-muted-foreground text-sm sm:text-base mt-2">Secure peer-to-peer trading</p>
         </div>
 
         <Card className="border-border bg-card/50 backdrop-blur">

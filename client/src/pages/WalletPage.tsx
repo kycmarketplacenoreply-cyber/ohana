@@ -236,8 +236,8 @@ export default function WalletPage() {
 
   return (
     <Layout>
-      <div className="space-y-8">
-        <h1 className="text-3xl font-bold text-foreground">Wallet</h1>
+      <div className="space-y-4 sm:space-y-8 px-2 sm:px-4">
+        <h1 className="text-2xl sm:text-3xl font-bold text-foreground truncate">Wallet</h1>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <Card className="bg-card border-border md:col-span-2">
