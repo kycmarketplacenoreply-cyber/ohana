@@ -5548,6 +5548,20 @@ export async function registerRoutes(
 
       await storage.updateUser(id, { role });
 
+      // Auto-grant verified badge when upgrading to vendor
+      if (role === "vendor") {
+        let vendorProfile = await storage.getVendorProfileByUserId(id);
+        if (!vendorProfile) {
+          vendorProfile = await storage.createVendorProfile({
+            userId: id,
+            businessName: null,
+            bio: null,
+            country: "",
+          });
+        }
+        await storage.updateVendorProfile(vendorProfile.id, { hasVerifyBadge: true });
+      }
+
       await storage.createAuditLog({
         userId: req.user!.userId,
         action: "user_role_changed",

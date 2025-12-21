@@ -947,7 +947,7 @@ export class DatabaseStorage implements IStorage {
         id: r.author.id,
         username: r.author.username,
         profilePicture: r.author.profilePicture,
-        isVerifiedVendor: r.vendorProfile?.isApproved || false,
+        isVerifiedVendor: r.vendorProfile?.hasVerifyBadge || false,
       },
     }));
   }
@@ -1000,7 +1000,7 @@ export class DatabaseStorage implements IStorage {
         id: r.author.id,
         username: r.author.username,
         profilePicture: r.author.profilePicture,
-        isVerifiedVendor: r.vendorProfile?.isApproved || false,
+        isVerifiedVendor: r.vendorProfile?.hasVerifyBadge || false,
       },
     }));
   }
@@ -1044,7 +1044,7 @@ export class DatabaseStorage implements IStorage {
       author: {
         id: r.author.id,
         username: r.author.username,
-        isVerifiedVendor: r.vendorProfile?.isApproved || false,
+        isVerifiedVendor: r.vendorProfile?.hasVerifyBadge || false,
       },
     }));
   }
