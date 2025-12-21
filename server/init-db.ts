@@ -477,6 +477,7 @@ async function createBlockchainTables() {
       confirmations INTEGER NOT NULL DEFAULT 0,
       required_confirmations INTEGER NOT NULL DEFAULT 15,
       status deposit_status NOT NULL DEFAULT 'pending',
+      confirmed_at TIMESTAMP,
       credited_at TIMESTAMP,
       credited_transaction_id VARCHAR,
       detected_at TIMESTAMP NOT NULL DEFAULT now(),
@@ -510,6 +511,7 @@ async function createBlockchainTables() {
       hot_wallet_balance_cap NUMERIC(18, 8) NOT NULL DEFAULT 100000,
       per_user_daily_withdrawal_limit NUMERIC(18, 8) NOT NULL DEFAULT 10000,
       platform_daily_withdrawal_limit NUMERIC(18, 8) NOT NULL DEFAULT 100000,
+      min_deposit_amount NUMERIC(18, 8) NOT NULL DEFAULT 5,
       min_withdrawal_amount NUMERIC(18, 8) NOT NULL DEFAULT 10,
       withdrawal_fee_percent NUMERIC(5, 2) NOT NULL DEFAULT 0.1,
       withdrawal_fee_fixed NUMERIC(18, 8) NOT NULL DEFAULT 1,
@@ -569,6 +571,8 @@ async function createBlockchainTables() {
 async function runMigrations() {
   const migrations = [
     `ALTER TABLE users ADD COLUMN IF NOT EXISTS profile_picture TEXT;`,
+    `ALTER TABLE blockchain_deposits ADD COLUMN IF NOT EXISTS confirmed_at TIMESTAMP;`,
+    `ALTER TABLE platform_wallet_controls ADD COLUMN IF NOT EXISTS min_deposit_amount NUMERIC(18, 8) NOT NULL DEFAULT 5;`,
     `ALTER TABLE loader_ads ADD COLUMN IF NOT EXISTS loader_fee_reserve DECIMAL(20, 8) DEFAULT '0';`,
     `ALTER TABLE loader_orders ADD COLUMN IF NOT EXISTS loader_fee_reserve DECIMAL(20, 8) DEFAULT '0';`,
     `ALTER TABLE loader_orders ADD COLUMN IF NOT EXISTS receiver_fee_reserve DECIMAL(20, 8) DEFAULT '0';`,
