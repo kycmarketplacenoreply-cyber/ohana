@@ -5715,5 +5715,89 @@ export async function registerRoutes(
     }
   });
 
+  // ==================== SUPPORT TICKETS ====================
+
+  // Submit support ticket
+  app.post("/api/support/tickets", requireAuth, async (req: AuthRequest, res) => {
+    try {
+      const { subject, message } = req.body;
+      if (!subject || !message) {
+        return res.status(400).json({ message: "Subject and message are required" });
+      }
+
+      const ticket = await storage.createSupportTicket({
+        userId: req.user!.userId,
+        subject,
+        message,
+      });
+
+      res.json(ticket);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Get user's support tickets
+  app.get("/api/support/tickets", requireAuth, async (req: AuthRequest, res) => {
+    try {
+      const tickets = await storage.getSupportTicketsByUser(req.user!.userId);
+      res.json(tickets);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Get support ticket details
+  app.get("/api/support/tickets/:id", requireAuth, async (req: AuthRequest, res) => {
+    try {
+      const ticket = await storage.getSupportTicket(req.params.id);
+      if (!ticket) {
+        return res.status(404).json({ message: "Ticket not found" });
+      }
+
+      // Verify ownership or admin access
+      const isAdmin = req.user!.role === "admin" || req.user!.role === "support";
+      if (ticket.userId !== req.user!.userId && !isAdmin) {
+        return res.status(403).json({ message: "Unauthorized" });
+      }
+
+      const messages = await storage.getSupportMessagesByTicket(ticket.id);
+      res.json({ ...ticket, messages });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Add message to support ticket
+  app.post("/api/support/tickets/:id/messages", requireAuth, async (req: AuthRequest, res) => {
+    try {
+      const { message } = req.body;
+      if (!message) {
+        return res.status(400).json({ message: "Message is required" });
+      }
+
+      const ticket = await storage.getSupportTicket(req.params.id);
+      if (!ticket) {
+        return res.status(404).json({ message: "Ticket not found" });
+      }
+
+      // Verify ownership or admin access
+      const isAdmin = req.user!.role === "admin" || req.user!.role === "support";
+      if (ticket.userId !== req.user!.userId && !isAdmin) {
+        return res.status(403).json({ message: "Unauthorized" });
+      }
+
+      const newMessage = await storage.createSupportMessage({
+        ticketId: req.params.id,
+        senderId: req.user!.userId,
+        message,
+      });
+
+      res.json(newMessage);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   return httpServer;
 }

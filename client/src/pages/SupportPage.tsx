@@ -116,6 +116,9 @@ export default function SupportPage() {
   const [ticketSubject, setTicketSubject] = useState("");
   const [ticketMessage, setTicketMessage] = useState("");
   const [submittingTicket, setSubmittingTicket] = useState(false);
+  const [selectedTicket, setSelectedTicket] = useState<string | null>(null);
+  const [newMessageText, setNewMessageText] = useState("");
+  const [sendingMessage, setSendingMessage] = useState(false);
 
   const isAdmin = user?.role === "admin" || user?.role === "support";
 
@@ -163,6 +166,26 @@ export default function SupportPage() {
       return res.json();
     },
     enabled: false,
+  });
+
+  const { data: userTickets, isLoading: loadingTickets } = useQuery({
+    queryKey: ["support-tickets"],
+    queryFn: async () => {
+      const res = await fetchWithAuth("/api/support/tickets");
+      if (!res.ok) throw new Error("Failed to fetch tickets");
+      return res.json();
+    },
+  });
+
+  const { data: selectedTicketData, isLoading: loadingTicketDetail } = useQuery({
+    queryKey: ["support-ticket", selectedTicket],
+    queryFn: async () => {
+      if (!selectedTicket) return null;
+      const res = await fetchWithAuth(`/api/support/tickets/${selectedTicket}`);
+      if (!res.ok) throw new Error("Failed to fetch ticket");
+      return res.json();
+    },
+    enabled: !!selectedTicket,
   });
 
   const approveKycMutation = useMutation({
@@ -290,6 +313,30 @@ export default function SupportPage() {
     }
   };
 
+  const handleSendMessage = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newMessageText.trim() || !selectedTicket) {
+      toast({ variant: "destructive", title: "Error", description: "Please enter a message" });
+      return;
+    }
+
+    setSendingMessage(true);
+    try {
+      const res = await fetchWithAuth(`/api/support/tickets/${selectedTicket}/messages`, {
+        method: "POST",
+        body: JSON.stringify({ message: newMessageText }),
+      });
+      if (!res.ok) throw new Error("Failed to send message");
+      toast({ title: "Success", description: "Message sent!" });
+      setNewMessageText("");
+      queryClient.invalidateQueries({ queryKey: ["support-ticket", selectedTicket] });
+    } catch (error) {
+      toast({ variant: "destructive", title: "Error", description: "Failed to send message" });
+    } finally {
+      setSendingMessage(false);
+    }
+  };
+
   return (
     <Layout>
       <div className="space-y-4 sm:space-y-6 px-2 sm:px-4" data-testid="support-page">
@@ -298,47 +345,114 @@ export default function SupportPage() {
           <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white truncate">Customer Support</h1>
         </div>
 
-        {/* Customer Support Ticket Form */}
+        {/* Customer Support - Chat View */}
         {!isAdmin && (
-          <Card className="bg-blue-50 dark:bg-blue-950/30 border-blue-200 dark:border-blue-800">
-            <CardHeader>
-              <CardTitle className="text-gray-900 dark:text-white">Report Issue or Get Help</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <form onSubmit={handleSubmitTicket} className="space-y-4">
-                <div>
-                  <Label htmlFor="subject" className="text-gray-700 dark:text-gray-300">Subject</Label>
-                  <Input
-                    id="subject"
-                    placeholder="What's the issue? (e.g., 'Withdrawal not received', 'Cannot post ads')"
-                    value={ticketSubject}
-                    onChange={(e) => setTicketSubject(e.target.value)}
-                    className="mt-2 bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-700"
-                    data-testid="input-ticket-subject"
-                  />
+          <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 h-96 lg:h-full">
+            {/* Tickets List */}
+            <div className="lg:col-span-1 bg-gray-50 dark:bg-gray-900/50 rounded-lg border border-gray-200 dark:border-gray-800 overflow-hidden flex flex-col">
+              <div className="p-4 border-b border-gray-200 dark:border-gray-800">
+                <h3 className="font-semibold text-gray-900 dark:text-white">Your Tickets</h3>
+              </div>
+              <div className="flex-1 overflow-y-auto space-y-2 p-2">
+                {loadingTickets ? (
+                  <div className="space-y-2 p-2">
+                    {[1,2,3].map(i => <Skeleton key={i} className="h-12 bg-gray-200 dark:bg-gray-800" />)}
+                  </div>
+                ) : userTickets?.length === 0 ? (
+                  <div className="p-4 text-center text-sm text-gray-500">No tickets yet</div>
+                ) : (
+                  userTickets?.map((ticket: any) => (
+                    <button
+                      key={ticket.id}
+                      onClick={() => setSelectedTicket(ticket.id)}
+                      className={`w-full text-left p-3 rounded-lg transition-colors ${selectedTicket === ticket.id ? "bg-blue-600 text-white" : "bg-white dark:bg-gray-800 text-gray-900 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-700"}`}
+                      data-testid={`ticket-item-${ticket.id}`}
+                    >
+                      <div className="font-medium text-sm truncate">{ticket.subject}</div>
+                      <div className={`text-xs truncate ${selectedTicket === ticket.id ? "text-blue-100" : "text-gray-500 dark:text-gray-400"}`}>{new Date(ticket.createdAt).toLocaleDateString()}</div>
+                    </button>
+                  ))
+                )}
+              </div>
+            </div>
+
+            {/* Chat View or New Ticket Form */}
+            <div className="lg:col-span-3 bg-white dark:bg-gray-900/50 rounded-lg border border-gray-200 dark:border-gray-800 overflow-hidden flex flex-col">
+              {selectedTicket && selectedTicketData ? (
+                // Existing Ticket Chat
+                <>
+                  <div className="p-4 border-b border-gray-200 dark:border-gray-800">
+                    <h3 className="font-semibold text-gray-900 dark:text-white">{selectedTicketData.subject}</h3>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">Status: <span className="capitalize">{selectedTicketData.status}</span></p>
+                  </div>
+                  <div className="flex-1 overflow-y-auto p-4 space-y-3">
+                    <div className="p-3 bg-gray-100 dark:bg-gray-800 rounded-lg">
+                      <p className="text-sm text-gray-900 dark:text-white">{selectedTicketData.message}</p>
+                      <p className="text-xs text-gray-500 mt-2">{new Date(selectedTicketData.createdAt).toLocaleString()}</p>
+                    </div>
+                    {selectedTicketData.messages?.sort((a: any, b: any) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()).map((msg: any) => (
+                      <div key={msg.id} className={`flex ${msg.senderId === user?.id ? "justify-end" : "justify-start"}`}>
+                        <div className={`p-3 rounded-lg max-w-xs ${msg.senderId === user?.id ? "bg-blue-600 text-white" : "bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white"}`}>
+                          <p className="text-sm">{msg.message}</p>
+                          <p className={`text-xs mt-1 ${msg.senderId === user?.id ? "text-blue-100" : "text-gray-500"}`}>{new Date(msg.createdAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  <form onSubmit={handleSendMessage} className="p-4 border-t border-gray-200 dark:border-gray-800 flex gap-2">
+                    <input
+                      type="text"
+                      value={newMessageText}
+                      onChange={(e) => setNewMessageText(e.target.value)}
+                      placeholder="Type a message..."
+                      className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm"
+                      data-testid="input-message"
+                    />
+                    <Button type="submit" disabled={sendingMessage} className="bg-blue-600 hover:bg-blue-700 text-white" data-testid="button-send-message">
+                      {sendingMessage ? "..." : "Send"}
+                    </Button>
+                  </form>
+                </>
+              ) : (
+                // New Ticket Form
+                <div className="flex-1 flex items-center justify-center p-4">
+                  <form onSubmit={handleSubmitTicket} className="w-full max-w-md space-y-4">
+                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white text-center">Create a New Support Ticket</h3>
+                    <div>
+                      <Label htmlFor="subject" className="text-gray-700 dark:text-gray-300">Subject</Label>
+                      <Input
+                        id="subject"
+                        placeholder="What's the issue?"
+                        value={ticketSubject}
+                        onChange={(e) => setTicketSubject(e.target.value)}
+                        className="mt-2 bg-white dark:bg-gray-800"
+                        data-testid="input-ticket-subject"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="message" className="text-gray-700 dark:text-gray-300">Message</Label>
+                      <Textarea
+                        id="message"
+                        placeholder="Describe the issue..."
+                        value={ticketMessage}
+                        onChange={(e) => setTicketMessage(e.target.value)}
+                        className="mt-2 bg-white dark:bg-gray-800 min-h-24"
+                        data-testid="textarea-ticket-message"
+                      />
+                    </div>
+                    <Button 
+                      type="submit" 
+                      className="w-full bg-blue-600 hover:bg-blue-700"
+                      disabled={submittingTicket}
+                      data-testid="button-submit-ticket"
+                    >
+                      {submittingTicket ? "Submitting..." : "Create Ticket"}
+                    </Button>
+                  </form>
                 </div>
-                <div>
-                  <Label htmlFor="message" className="text-gray-700 dark:text-gray-300">Message</Label>
-                  <Textarea
-                    id="message"
-                    placeholder="Please describe the issue in detail. Include order IDs or specific details if applicable..."
-                    value={ticketMessage}
-                    onChange={(e) => setTicketMessage(e.target.value)}
-                    className="mt-2 bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-700 min-h-32"
-                    data-testid="textarea-ticket-message"
-                  />
-                </div>
-                <Button 
-                  type="submit" 
-                  className="w-full bg-blue-600 hover:bg-blue-700 text-white"
-                  disabled={submittingTicket}
-                  data-testid="button-submit-ticket"
-                >
-                  {submittingTicket ? "Submitting..." : "Submit Support Ticket"}
-                </Button>
-              </form>
-            </CardContent>
-          </Card>
+              )}
+            </div>
+          </div>
         )}
 
         {isAdmin && (

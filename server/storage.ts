@@ -14,6 +14,8 @@ import {
   ratings,
   notifications,
   auditLogs,
+  supportTickets,
+  supportMessages,
   maintenanceSettings,
   themeSettings,
   withdrawalRequests,
@@ -104,6 +106,10 @@ import {
   type InsertUserWithdrawalLimit,
   type UserFirstWithdrawal,
   type InsertUserFirstWithdrawal,
+  type SupportTicket,
+  type InsertSupportTicket,
+  type SupportMessage,
+  type InsertSupportMessage,
 } from "@shared/schema";
 
 export interface IStorage {
@@ -358,6 +364,16 @@ export interface IStorage {
   getWithdrawalRequestsByUser(userId: string): Promise<WithdrawalRequest[]>;
   getApprovedWithdrawalRequests(): Promise<WithdrawalRequest[]>;
   getTodayPlatformWithdrawalTotal(): Promise<string>;
+
+  // Support Tickets
+  createSupportTicket(ticket: InsertSupportTicket): Promise<SupportTicket>;
+  getSupportTicketsByUser(userId: string): Promise<SupportTicket[]>;
+  getSupportTicket(id: string): Promise<SupportTicket | undefined>;
+  updateSupportTicket(id: string, updates: Partial<SupportTicket>): Promise<SupportTicket | undefined>;
+  
+  // Support Messages
+  createSupportMessage(message: InsertSupportMessage): Promise<SupportMessage>;
+  getSupportMessagesByTicket(ticketId: string): Promise<SupportMessage[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1750,6 +1766,36 @@ export class DatabaseStorage implements IStorage {
         )
       );
     return result[0]?.total || "0";
+  }
+
+  // Support Tickets
+  async createSupportTicket(ticket: InsertSupportTicket): Promise<SupportTicket> {
+    const [newTicket] = await db.insert(supportTickets).values(ticket).returning();
+    return newTicket;
+  }
+
+  async getSupportTicketsByUser(userId: string): Promise<SupportTicket[]> {
+    return await db.select().from(supportTickets).where(eq(supportTickets.userId, userId)).orderBy(desc(supportTickets.createdAt));
+  }
+
+  async getSupportTicket(id: string): Promise<SupportTicket | undefined> {
+    const [ticket] = await db.select().from(supportTickets).where(eq(supportTickets.id, id));
+    return ticket || undefined;
+  }
+
+  async updateSupportTicket(id: string, updates: Partial<SupportTicket>): Promise<SupportTicket | undefined> {
+    const [ticket] = await db.update(supportTickets).set({ ...updates, updatedAt: new Date() }).where(eq(supportTickets.id, id)).returning();
+    return ticket || undefined;
+  }
+
+  // Support Messages
+  async createSupportMessage(message: InsertSupportMessage): Promise<SupportMessage> {
+    const [newMessage] = await db.insert(supportMessages).values(message).returning();
+    return newMessage;
+  }
+
+  async getSupportMessagesByTicket(ticketId: string): Promise<SupportMessage[]> {
+    return await db.select().from(supportMessages).where(eq(supportMessages.ticketId, ticketId)).orderBy(desc(supportMessages.createdAt));
   }
 }
 

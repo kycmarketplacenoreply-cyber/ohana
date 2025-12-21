@@ -724,6 +724,19 @@ export const insertAuditLogSchema = createInsertSchema(auditLogs).omit({
   createdAt: true,
 });
 
+export const insertSupportTicketSchema = createInsertSchema(supportTickets).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+  status: true,
+  assignedTo: true,
+});
+
+export const insertSupportMessageSchema = createInsertSchema(supportMessages).omit({
+  id: true,
+  createdAt: true,
+});
+
 // Type Exports
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
@@ -1350,3 +1363,9 @@ export type UserWithdrawalLimit = typeof userWithdrawalLimits.$inferSelect;
 
 export type InsertUserFirstWithdrawal = z.infer<typeof insertUserFirstWithdrawalSchema>;
 export type UserFirstWithdrawal = typeof userFirstWithdrawals.$inferSelect;
+
+export type SupportTicket = typeof supportTickets.$inferSelect;
+export type InsertSupportTicket = z.infer<typeof insertSupportTicketSchema>;
+
+export type SupportMessage = typeof supportMessages.$inferSelect;
+export type InsertSupportMessage = z.infer<typeof insertSupportMessageSchema>;
