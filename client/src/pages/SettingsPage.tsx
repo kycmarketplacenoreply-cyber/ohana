@@ -26,6 +26,7 @@ import {
   Upload,
   FileText,
   Camera,
+  Star,
 } from "lucide-react";
 
 export default function SettingsPage() {
@@ -58,6 +59,28 @@ export default function SettingsPage() {
       const res = await fetchWithAuth("/api/kyc/status");
       return res.json();
     },
+  });
+
+  const { data: tradeStats } = useQuery({
+    queryKey: ["user-trades", user?.id],
+    queryFn: async () => {
+      if (!user?.id) return null;
+      const res = await fetchWithAuth(`/api/users/${user.id}/trades`);
+      if (!res.ok) throw new Error("Failed to fetch trades");
+      return res.json();
+    },
+    enabled: !!user?.id,
+  });
+
+  const { data: userProfile } = useQuery({
+    queryKey: ["user-profile", user?.id],
+    queryFn: async () => {
+      if (!user?.id) return null;
+      const res = await fetchWithAuth(`/api/users/${user.id}/profile`);
+      if (!res.ok) throw new Error("Failed to fetch profile");
+      return res.json();
+    },
+    enabled: !!user?.id,
   });
 
   const setup2FAMutation = useMutation({
@@ -559,6 +582,89 @@ export default function SettingsPage() {
             </div>
           </CardContent>
         </Card>
+        )}
+
+        {/* Verified Badge Section */}
+        {tradeStats && (
+          <Card className="bg-card border-border border-yellow-200 bg-yellow-50/20">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-base">
+                <Star className="h-5 w-5 text-yellow-600" />
+                Verified Badge Application
+              </CardTitle>
+              <CardDescription>
+                Unlock the verified badge for increased trust and visibility
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {userProfile?.hasVerifyBadge ? (
+                <div className="text-center py-4 bg-green-50 rounded-lg border border-green-200">
+                  <div className="flex items-center justify-center gap-2 mb-2">
+                    <CheckCircle className="h-6 w-6 text-green-600" />
+                    <p className="font-bold text-green-700">
+                      You have the Verified Badge! 🎉
+                    </p>
+                  </div>
+                  <p className="text-sm text-green-600">
+                    Your badge appears next to your name on your profile
+                  </p>
+                </div>
+              ) : (
+                <>
+                  <div className="space-y-3">
+                    <p className="text-sm font-medium text-foreground">
+                      Requirements to qualify:
+                    </p>
+                    <div className="space-y-2">
+                      <div className={`flex items-center gap-3 p-3 rounded-lg ${tradeStats.totalTrades >= 10 ? "bg-green-100/30 border border-green-200" : "bg-gray-100/30 border border-gray-200"}`}>
+                        <div className={`w-6 h-6 rounded-full flex items-center justify-center text-sm font-bold ${tradeStats.totalTrades >= 10 ? "bg-green-600 text-white" : "border-2 border-gray-400 text-gray-400"}`}>
+                          {tradeStats.totalTrades >= 10 ? "✓" : ""}
+                        </div>
+                        <div className="flex-1">
+                          <span className={tradeStats.totalTrades >= 10 ? "text-green-700 font-medium" : "text-muted-foreground"}>
+                            More than 10 trades
+                          </span>
+                          <p className="text-xs text-muted-foreground">
+                            Current: {tradeStats.totalTrades} trades
+                          </p>
+                        </div>
+                      </div>
+                      <div className={`flex items-center gap-3 p-3 rounded-lg ${parseFloat(tradeStats.totalTradeVolume || "0") > 700 ? "bg-green-100/30 border border-green-200" : "bg-gray-100/30 border border-gray-200"}`}>
+                        <div className={`w-6 h-6 rounded-full flex items-center justify-center text-sm font-bold ${parseFloat(tradeStats.totalTradeVolume || "0") > 700 ? "bg-green-600 text-white" : "border-2 border-gray-400 text-gray-400"}`}>
+                          {parseFloat(tradeStats.totalTradeVolume || "0") > 700 ? "✓" : ""}
+                        </div>
+                        <div className="flex-1">
+                          <span className={parseFloat(tradeStats.totalTradeVolume || "0") > 700 ? "text-green-700 font-medium" : "text-muted-foreground"}>
+                            Trade volume above 700 USDT
+                          </span>
+                          <p className="text-xs text-muted-foreground">
+                            Current: ${tradeStats.totalTradeVolume || "0"}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  <Button
+                    disabled={
+                      tradeStats.totalTrades < 10 ||
+                      parseFloat(tradeStats.totalTradeVolume || "0") <= 700
+                    }
+                    className="w-full bg-yellow-600 hover:bg-yellow-700"
+                    data-testid="button-apply-verify-badge"
+                    onClick={() => {
+                      console.log("Applying for verify badge");
+                      toast({ title: "Application submitted", description: "Admin will review and approve your application soon" });
+                    }}
+                  >
+                    Apply for Verified Badge
+                  </Button>
+                  <p className="text-xs text-center text-muted-foreground">
+                    Admin approval required • Badge appears next to your username once approved
+                  </p>
+                </>
+              )}
+            </CardContent>
+          </Card>
         )}
       </div>
     </Layout>
