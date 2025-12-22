@@ -482,17 +482,17 @@ export default function SupportPage() {
             {/* All Tickets List */}
             <div className="lg:col-span-1 bg-gray-50 dark:bg-gray-900/50 rounded-lg border border-gray-200 dark:border-gray-800 overflow-hidden flex flex-col min-h-96">
               <div className="p-4 border-b border-gray-200 dark:border-gray-800">
-                <h3 className="font-semibold text-gray-900 dark:text-white">Support Queue ({userTickets?.length || 0})</h3>
+                <h3 className="font-semibold text-gray-900 dark:text-white">Support Queue ({userTickets?.filter((t: any) => t.status !== "solved").length || 0})</h3>
               </div>
               <div className="flex-1 overflow-y-auto space-y-2 p-2">
                 {loadingTickets ? (
                   <div className="space-y-2 p-2">
                     {[1,2,3].map(i => <Skeleton key={i} className="h-12 bg-gray-200 dark:bg-gray-800" />)}
                   </div>
-                ) : !userTickets || userTickets.length === 0 ? (
+                ) : !userTickets || userTickets.filter((t: any) => t.status !== "solved").length === 0 ? (
                   <div className="p-4 text-center text-sm text-gray-500">No open tickets</div>
                 ) : (
-                  userTickets.map((ticket: any) => (
+                  userTickets.filter((ticket: any) => ticket.status !== "solved").map((ticket: any) => (
                     <button
                       key={ticket.id}
                       onClick={() => setSelectedTicket(ticket.id)}
