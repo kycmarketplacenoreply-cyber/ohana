@@ -54,14 +54,17 @@ export async function registerRoutes(
       const code = generateVerificationCode();
       const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
       
-      await sendVerificationEmail(email, code);
+      const emailSent = await sendVerificationEmail(email, code);
+      if (!emailSent) {
+        console.warn(`Warning: Email sending returned false for ${email}, but continuing...`);
+      }
       
       res.json({
         message: "Verification code sent to your email",
         expirationMinutes: 10,
-        code, // For development only - remove in production
       });
     } catch (error: any) {
+      console.error("Send verification code error:", error);
       res.status(400).json({ message: error.message || "Failed to send verification code" });
     }
   });

@@ -5,6 +5,8 @@ const gmailSender = "kycmarketplace.noreply@gmail.com";
 
 if (!gmailAppPassword) {
   console.warn("⚠️  GMAIL_APP_PASSWORD not set - email sending will be disabled");
+} else {
+  console.log("✅ Gmail configured - email sending enabled");
 }
 
 const transporter = gmailAppPassword
@@ -27,6 +29,7 @@ export async function sendVerificationEmail(
   }
 
   try {
+    console.log(`Sending verification email to ${email}...`);
     await transporter.sendMail({
       from: gmailSender,
       to: email,
@@ -43,9 +46,10 @@ export async function sendVerificationEmail(
         </div>
       `,
     });
+    console.log(`✅ Verification email sent to ${email}`);
     return true;
-  } catch (error) {
-    console.error("Email sending failed:", error);
+  } catch (error: any) {
+    console.error(`❌ Email sending failed for ${email}:`, error.message);
     return false;
   }
 }
