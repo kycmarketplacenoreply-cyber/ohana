@@ -131,12 +131,12 @@ export default function AuthPage() {
                   </div>
                   {requires2FA && (
                     <div className="space-y-2">
-                      <Label htmlFor="2fa-token" className="text-gray-300">2FA Code</Label>
+                      <Label htmlFor="2fa-token" className="text-foreground">2FA Code</Label>
                       <Input
                         id="2fa-token"
                         data-testid="input-2fa-token"
                         placeholder="Enter 6-digit code"
-                        className="bg-gray-800 border-gray-700 text-white text-center text-lg tracking-widest"
+                        className="bg-muted border-border text-foreground text-center text-lg tracking-widest"
                         maxLength={6}
                         value={loginForm.twoFactorToken}
                         onChange={(e) => setLoginForm({ ...loginForm, twoFactorToken: e.target.value })}
@@ -146,7 +146,7 @@ export default function AuthPage() {
                   <Button
                     type="submit"
                     data-testid="button-login"
-                    className="w-full bg-purple-600 hover:bg-purple-700"
+                    className="w-full"
                     disabled={loginMutation.isPending}
                   >
                     {loginMutation.isPending ? "Signing in..." : "Sign In"}
@@ -163,44 +163,44 @@ export default function AuthPage() {
                   className="space-y-4"
                 >
                   <div className="space-y-2">
-                    <Label htmlFor="register-username" className="text-gray-300">Username</Label>
+                    <Label htmlFor="register-username" className="text-foreground">Username</Label>
                     <div className="relative">
-                      <User className="absolute left-3 top-2.5 h-5 w-5 text-gray-500" />
+                      <User className="absolute left-3 top-2.5 h-5 w-5 text-muted-foreground" />
                       <Input
                         id="register-username"
                         data-testid="input-register-username"
                         placeholder="Choose username"
-                        className="pl-10 bg-gray-800 border-gray-700 text-white"
+                        className="pl-10 bg-muted border-border text-foreground"
                         value={registerForm.username}
                         onChange={(e) => setRegisterForm({ ...registerForm, username: e.target.value })}
                       />
                     </div>
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="register-email" className="text-gray-300">Email</Label>
+                    <Label htmlFor="register-email" className="text-foreground">Email</Label>
                     <div className="relative">
-                      <Mail className="absolute left-3 top-2.5 h-5 w-5 text-gray-500" />
+                      <Mail className="absolute left-3 top-2.5 h-5 w-5 text-muted-foreground" />
                       <Input
                         id="register-email"
                         data-testid="input-register-email"
                         type="email"
                         placeholder="Enter email"
-                        className="pl-10 bg-gray-800 border-gray-700 text-white"
+                        className="pl-10 bg-muted border-border text-foreground"
                         value={registerForm.email}
                         onChange={(e) => setRegisterForm({ ...registerForm, email: e.target.value })}
                       />
                     </div>
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="register-password" className="text-gray-300">Password</Label>
+                    <Label htmlFor="register-password" className="text-foreground">Password</Label>
                     <div className="relative">
-                      <Lock className="absolute left-3 top-2.5 h-5 w-5 text-gray-500" />
+                      <Lock className="absolute left-3 top-2.5 h-5 w-5 text-muted-foreground" />
                       <Input
                         id="register-password"
                         data-testid="input-register-password"
                         type="password"
                         placeholder="Create password"
-                        className="pl-10 bg-gray-800 border-gray-700 text-white"
+                        className="pl-10 bg-muted border-border text-foreground"
                         value={registerForm.password}
                         onChange={(e) => setRegisterForm({ ...registerForm, password: e.target.value })}
                       />
@@ -209,7 +209,7 @@ export default function AuthPage() {
                   <Button
                     type="submit"
                     data-testid="button-register"
-                    className="w-full bg-purple-600 hover:bg-purple-700"
+                    className="w-full"
                     disabled={registerMutation.isPending}
                   >
                     {registerMutation.isPending ? "Creating account..." : "Create Account"}
