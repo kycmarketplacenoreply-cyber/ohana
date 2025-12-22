@@ -1,7 +1,5 @@
 import { eq, and, desc, sql, gte, lte, or, like, isNull, gt } from "drizzle-orm";
 import { emailVerificationCodes, passwordResetCodes, twoFactorResetCodes, type InsertEmailVerificationCode, type EmailVerificationCode, type InsertPasswordResetCode, type PasswordResetCode, type InsertTwoFactorResetCode, type TwoFactorResetCode } from "@shared/schema";
-import { emailVerificationCodes, passwordResetCodes, twoFactorResetCodes, type InsertEmailVerificationCode, type EmailVerificationCode, type InsertPasswordResetCode, type PasswordResetCode, type InsertTwoFactorResetCode, type TwoFactorResetCode } from "@shared/schema";
-import { emailVerificationCodes, passwordResetCodes, twoFactorResetCodes, type InsertEmailVerificationCode, type EmailVerificationCode, type InsertPasswordResetCode, type PasswordResetCode, type InsertTwoFactorResetCode, type TwoFactorResetCode } from "@shared/schema";
 import { db } from "./db";
 import {
   users,
@@ -388,23 +386,10 @@ export interface IStorage {
   createTwoFactorResetCode(code: InsertTwoFactorResetCode): Promise<TwoFactorResetCode>;
   getTwoFactorResetCode(userId: string): Promise<TwoFactorResetCode | undefined>;
   markTwoFactorResetAsUsed(codeId: string): Promise<void>;
+
   // Support Messages
   createSupportMessage(message: InsertSupportMessage): Promise<SupportMessage>;
   getSupportMessagesByTicket(ticketId: string): Promise<SupportMessage[]>;
-  // Email Verification Codes
-  createEmailVerificationCode(code: InsertEmailVerificationCode): Promise<EmailVerificationCode>;
-  getEmailVerificationCode(userId: string): Promise<EmailVerificationCode | undefined>;
-  markEmailVerificationAsUsed(codeId: string): Promise<void>;
-
-  // Password Reset Codes
-  createPasswordResetCode(code: InsertPasswordResetCode): Promise<PasswordResetCode>;
-  getPasswordResetCode(userId: string): Promise<PasswordResetCode | undefined>;
-  markPasswordResetAsUsed(codeId: string): Promise<void>;
-
-  // 2FA Reset Codes
-  createTwoFactorResetCode(code: InsertTwoFactorResetCode): Promise<TwoFactorResetCode>;
-  getTwoFactorResetCode(userId: string): Promise<TwoFactorResetCode | undefined>;
-  markTwoFactorResetAsUsed(codeId: string): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1827,6 +1812,7 @@ export class DatabaseStorage implements IStorage {
 
   async getSupportMessagesByTicket(ticketId: string): Promise<SupportMessage[]> {
     return await db.select().from(supportMessages).where(eq(supportMessages.ticketId, ticketId)).orderBy(desc(supportMessages.createdAt));
+  }
 
   // Email Verification
   async createEmailVerificationCode(code: InsertEmailVerificationCode): Promise<EmailVerificationCode> {
@@ -1873,3 +1859,5 @@ export class DatabaseStorage implements IStorage {
     await db.update(twoFactorResetCodes).set({ usedAt: new Date() }).where(eq(twoFactorResetCodes.id, codeId));
   }
 }
+
+export const storage = new DatabaseStorage();

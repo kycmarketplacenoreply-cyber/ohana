@@ -18,7 +18,7 @@ import {
   notifyAccountFrozen,
   notifyAccountUnfrozen
 } from "./services/notifications";
-import { insertUserSchema, insertKycSchema, insertVendorProfileSchema, insertOfferSchema, insertOrderSchema, insertRatingSchema, insertExchangeSchema, disputes, supportTickets } from "@shared/schema";
+import { insertUserSchema, insertKycSchema, insertVendorProfileSchema, insertOfferSchema, insertOrderSchema, insertExchangeSchema, disputes, supportTickets } from "@shared/schema";
 import { db } from "./db";
 import { emailVerificationLimiter, passwordResetLimiter, emailResendLimiter } from "./middleware/emailRateLimiter";
 import { sendVerificationEmail, sendPasswordResetEmail, send2FAResetEmail } from "./services/email";
@@ -6059,3 +6059,5 @@ export async function registerRoutes(
   });
 
   return httpServer;
+
+}
