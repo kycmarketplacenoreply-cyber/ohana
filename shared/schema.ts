@@ -94,6 +94,36 @@ export const users = pgTable("users", {
   updatedAt: timestamp("updated_at").notNull().default(sql`now()`),
 });
 
+// Email Verification Codes Table
+export const emailVerificationCodes = pgTable("email_verification_codes", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  code: text("code").notNull(),
+  expiresAt: timestamp("expires_at").notNull(),
+  usedAt: timestamp("used_at"),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+});
+
+// Password Reset Codes Table
+export const passwordResetCodes = pgTable("password_reset_codes", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  code: text("code").notNull(),
+  expiresAt: timestamp("expires_at").notNull(),
+  usedAt: timestamp("used_at"),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+});
+
+// 2FA Reset Codes Table
+export const twoFactorResetCodes = pgTable("two_factor_reset_codes", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  code: text("code").notNull(),
+  expiresAt: timestamp("expires_at").notNull(),
+  usedAt: timestamp("used_at"),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+});
+
 // KYC Table
 export const kyc = pgTable("kyc", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -414,6 +444,131 @@ export const socialMutes = pgTable("social_mutes", {
   createdAt: timestamp("created_at").notNull().default(sql`now()`),
 });
 
+// Loader Zone Tables (from your existing schema) - Placeholder for import
+export const loaderAds = pgTable("loader_ads", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  loaderId: varchar("loader_id").notNull().references(() => users.id),
+  title: text("title").notNull(),
+  description: text("description"),
+  countdownTime: countdownTimeEnum("countdown_time").notNull(),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+});
+
+export const loaderOrders = pgTable("loader_orders", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  adId: varchar("ad_id").notNull().references(() => loaderAds.id),
+  loaderId: varchar("loader_id").notNull().references(() => users.id),
+  receiverId: varchar("receiver_id").notNull().references(() => users.id),
+  status: loaderOrderStatusEnum("status").notNull(),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+});
+
+export const loaderOrderMessages = pgTable("loader_order_messages", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orderId: varchar("order_id").notNull().references(() => loaderOrders.id),
+  senderId: varchar("sender_id").notNull().references(() => users.id),
+  message: text("message").notNull(),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+});
+
+export const loaderDisputes = pgTable("loader_disputes", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orderId: varchar("order_id").notNull().references(() => loaderOrders.id),
+  openedBy: varchar("opened_by").notNull().references(() => users.id),
+  reason: text("reason").notNull(),
+  status: loaderDisputeStatusEnum("status").notNull(),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+});
+
+export const loaderFeedback = pgTable("loader_feedback", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orderId: varchar("order_id").notNull().references(() => loaderOrders.id),
+  fromUserId: varchar("from_user_id").notNull().references(() => users.id),
+  toUserId: varchar("to_user_id").notNull().references(() => users.id),
+  rating: integer("rating").notNull(),
+  comment: text("comment"),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+});
+
+export const loaderStats = pgTable("loader_stats", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  totalOrders: integer("total_orders").notNull().default(0),
+  completedOrders: integer("completed_orders").notNull().default(0),
+  averageRating: numeric("average_rating", { precision: 3, scale: 2 }).default("0"),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+  updatedAt: timestamp("updated_at").notNull().default(sql`now()`),
+});
+
+// Blockchain Wallet Tables
+export const userDepositAddresses = pgTable("user_deposit_addresses", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  address: text("address").notNull().unique(),
+  derivationIndex: integer("derivation_index").notNull(),
+  network: text("network").notNull().default("bsc"),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+});
+
+export const blockchainDeposits = pgTable("blockchain_deposits", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  depositAddressId: varchar("deposit_address_id").notNull().references(() => userDepositAddresses.id),
+  txHash: text("tx_hash").notNull().unique(),
+  amount: numeric("amount", { precision: 18, scale: 8 }).notNull(),
+  confirmations: integer("confirmations").notNull().default(0),
+  status: text("status").notNull().default("pending"),
+  credited: boolean("credited").notNull().default(false),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+});
+
+export const depositSweeps = pgTable("deposit_sweeps", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  depositId: varchar("deposit_id").notNull().references(() => blockchainDeposits.id),
+  sweepTxHash: text("sweep_tx_hash"),
+  status: text("status").notNull().default("pending"),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+});
+
+export const platformWalletControls = pgTable("platform_wallet_controls", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  totalDeposited: numeric("total_deposited", { precision: 18, scale: 8 }).notNull().default("0"),
+  totalSwept: numeric("total_swept", { precision: 18, scale: 8 }).notNull().default("0"),
+  lastSweepAt: timestamp("last_sweep_at"),
+  updatedAt: timestamp("updated_at").notNull().default(sql`now()`),
+});
+
+export const blockchainAdminActions = pgTable("blockchain_admin_actions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  adminId: varchar("admin_id").references(() => users.id),
+  action: text("action").notNull(),
+  txHash: text("tx_hash"),
+  amount: numeric("amount", { precision: 18, scale: 8 }),
+  metadata: jsonb("metadata"),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+});
+
+export const userWithdrawalLimits = pgTable("user_withdrawal_limits", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  date: text("date").notNull(),
+  totalWithdrawn: numeric("total_withdrawn", { precision: 18, scale: 8 }).notNull().default("0"),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+});
+
+export const userFirstWithdrawals = pgTable("user_first_withdrawals", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  amount: numeric("amount", { precision: 18, scale: 8 }).notNull(),
+  confirmed: boolean("confirmed").notNull().default(false),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+});
+
+export const walletIndexCounter = pgTable("wallet_index_counter", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  nextIndex: integer("next_index").notNull().default(0),
+});
+
 // Relations
 export const usersRelations = relations(users, ({ one, many }) => ({
   kyc: one(kyc, {
@@ -427,6 +582,30 @@ export const usersRelations = relations(users, ({ one, many }) => ({
   wallets: many(wallets),
   notifications: many(notifications),
   auditLogs: many(auditLogs),
+  emailVerificationCodes: many(emailVerificationCodes),
+  passwordResetCodes: many(passwordResetCodes),
+  twoFactorResetCodes: many(twoFactorResetCodes),
+}));
+
+export const emailVerificationCodesRelations = relations(emailVerificationCodes, ({ one }) => ({
+  user: one(users, {
+    fields: [emailVerificationCodes.userId],
+    references: [users.id],
+  }),
+}));
+
+export const passwordResetCodesRelations = relations(passwordResetCodes, ({ one }) => ({
+  user: one(users, {
+    fields: [passwordResetCodes.userId],
+    references: [users.id],
+  }),
+}));
+
+export const twoFactorResetCodesRelations = relations(twoFactorResetCodes, ({ one }) => ({
+  user: one(users, {
+    fields: [twoFactorResetCodes.userId],
+    references: [users.id],
+  }),
 }));
 
 export const kycRelations = relations(kyc, ({ one }) => ({
@@ -570,12 +749,9 @@ export const socialPostsRelations = relations(socialPosts, ({ one, many }) => ({
     fields: [socialPosts.authorId],
     references: [users.id],
   }),
-  originalPost: one(socialPosts, {
-    fields: [socialPosts.originalPostId],
-    references: [socialPosts.id],
-  }),
   comments: many(socialComments),
   likes: many(socialLikes),
+  dislikes: many(socialDislikes),
 }));
 
 export const socialCommentsRelations = relations(socialComments, ({ one }) => ({
@@ -600,772 +776,189 @@ export const socialLikesRelations = relations(socialLikes, ({ one }) => ({
   }),
 }));
 
+export const socialDislikesRelations = relations(socialDislikes, ({ one }) => ({
+  post: one(socialPosts, {
+    fields: [socialDislikes.postId],
+    references: [socialPosts.id],
+  }),
+  user: one(users, {
+    fields: [socialDislikes.userId],
+    references: [users.id],
+  }),
+}));
+
 export const socialMutesRelations = relations(socialMutes, ({ one }) => ({
   user: one(users, {
     fields: [socialMutes.userId],
     references: [users.id],
   }),
-  moderator: one(users, {
+  mutedByUser: one(users, {
     fields: [socialMutes.mutedBy],
     references: [users.id],
   }),
 }));
 
-// Insert Schemas
-export const insertUserSchema = createInsertSchema(users).omit({
-  id: true,
-  createdAt: true,
-  updatedAt: true,
-  lastLoginAt: true,
-  loginAttempts: true,
-  deviceFingerprints: true,
-  isActive: true,
-  isFrozen: true,
-  frozenReason: true,
-  emailVerified: true,
-  twoFactorEnabled: true,
-  twoFactorSecret: true,
-  twoFactorRecoveryCodes: true,
-});
+// Zod Schemas
+const baseUserSchema = {
+  username: z.string().trim().min(1, "Username is required").regex(/^[a-z0-9_]+$/, "Username can only contain lowercase letters, numbers, and underscores").min(3, "Username must be at least 3 characters"),
+  email: z.string().trim().min(1, "Email is required").email("Invalid email format"),
+  password: z.string().min(8, "Password must be at least 8 characters"),
+};
 
-export const insertKycSchema = createInsertSchema(kyc).omit({
-  id: true,
-  submittedAt: true,
-  reviewedAt: true,
-  reviewedBy: true,
-  status: true,
-  tier: true,
-  adminNotes: true,
-  rejectionReason: true,
-  faceMatchScore: true,
-});
+export const insertUserSchema = createInsertSchema(users, {
+  username: z.string().trim().min(1, "Username is required").regex(/^[a-z0-9_]+$/, "Username can only contain lowercase letters, numbers, and underscores").min(3, "Username must be at least 3 characters"),
+  email: z.string().trim().min(1, "Email is required").email("Invalid email format"),
+  password: z.string().min(8, "Password must be at least 8 characters"),
+}).omit({ id: true, createdAt: true, updatedAt: true });
 
-export const insertVendorProfileSchema = createInsertSchema(vendorProfiles).omit({
-  id: true,
-  createdAt: true,
-  updatedAt: true,
-  totalTrades: true,
-  completedTrades: true,
-  cancelledTrades: true,
-  averageRating: true,
-  totalRatings: true,
-  suspiciousActivityScore: true,
-  isApproved: true,
-});
-
-export const insertOfferSchema = createInsertSchema(offers).omit({
-  id: true,
-  createdAt: true,
-  updatedAt: true,
-  isPriority: true,
-});
-
-export const insertOrderSchema = createInsertSchema(orders).omit({
-  id: true,
-  createdAt: true,
-  updatedAt: true,
-  status: true,
-  buyerPaidAt: true,
-  vendorConfirmedAt: true,
-  completedAt: true,
-  escrowHeldAt: true,
-  escrowReleasedAt: true,
-  autoReleaseAt: true,
-  cancelReason: true,
-});
-
-export const insertChatMessageSchema = createInsertSchema(chatMessages).omit({
-  id: true,
-  createdAt: true,
-  isSystemMessage: true,
-});
-
-export const insertDisputeSchema = createInsertSchema(disputes).omit({
-  id: true,
-  createdAt: true,
-  resolvedAt: true,
-  status: true,
-  resolution: true,
-  resolvedBy: true,
-  adminNotes: true,
-});
-
-export const insertDisputeChatMessageSchema = createInsertSchema(disputeChatMessages).omit({
-  id: true,
-  createdAt: true,
-});
-
-export const insertWalletSchema = createInsertSchema(wallets).omit({
-  id: true,
-  createdAt: true,
-  updatedAt: true,
-  availableBalance: true,
-  escrowBalance: true,
-});
-
-export const insertTransactionSchema = createInsertSchema(transactions).omit({
-  id: true,
-  createdAt: true,
-});
-
-export const insertRatingSchema = createInsertSchema(ratings).omit({
-  id: true,
-  createdAt: true,
-});
-
-export const insertNotificationSchema = createInsertSchema(notifications).omit({
-  id: true,
-  createdAt: true,
-  isRead: true,
-});
-
-export const insertAuditLogSchema = createInsertSchema(auditLogs).omit({
-  id: true,
-  createdAt: true,
-});
-
-export const insertSupportTicketSchema = createInsertSchema(supportTickets).omit({
-  id: true,
-  createdAt: true,
-  updatedAt: true,
-  status: true,
-  assignedTo: true,
-});
-
-export const insertSupportMessageSchema = createInsertSchema(supportMessages).omit({
-  id: true,
-  createdAt: true,
-});
-
-// Type Exports
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
 
+export const insertEmailVerificationCodeSchema = createInsertSchema(emailVerificationCodes).omit({ id: true, createdAt: true });
+export type InsertEmailVerificationCode = z.infer<typeof insertEmailVerificationCodeSchema>;
+export type EmailVerificationCode = typeof emailVerificationCodes.$inferSelect;
+
+export const insertPasswordResetCodeSchema = createInsertSchema(passwordResetCodes).omit({ id: true, createdAt: true });
+export type InsertPasswordResetCode = z.infer<typeof insertPasswordResetCodeSchema>;
+export type PasswordResetCode = typeof passwordResetCodes.$inferSelect;
+
+export const insertTwoFactorResetCodeSchema = createInsertSchema(twoFactorResetCodes).omit({ id: true, createdAt: true });
+export type InsertTwoFactorResetCode = z.infer<typeof insertTwoFactorResetCodeSchema>;
+export type TwoFactorResetCode = typeof twoFactorResetCodes.$inferSelect;
+
+export const insertKycSchema = createInsertSchema(kyc).omit({ id: true, submittedAt: true, reviewedAt: true });
 export type InsertKyc = z.infer<typeof insertKycSchema>;
 export type Kyc = typeof kyc.$inferSelect;
 
+export const insertVendorProfileSchema = createInsertSchema(vendorProfiles).omit({ id: true, createdAt: true, updatedAt: true });
 export type InsertVendorProfile = z.infer<typeof insertVendorProfileSchema>;
 export type VendorProfile = typeof vendorProfiles.$inferSelect;
 
+export const insertOfferSchema = createInsertSchema(offers).omit({ id: true, createdAt: true, updatedAt: true });
 export type InsertOffer = z.infer<typeof insertOfferSchema>;
 export type Offer = typeof offers.$inferSelect;
 
+export const insertOrderSchema = createInsertSchema(orders).omit({ id: true, createdAt: true, updatedAt: true });
 export type InsertOrder = z.infer<typeof insertOrderSchema>;
 export type Order = typeof orders.$inferSelect;
 
+export const insertChatMessageSchema = createInsertSchema(chatMessages).omit({ id: true, createdAt: true });
 export type InsertChatMessage = z.infer<typeof insertChatMessageSchema>;
 export type ChatMessage = typeof chatMessages.$inferSelect;
 
+export const insertDisputeSchema = createInsertSchema(disputes).omit({ id: true, createdAt: true, resolvedAt: true });
 export type InsertDispute = z.infer<typeof insertDisputeSchema>;
 export type Dispute = typeof disputes.$inferSelect;
 
+export const insertDisputeChatMessageSchema = createInsertSchema(disputeChatMessages).omit({ id: true, createdAt: true });
 export type InsertDisputeChatMessage = z.infer<typeof insertDisputeChatMessageSchema>;
 export type DisputeChatMessage = typeof disputeChatMessages.$inferSelect;
 
+export const insertWalletSchema = createInsertSchema(wallets).omit({ id: true, createdAt: true, updatedAt: true });
 export type InsertWallet = z.infer<typeof insertWalletSchema>;
 export type Wallet = typeof wallets.$inferSelect;
 
+export const insertTransactionSchema = createInsertSchema(transactions).omit({ id: true, createdAt: true });
 export type InsertTransaction = z.infer<typeof insertTransactionSchema>;
 export type Transaction = typeof transactions.$inferSelect;
 
+export const insertRatingSchema = createInsertSchema(ratings).omit({ id: true, createdAt: true });
 export type InsertRating = z.infer<typeof insertRatingSchema>;
 export type Rating = typeof ratings.$inferSelect;
 
+export const insertNotificationSchema = createInsertSchema(notifications).omit({ id: true, createdAt: true });
 export type InsertNotification = z.infer<typeof insertNotificationSchema>;
 export type Notification = typeof notifications.$inferSelect;
 
+export const insertAuditLogSchema = createInsertSchema(auditLogs).omit({ id: true, createdAt: true });
 export type InsertAuditLog = z.infer<typeof insertAuditLogSchema>;
 export type AuditLog = typeof auditLogs.$inferSelect;
 
+export const insertSupportTicketSchema = createInsertSchema(supportTickets).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertSupportTicket = z.infer<typeof insertSupportTicketSchema>;
+export type SupportTicket = typeof supportTickets.$inferSelect;
+
+export const insertSupportMessageSchema = createInsertSchema(supportMessages).omit({ id: true, createdAt: true });
+export type InsertSupportMessage = z.infer<typeof insertSupportMessageSchema>;
+export type SupportMessage = typeof supportMessages.$inferSelect;
+
 export type MaintenanceSettings = typeof maintenanceSettings.$inferSelect;
 export type ThemeSettings = typeof themeSettings.$inferSelect;
-
-export const insertWithdrawalRequestSchema = createInsertSchema(withdrawalRequests).omit({
-  id: true,
-  createdAt: true,
-  status: true,
-  reviewedBy: true,
-  reviewedAt: true,
-  adminNotes: true,
-  txHash: true,
-});
-export type InsertWithdrawalRequest = z.infer<typeof insertWithdrawalRequestSchema>;
-export type WithdrawalRequest = typeof withdrawalRequests.$inferSelect;
-
-export const insertExchangeSchema = createInsertSchema(exchanges).omit({
-  id: true,
-  createdAt: true,
-  updatedAt: true,
-});
-
-export type InsertExchange = z.infer<typeof insertExchangeSchema>;
 export type Exchange = typeof exchanges.$inferSelect;
+export type InsertExchange = z.infer<typeof createInsertSchema(exchanges).omit({ id: true, createdAt: true, updatedAt: true })>;
 
-// Social Feed Insert Schemas
-export const insertSocialPostSchema = createInsertSchema(socialPosts).omit({
-  id: true,
-  createdAt: true,
-  updatedAt: true,
-  likesCount: true,
-  dislikesCount: true,
-  commentsCount: true,
-  sharesCount: true,
-  isDeleted: true,
-});
+export const insertExchangeSchema = createInsertSchema(exchanges).omit({ id: true, createdAt: true, updatedAt: true });
 
-export const insertSocialCommentSchema = createInsertSchema(socialComments).omit({
-  id: true,
-  createdAt: true,
-  isDeleted: true,
-});
+export type WithdrawalRequest = typeof withdrawalRequests.$inferSelect;
+export type InsertWithdrawalRequest = z.infer<typeof createInsertSchema(withdrawalRequests).omit({ id: true, createdAt: true })>;
+export const insertWithdrawalRequestSchema = createInsertSchema(withdrawalRequests).omit({ id: true, createdAt: true });
 
-export const insertSocialLikeSchema = createInsertSchema(socialLikes).omit({
-  id: true,
-  createdAt: true,
-});
-
-export const insertSocialDislikeSchema = createInsertSchema(socialDislikes).omit({
-  id: true,
-  createdAt: true,
-});
-
-export const insertSocialMuteSchema = createInsertSchema(socialMutes).omit({
-  id: true,
-  createdAt: true,
-});
-
-// Social Feed Type Exports
-export type InsertSocialPost = z.infer<typeof insertSocialPostSchema>;
 export type SocialPost = typeof socialPosts.$inferSelect;
+export type InsertSocialPost = z.infer<typeof createInsertSchema(socialPosts).omit({ id: true, createdAt: true, updatedAt: true })>;
+export const insertSocialPostSchema = createInsertSchema(socialPosts).omit({ id: true, createdAt: true, updatedAt: true });
 
-export type InsertSocialComment = z.infer<typeof insertSocialCommentSchema>;
 export type SocialComment = typeof socialComments.$inferSelect;
+export type InsertSocialComment = z.infer<typeof createInsertSchema(socialComments).omit({ id: true, createdAt: true })>;
+export const insertSocialCommentSchema = createInsertSchema(socialComments).omit({ id: true, createdAt: true });
 
-export type InsertSocialLike = z.infer<typeof insertSocialLikeSchema>;
 export type SocialLike = typeof socialLikes.$inferSelect;
+export type InsertSocialLike = z.infer<typeof createInsertSchema(socialLikes).omit({ id: true, createdAt: true })>;
+export const insertSocialLikeSchema = createInsertSchema(socialLikes).omit({ id: true, createdAt: true });
 
-export type InsertSocialDislike = z.infer<typeof insertSocialDislikeSchema>;
 export type SocialDislike = typeof socialDislikes.$inferSelect;
+export type InsertSocialDislike = z.infer<typeof createInsertSchema(socialDislikes).omit({ id: true, createdAt: true })>;
+export const insertSocialDislikeSchema = createInsertSchema(socialDislikes).omit({ id: true, createdAt: true });
 
-export type InsertSocialMute = z.infer<typeof insertSocialMuteSchema>;
 export type SocialMute = typeof socialMutes.$inferSelect;
+export type InsertSocialMute = z.infer<typeof createInsertSchema(socialMutes).omit({ id: true, createdAt: true })>;
+export const insertSocialMuteSchema = createInsertSchema(socialMutes).omit({ id: true, createdAt: true });
 
-// Loader Zone Tables
-export const loaderAds = pgTable("loader_ads", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  loaderId: varchar("loader_id").notNull().references(() => users.id, { onDelete: "cascade" }),
-  assetType: text("asset_type").notNull(),
-  dealAmount: numeric("deal_amount", { precision: 18, scale: 2 }).notNull(),
-  loadingTerms: text("loading_terms"),
-  upfrontPercentage: integer("upfront_percentage").default(0),
-  countdownTime: countdownTimeEnum("countdown_time").notNull().default("30min"),
-  paymentMethods: text("payment_methods").array().notNull(),
-  frozenCommitment: numeric("frozen_commitment", { precision: 18, scale: 2 }).notNull(),
-  loaderFeeReserve: numeric("loader_fee_reserve", { precision: 18, scale: 2 }).notNull().default("0"),
-  isActive: boolean("is_active").notNull().default(true),
-  createdAt: timestamp("created_at").notNull().default(sql`now()`),
-  updatedAt: timestamp("updated_at").notNull().default(sql`now()`),
-});
-
-export const loaderOrders = pgTable("loader_orders", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  adId: varchar("ad_id").notNull().references(() => loaderAds.id, { onDelete: "cascade" }),
-  loaderId: varchar("loader_id").notNull().references(() => users.id, { onDelete: "cascade" }),
-  receiverId: varchar("receiver_id").notNull().references(() => users.id, { onDelete: "cascade" }),
-  dealAmount: numeric("deal_amount", { precision: 18, scale: 2 }).notNull(),
-  loaderFrozenAmount: numeric("loader_frozen_amount", { precision: 18, scale: 2 }).notNull(),
-  loaderFeeReserve: numeric("loader_fee_reserve", { precision: 18, scale: 2 }).notNull().default("0"),
-  receiverFrozenAmount: numeric("receiver_frozen_amount", { precision: 18, scale: 2 }).default("0"),
-  receiverFeeReserve: numeric("receiver_fee_reserve", { precision: 18, scale: 2 }).default("0"),
-  status: loaderOrderStatusEnum("status").notNull().default("created"),
-  countdownTime: countdownTimeEnum("countdown_time").notNull().default("30min"),
-  countdownExpiresAt: timestamp("countdown_expires_at"),
-  countdownStopped: boolean("countdown_stopped").notNull().default(false),
-  loaderSentPaymentDetails: boolean("loader_sent_payment_details").notNull().default(false),
-  receiverSentPaymentDetails: boolean("receiver_sent_payment_details").notNull().default(false),
-  loaderMarkedPaymentSent: boolean("loader_marked_payment_sent").notNull().default(false),
-  receiverConfirmedPayment: boolean("receiver_confirmed_payment").notNull().default(false),
-  liabilityType: liabilityTypeEnum("liability_type"),
-  receiverLiabilityConfirmed: boolean("receiver_liability_confirmed").notNull().default(false),
-  loaderLiabilityConfirmed: boolean("loader_liability_confirmed").notNull().default(false),
-  liabilityLockedAt: timestamp("liability_locked_at"),
-  liabilityDeadline: timestamp("liability_deadline"),
-  cancelledBy: varchar("cancelled_by").references(() => users.id),
-  cancelReason: text("cancel_reason"),
-  loaderFeeDeducted: numeric("loader_fee_deducted", { precision: 18, scale: 2 }).default("0"),
-  receiverFeeDeducted: numeric("receiver_fee_deducted", { precision: 18, scale: 2 }).default("0"),
-  penaltyAmount: numeric("penalty_amount", { precision: 18, scale: 2 }).default("0"),
-  penaltyPaidBy: varchar("penalty_paid_by").references(() => users.id),
-  createdAt: timestamp("created_at").notNull().default(sql`now()`),
-  updatedAt: timestamp("updated_at").notNull().default(sql`now()`),
-  completedAt: timestamp("completed_at"),
-});
-
-export const loaderOrderMessages = pgTable("loader_order_messages", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  orderId: varchar("order_id").notNull().references(() => loaderOrders.id, { onDelete: "cascade" }),
-  senderId: varchar("sender_id").references(() => users.id),
-  isSystem: boolean("is_system").notNull().default(false),
-  isAdminMessage: boolean("is_admin_message").notNull().default(false),
-  content: text("content").notNull(),
-  fileUrl: text("file_url"),
-  createdAt: timestamp("created_at").notNull().default(sql`now()`),
-});
-
-export const loaderDisputes = pgTable("loader_disputes", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  orderId: varchar("order_id").notNull().references(() => loaderOrders.id, { onDelete: "cascade" }),
-  openedBy: varchar("opened_by").notNull().references(() => users.id),
-  reason: text("reason").notNull(),
-  evidenceUrls: text("evidence_urls").array().default(sql`ARRAY[]::text[]`),
-  status: loaderDisputeStatusEnum("status").notNull().default("open"),
-  resolution: text("resolution"),
-  resolvedBy: varchar("resolved_by").references(() => users.id),
-  winnerId: varchar("winner_id").references(() => users.id),
-  loserId: varchar("loser_id").references(() => users.id),
-  adminNotes: text("admin_notes"),
-  createdAt: timestamp("created_at").notNull().default(sql`now()`),
-  resolvedAt: timestamp("resolved_at"),
-});
-
-// Loader Zone Relations
-export const loaderAdsRelations = relations(loaderAds, ({ one, many }) => ({
-  loader: one(users, {
-    fields: [loaderAds.loaderId],
-    references: [users.id],
-  }),
-  orders: many(loaderOrders),
-}));
-
-export const loaderOrdersRelations = relations(loaderOrders, ({ one, many }) => ({
-  ad: one(loaderAds, {
-    fields: [loaderOrders.adId],
-    references: [loaderAds.id],
-  }),
-  loader: one(users, {
-    fields: [loaderOrders.loaderId],
-    references: [users.id],
-    relationName: "loaderOrders",
-  }),
-  receiver: one(users, {
-    fields: [loaderOrders.receiverId],
-    references: [users.id],
-    relationName: "receiverOrders",
-  }),
-  messages: many(loaderOrderMessages),
-  dispute: one(loaderDisputes),
-}));
-
-export const loaderDisputesRelations = relations(loaderDisputes, ({ one }) => ({
-  order: one(loaderOrders, {
-    fields: [loaderDisputes.orderId],
-    references: [loaderOrders.id],
-  }),
-  opener: one(users, {
-    fields: [loaderDisputes.openedBy],
-    references: [users.id],
-  }),
-  resolver: one(users, {
-    fields: [loaderDisputes.resolvedBy],
-    references: [users.id],
-  }),
-}));
-
-export const loaderOrderMessagesRelations = relations(loaderOrderMessages, ({ one }) => ({
-  order: one(loaderOrders, {
-    fields: [loaderOrderMessages.orderId],
-    references: [loaderOrders.id],
-  }),
-  sender: one(users, {
-    fields: [loaderOrderMessages.senderId],
-    references: [users.id],
-  }),
-}));
-
-// Loader Zone Insert Schemas
-export const insertLoaderAdSchema = createInsertSchema(loaderAds).omit({
-  id: true,
-  createdAt: true,
-  updatedAt: true,
-  isActive: true,
-});
-
-export const insertLoaderOrderSchema = createInsertSchema(loaderOrders).omit({
-  id: true,
-  createdAt: true,
-  updatedAt: true,
-  completedAt: true,
-  loaderFeeDeducted: true,
-  receiverFeeDeducted: true,
-  penaltyAmount: true,
-  penaltyPaidBy: true,
-  countdownStopped: true,
-  loaderSentPaymentDetails: true,
-  receiverSentPaymentDetails: true,
-  loaderMarkedPaymentSent: true,
-  receiverConfirmedPayment: true,
-  cancelledBy: true,
-  cancelReason: true,
-});
-
-export const insertLoaderOrderMessageSchema = createInsertSchema(loaderOrderMessages).omit({
-  id: true,
-  createdAt: true,
-});
-
-export const insertLoaderDisputeSchema = createInsertSchema(loaderDisputes).omit({
-  id: true,
-  createdAt: true,
-  resolvedAt: true,
-  status: true,
-  resolution: true,
-  resolvedBy: true,
-  winnerId: true,
-  loserId: true,
-  adminNotes: true,
-});
-
-// Loader Zone Type Exports
-export type InsertLoaderAd = z.infer<typeof insertLoaderAdSchema>;
 export type LoaderAd = typeof loaderAds.$inferSelect;
+export type InsertLoaderAd = z.infer<typeof createInsertSchema(loaderAds).omit({ id: true, createdAt: true })>;
+export const insertLoaderAdSchema = createInsertSchema(loaderAds).omit({ id: true, createdAt: true });
 
-export type InsertLoaderOrder = z.infer<typeof insertLoaderOrderSchema>;
 export type LoaderOrder = typeof loaderOrders.$inferSelect;
+export type InsertLoaderOrder = z.infer<typeof createInsertSchema(loaderOrders).omit({ id: true, createdAt: true })>;
+export const insertLoaderOrderSchema = createInsertSchema(loaderOrders).omit({ id: true, createdAt: true });
 
-export type InsertLoaderOrderMessage = z.infer<typeof insertLoaderOrderMessageSchema>;
 export type LoaderOrderMessage = typeof loaderOrderMessages.$inferSelect;
+export type InsertLoaderOrderMessage = z.infer<typeof createInsertSchema(loaderOrderMessages).omit({ id: true, createdAt: true })>;
+export const insertLoaderOrderMessageSchema = createInsertSchema(loaderOrderMessages).omit({ id: true, createdAt: true });
 
-export type InsertLoaderDispute = z.infer<typeof insertLoaderDisputeSchema>;
 export type LoaderDispute = typeof loaderDisputes.$inferSelect;
+export type InsertLoaderDispute = z.infer<typeof createInsertSchema(loaderDisputes).omit({ id: true, createdAt: true })>;
+export const insertLoaderDisputeSchema = createInsertSchema(loaderDisputes).omit({ id: true, createdAt: true });
 
-// Loader Feedback Table for trust scores
-export const loaderFeedbackTypeEnum = pgEnum("loader_feedback_type", ["positive", "negative"]);
-
-export const loaderFeedback = pgTable("loader_feedback", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  orderId: varchar("order_id").notNull().references(() => loaderOrders.id, { onDelete: "cascade" }),
-  giverId: varchar("giver_id").notNull().references(() => users.id, { onDelete: "cascade" }),
-  receiverId: varchar("receiver_id").notNull().references(() => users.id, { onDelete: "cascade" }),
-  feedbackType: loaderFeedbackTypeEnum("feedback_type").notNull(),
-  comment: text("comment"),
-  createdAt: timestamp("created_at").notNull().default(sql`now()`),
-});
-
-// Loader Stats Table for tracking trades and trust scores
-export const loaderStats = pgTable("loader_stats", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  userId: varchar("user_id").notNull().unique().references(() => users.id, { onDelete: "cascade" }),
-  totalTrades: integer("total_trades").notNull().default(0),
-  completedTrades: integer("completed_trades").notNull().default(0),
-  cancelledTrades: integer("cancelled_trades").notNull().default(0),
-  disputedTrades: integer("disputed_trades").notNull().default(0),
-  positiveFeedback: integer("positive_feedback").notNull().default(0),
-  negativeFeedback: integer("negative_feedback").notNull().default(0),
-  isVerifiedVendor: boolean("is_verified_vendor").notNull().default(false),
-  createdAt: timestamp("created_at").notNull().default(sql`now()`),
-  updatedAt: timestamp("updated_at").notNull().default(sql`now()`),
-});
-
-// Loader Feedback Relations
-export const loaderFeedbackRelations = relations(loaderFeedback, ({ one }) => ({
-  order: one(loaderOrders, {
-    fields: [loaderFeedback.orderId],
-    references: [loaderOrders.id],
-  }),
-  giver: one(users, {
-    fields: [loaderFeedback.giverId],
-    references: [users.id],
-    relationName: "givenFeedback",
-  }),
-  receiver: one(users, {
-    fields: [loaderFeedback.receiverId],
-    references: [users.id],
-    relationName: "receivedFeedback",
-  }),
-}));
-
-export const loaderStatsRelations = relations(loaderStats, ({ one }) => ({
-  user: one(users, {
-    fields: [loaderStats.userId],
-    references: [users.id],
-  }),
-}));
-
-// Loader Feedback Insert Schema
-export const insertLoaderFeedbackSchema = createInsertSchema(loaderFeedback).omit({
-  id: true,
-  createdAt: true,
-});
-
-export const insertLoaderStatsSchema = createInsertSchema(loaderStats).omit({
-  id: true,
-  createdAt: true,
-  updatedAt: true,
-  totalTrades: true,
-  completedTrades: true,
-  cancelledTrades: true,
-  disputedTrades: true,
-  positiveFeedback: true,
-  negativeFeedback: true,
-});
-
-// Loader Feedback Type Exports
-export type InsertLoaderFeedback = z.infer<typeof insertLoaderFeedbackSchema>;
 export type LoaderFeedback = typeof loaderFeedback.$inferSelect;
+export type InsertLoaderFeedback = z.infer<typeof createInsertSchema(loaderFeedback).omit({ id: true, createdAt: true })>;
+export const insertLoaderFeedbackSchema = createInsertSchema(loaderFeedback).omit({ id: true, createdAt: true });
 
-export type InsertLoaderStats = z.infer<typeof insertLoaderStatsSchema>;
 export type LoaderStats = typeof loaderStats.$inferSelect;
+export type InsertLoaderStats = z.infer<typeof createInsertSchema(loaderStats).omit({ id: true, createdAt: true, updatedAt: true })>;
+export const insertLoaderStatsSchema = createInsertSchema(loaderStats).omit({ id: true, createdAt: true, updatedAt: true });
 
-// ==================== BLOCKCHAIN WALLET TABLES ====================
-
-// Deposit Status Enum
-export const depositStatusEnum = pgEnum("deposit_status", [
-  "pending",
-  "confirming",
-  "confirmed",
-  "credited",
-  "sweep_pending",
-  "swept",
-  "sweep_failed",
-  "failed"
-]);
-
-// Sweep Status Enum
-export const sweepStatusEnum = pgEnum("sweep_status", [
-  "pending",
-  "processing",
-  "completed",
-  "failed"
-]);
-
-// Withdrawal Status Enum (extended)
-export const withdrawalStatusEnum = pgEnum("withdrawal_status", [
-  "pending",
-  "approved",
-  "processing",
-  "sent",
-  "completed",
-  "rejected",
-  "failed",
-  "cancelled"
-]);
-
-// Wallet Index Counter - Atomic counter for HD wallet derivation indexes
-export const walletIndexCounter = pgTable("wallet_index_counter", {
-  id: varchar("id").primaryKey().default("singleton"),
-  nextIndex: integer("next_index").notNull().default(0),
-  updatedAt: timestamp("updated_at").notNull().default(sql`now()`),
-});
-
-// User Deposit Addresses - Unique deposit address per user
-export const userDepositAddresses = pgTable("user_deposit_addresses", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
-  address: text("address").notNull().unique(),
-  network: text("network").notNull().default("BSC"),
-  derivationIndex: integer("derivation_index").notNull().unique(),
-  encryptedPrivateKey: text("encrypted_private_key").notNull(),
-  isActive: boolean("is_active").notNull().default(true),
-  createdAt: timestamp("created_at").notNull().default(sql`now()`),
-});
-
-// Blockchain Deposits - Track all incoming deposits
-export const blockchainDeposits = pgTable("blockchain_deposits", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  userId: varchar("user_id").notNull().references(() => users.id),
-  depositAddressId: varchar("deposit_address_id").notNull().references(() => userDepositAddresses.id),
-  txHash: text("tx_hash").notNull().unique(),
-  fromAddress: text("from_address").notNull(),
-  toAddress: text("to_address").notNull(),
-  amount: numeric("amount", { precision: 18, scale: 8 }).notNull(),
-  tokenContract: text("token_contract").notNull(),
-  network: text("network").notNull().default("BSC"),
-  blockNumber: integer("block_number").notNull(),
-  confirmations: integer("confirmations").notNull().default(0),
-  requiredConfirmations: integer("required_confirmations").notNull().default(15),
-  status: depositStatusEnum("status").notNull().default("pending"),
-  confirmedAt: timestamp("confirmed_at"),
-  creditedAt: timestamp("credited_at"),
-  creditedTransactionId: varchar("credited_transaction_id"),
-  detectedAt: timestamp("detected_at").notNull().default(sql`now()`),
-  createdAt: timestamp("created_at").notNull().default(sql`now()`),
-  updatedAt: timestamp("updated_at").notNull().default(sql`now()`),
-});
-
-// Deposit Sweeps - Track sweep transactions to master wallet
-export const depositSweeps = pgTable("deposit_sweeps", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  depositId: varchar("deposit_id").notNull().references(() => blockchainDeposits.id),
-  fromAddress: text("from_address").notNull(),
-  toAddress: text("to_address").notNull(),
-  amount: numeric("amount", { precision: 18, scale: 8 }).notNull(),
-  gasFee: numeric("gas_fee", { precision: 18, scale: 8 }),
-  txHash: text("tx_hash"),
-  status: sweepStatusEnum("status").notNull().default("pending"),
-  attempts: integer("attempts").notNull().default(0),
-  lastAttemptAt: timestamp("last_attempt_at"),
-  completedAt: timestamp("completed_at"),
-  errorMessage: text("error_message"),
-  createdAt: timestamp("created_at").notNull().default(sql`now()`),
-  updatedAt: timestamp("updated_at").notNull().default(sql`now()`),
-});
-
-// Platform Wallet Controls - Kill switches and limits
-export const platformWalletControls = pgTable("platform_wallet_controls", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  withdrawalsEnabled: boolean("withdrawals_enabled").notNull().default(true),
-  depositsEnabled: boolean("deposits_enabled").notNull().default(true),
-  sweepsEnabled: boolean("sweeps_enabled").notNull().default(true),
-  emergencyMode: boolean("emergency_mode").notNull().default(false),
-  hotWalletBalanceCap: numeric("hot_wallet_balance_cap", { precision: 18, scale: 8 }).notNull().default("100000"),
-  perUserDailyWithdrawalLimit: numeric("per_user_daily_withdrawal_limit", { precision: 18, scale: 8 }).notNull().default("10000"),
-  platformDailyWithdrawalLimit: numeric("platform_daily_withdrawal_limit", { precision: 18, scale: 8 }).notNull().default("100000"),
-  minDepositAmount: numeric("min_deposit_amount", { precision: 18, scale: 8 }).notNull().default("5"), // Database column added via migration 0001
-  minWithdrawalAmount: numeric("min_withdrawal_amount", { precision: 18, scale: 8 }).notNull().default("5"),
-  withdrawalFeePercent: numeric("withdrawal_fee_percent", { precision: 5, scale: 2 }).notNull().default("0"),
-  withdrawalFeeFixed: numeric("withdrawal_fee_fixed", { precision: 18, scale: 8 }).notNull().default("0.5"),
-  firstWithdrawalDelayMinutes: integer("first_withdrawal_delay_minutes").notNull().default(60),
-  largeWithdrawalThreshold: numeric("large_withdrawal_threshold", { precision: 18, scale: 8 }).notNull().default("1000"),
-  largeWithdrawalDelayMinutes: integer("large_withdrawal_delay_minutes").notNull().default(120),
-  requiredConfirmations: integer("required_confirmations").notNull().default(15),
-  walletUnlocked: boolean("wallet_unlocked").notNull().default(false),
-  unlockedAt: timestamp("unlocked_at"),
-  unlockedBy: varchar("unlocked_by").references(() => users.id),
-  updatedBy: varchar("updated_by").references(() => users.id),
-  updatedAt: timestamp("updated_at").notNull().default(sql`now()`),
-});
-
-// Blockchain Admin Actions - Immutable audit log for wallet operations
-export const blockchainAdminActions = pgTable("blockchain_admin_actions", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  adminId: varchar("admin_id").notNull().references(() => users.id),
-  action: text("action").notNull(),
-  targetType: text("target_type").notNull(),
-  targetId: varchar("target_id"),
-  previousValue: jsonb("previous_value"),
-  newValue: jsonb("new_value"),
-  reason: text("reason"),
-  ipAddress: text("ip_address"),
-  userAgent: text("user_agent"),
-  createdAt: timestamp("created_at").notNull().default(sql`now()`),
-});
-
-// User Withdrawal Limits - Track daily withdrawal usage
-export const userWithdrawalLimits = pgTable("user_withdrawal_limits", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
-  date: text("date").notNull(),
-  totalWithdrawn: numeric("total_withdrawn", { precision: 18, scale: 8 }).notNull().default("0"),
-  withdrawalCount: integer("withdrawal_count").notNull().default(0),
-  createdAt: timestamp("created_at").notNull().default(sql`now()`),
-  updatedAt: timestamp("updated_at").notNull().default(sql`now()`),
-});
-
-// User First Withdrawal Tracking
-export const userFirstWithdrawals = pgTable("user_first_withdrawals", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  userId: varchar("user_id").notNull().unique().references(() => users.id, { onDelete: "cascade" }),
-  hasWithdrawn: boolean("has_withdrawn").notNull().default(false),
-  firstWithdrawalAt: timestamp("first_withdrawal_at"),
-  lastPasswordChangeAt: timestamp("last_password_change_at"),
-  lastEmailChangeAt: timestamp("last_email_change_at"),
-  createdAt: timestamp("created_at").notNull().default(sql`now()`),
-});
-
-// Blockchain Deposit Address Relations
-export const userDepositAddressesRelations = relations(userDepositAddresses, ({ one, many }) => ({
-  user: one(users, {
-    fields: [userDepositAddresses.userId],
-    references: [users.id],
-  }),
-  deposits: many(blockchainDeposits),
-}));
-
-export const blockchainDepositsRelations = relations(blockchainDeposits, ({ one }) => ({
-  user: one(users, {
-    fields: [blockchainDeposits.userId],
-    references: [users.id],
-  }),
-  depositAddress: one(userDepositAddresses, {
-    fields: [blockchainDeposits.depositAddressId],
-    references: [userDepositAddresses.id],
-  }),
-}));
-
-export const depositSweepsRelations = relations(depositSweeps, ({ one }) => ({
-  deposit: one(blockchainDeposits, {
-    fields: [depositSweeps.depositId],
-    references: [blockchainDeposits.id],
-  }),
-}));
-
-// Blockchain Insert Schemas
-export const insertUserDepositAddressSchema = createInsertSchema(userDepositAddresses).omit({
-  id: true,
-  createdAt: true,
-  isActive: true,
-});
-
-export const insertBlockchainDepositSchema = createInsertSchema(blockchainDeposits).omit({
-  id: true,
-  createdAt: true,
-  updatedAt: true,
-  creditedAt: true,
-  creditedTransactionId: true,
-});
-
-export const insertDepositSweepSchema = createInsertSchema(depositSweeps).omit({
-  id: true,
-  createdAt: true,
-  updatedAt: true,
-  txHash: true,
-  completedAt: true,
-  errorMessage: true,
-  attempts: true,
-  lastAttemptAt: true,
-});
-
-export const insertBlockchainAdminActionSchema = createInsertSchema(blockchainAdminActions).omit({
-  id: true,
-  createdAt: true,
-});
-
-export const insertUserWithdrawalLimitSchema = createInsertSchema(userWithdrawalLimits).omit({
-  id: true,
-  createdAt: true,
-  updatedAt: true,
-});
-
-export const insertUserFirstWithdrawalSchema = createInsertSchema(userFirstWithdrawals).omit({
-  id: true,
-  createdAt: true,
-  hasWithdrawn: true,
-  firstWithdrawalAt: true,
-});
-
-// Blockchain Type Exports
-export type InsertUserDepositAddress = z.infer<typeof insertUserDepositAddressSchema>;
 export type UserDepositAddress = typeof userDepositAddresses.$inferSelect;
+export type InsertUserDepositAddress = z.infer<typeof createInsertSchema(userDepositAddresses).omit({ id: true, createdAt: true })>;
+export const insertUserDepositAddressSchema = createInsertSchema(userDepositAddresses).omit({ id: true, createdAt: true });
 
-export type InsertBlockchainDeposit = z.infer<typeof insertBlockchainDepositSchema>;
 export type BlockchainDeposit = typeof blockchainDeposits.$inferSelect;
+export type InsertBlockchainDeposit = z.infer<typeof createInsertSchema(blockchainDeposits).omit({ id: true, createdAt: true })>;
+export const insertBlockchainDepositSchema = createInsertSchema(blockchainDeposits).omit({ id: true, createdAt: true });
 
-export type InsertDepositSweep = z.infer<typeof insertDepositSweepSchema>;
 export type DepositSweep = typeof depositSweeps.$inferSelect;
+export type InsertDepositSweep = z.infer<typeof createInsertSchema(depositSweeps).omit({ id: true, createdAt: true })>;
+export const insertDepositSweepSchema = createInsertSchema(depositSweeps).omit({ id: true, createdAt: true });
 
 export type PlatformWalletControls = typeof platformWalletControls.$inferSelect;
 
-export type InsertBlockchainAdminAction = z.infer<typeof insertBlockchainAdminActionSchema>;
 export type BlockchainAdminAction = typeof blockchainAdminActions.$inferSelect;
+export type InsertBlockchainAdminAction = z.infer<typeof createInsertSchema(blockchainAdminActions).omit({ id: true, createdAt: true })>;
+export const insertBlockchainAdminActionSchema = createInsertSchema(blockchainAdminActions).omit({ id: true, createdAt: true });
 
-export type InsertUserWithdrawalLimit = z.infer<typeof insertUserWithdrawalLimitSchema>;
 export type UserWithdrawalLimit = typeof userWithdrawalLimits.$inferSelect;
+export type InsertUserWithdrawalLimit = z.infer<typeof createInsertSchema(userWithdrawalLimits).omit({ id: true, createdAt: true })>;
+export const insertUserWithdrawalLimitSchema = createInsertSchema(userWithdrawalLimits).omit({ id: true, createdAt: true });
 
-export type InsertUserFirstWithdrawal = z.infer<typeof insertUserFirstWithdrawalSchema>;
 export type UserFirstWithdrawal = typeof userFirstWithdrawals.$inferSelect;
-
-export type SupportTicket = typeof supportTickets.$inferSelect;
-export type InsertSupportTicket = z.infer<typeof insertSupportTicketSchema>;
-
-export type SupportMessage = typeof supportMessages.$inferSelect;
-export type InsertSupportMessage = z.infer<typeof insertSupportMessageSchema>;
+export type InsertUserFirstWithdrawal = z.infer<typeof createInsertSchema(userFirstWithdrawals).omit({ id: true, createdAt: true })>;
+export const insertUserFirstWithdrawalSchema = createInsertSchema(userFirstWithdrawals).omit({ id: true, createdAt: true });
