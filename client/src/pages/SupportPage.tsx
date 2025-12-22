@@ -565,7 +565,7 @@ export default function SupportPage() {
                 <ShieldCheck className="h-10 w-10 text-green-400" />
                 <div>
                   <p className="text-green-300 text-sm">Role</p>
-                  <p className="text-xl font-bold text-white">Customer Support</p>
+                  <p className="text-xl font-bold text-white">Admin</p>
                 </div>
               </div>
             </CardContent>
