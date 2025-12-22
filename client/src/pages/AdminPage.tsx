@@ -40,6 +40,7 @@ import {
   Unlock,
   Clock,
   MessageSquare,
+  ArrowDownLeft,
 } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { Input } from "@/components/ui/input";
@@ -134,6 +135,17 @@ interface MaintenanceSettings {
   tradingEnabled: boolean;
   loginEnabled: boolean;
   updatedAt: string;
+}
+
+interface WithdrawalRequest {
+  id: string;
+  userId: string;
+  username?: string;
+  amount: string;
+  currency: string;
+  walletAddress: string;
+  status: string;
+  createdAt: string;
 }
 
 interface WalletDashboard {
@@ -399,6 +411,15 @@ export default function AdminPage() {
     },
   });
 
+  const { data: pendingWithdrawals, isLoading: loadingWithdrawals } = useQuery<WithdrawalRequest[]>({
+    queryKey: ["admin-pending-withdrawals"],
+    queryFn: async () => {
+      const res = await fetchWithAuth("/api/admin/withdrawals");
+      if (!res.ok) throw new Error("Failed to fetch withdrawals");
+      return res.json();
+    },
+  });
+
   const updateMaintenanceMutation = useMutation({
     mutationFn: async (settings: Partial<MaintenanceSettings>) => {
       const res = await fetchWithAuth("/api/admin/maintenance", {
@@ -619,6 +640,10 @@ export default function AdminPage() {
             <TabsTrigger value="vendors" data-testid="tab-vendors">
               <Store className="h-4 w-4 mr-2" />
               Vendors ({pendingVendors?.length || 0})
+            </TabsTrigger>
+            <TabsTrigger value="withdrawals" data-testid="tab-withdrawals">
+              <ArrowDownLeft className="h-4 w-4 mr-2" />
+              Withdrawals ({pendingWithdrawals?.filter((w: WithdrawalRequest) => w.status === "pending").length || 0})
             </TabsTrigger>
             <TabsTrigger value="maintenance" data-testid="tab-maintenance">
               <Settings className="h-4 w-4 mr-2" />
@@ -1368,6 +1393,86 @@ export default function AdminPage() {
                 </Card>
               ))
             )}
+          </TabsContent>
+
+          <TabsContent value="withdrawals" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-foreground flex items-center gap-2">
+                  <ArrowDownLeft className="h-5 w-5" />
+                  Pending Withdrawals
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {loadingWithdrawals ? (
+                  <Skeleton className="h-64" />
+                ) : !pendingWithdrawals || pendingWithdrawals.length === 0 ? (
+                  <div className="text-center py-12">
+                    <ArrowDownLeft className="h-12 w-12 text-muted-foreground/50 mx-auto mb-4" />
+                    <p className="text-muted-foreground">No withdrawal requests</p>
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead className="text-muted-foreground">Username</TableHead>
+                          <TableHead className="text-muted-foreground">Amount</TableHead>
+                          <TableHead className="text-muted-foreground">Currency</TableHead>
+                          <TableHead className="text-muted-foreground">Wallet Address</TableHead>
+                          <TableHead className="text-muted-foreground">Status</TableHead>
+                          <TableHead className="text-muted-foreground">Requested</TableHead>
+                          <TableHead className="text-muted-foreground">Actions</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {pendingWithdrawals.map((withdrawal: WithdrawalRequest) => (
+                          <TableRow key={withdrawal.id} data-testid={`withdrawal-row-${withdrawal.id}`}>
+                            <TableCell className="text-foreground font-medium">{withdrawal.username || withdrawal.userId}</TableCell>
+                            <TableCell className="text-foreground font-bold">{withdrawal.amount}</TableCell>
+                            <TableCell className="text-muted-foreground">{withdrawal.currency}</TableCell>
+                            <TableCell className="text-muted-foreground font-mono text-xs break-all max-w-xs">{withdrawal.walletAddress}</TableCell>
+                            <TableCell>
+                              <Badge className={
+                                withdrawal.status === "pending" ? "bg-yellow-600" :
+                                withdrawal.status === "approved" ? "bg-green-600" :
+                                "bg-red-600"
+                              }>
+                                {withdrawal.status}
+                              </Badge>
+                            </TableCell>
+                            <TableCell className="text-muted-foreground text-sm">
+                              {new Date(withdrawal.createdAt).toLocaleDateString()}
+                            </TableCell>
+                            <TableCell>
+                              {withdrawal.status === "pending" && (
+                                <div className="flex gap-2">
+                                  <Button
+                                    size="sm"
+                                    className="bg-green-600 hover:bg-green-700 text-xs"
+                                    data-testid={`button-approve-withdrawal-${withdrawal.id}`}
+                                  >
+                                    Approve
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="destructive"
+                                    className="text-xs"
+                                    data-testid={`button-reject-withdrawal-${withdrawal.id}`}
+                                  >
+                                    Reject
+                                  </Button>
+                                </div>
+                              )}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
           </TabsContent>
 
           <TabsContent value="maintenance" className="space-y-4">
