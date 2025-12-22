@@ -5810,5 +5810,26 @@ export async function registerRoutes(
     }
   });
 
+  // Mark support ticket as solved
+  app.patch("/api/support/tickets/:id/solve", requireAuth, async (req: AuthRequest, res) => {
+    try {
+      const ticket = await storage.getSupportTicket(req.params.id);
+      if (!ticket) {
+        return res.status(404).json({ message: "Ticket not found" });
+      }
+
+      // Verify support staff or admin access
+      const isAdmin = req.user!.role === "admin" || req.user!.role === "support";
+      if (!isAdmin) {
+        return res.status(403).json({ message: "Only support staff can solve tickets" });
+      }
+
+      const updatedTicket = await storage.updateSupportTicket(req.params.id, { status: "solved" });
+      res.json(updatedTicket);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   return httpServer;
 }

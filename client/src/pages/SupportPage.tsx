@@ -119,6 +119,7 @@ export default function SupportPage() {
   const [selectedTicket, setSelectedTicket] = useState<string | null>(null);
   const [newMessageText, setNewMessageText] = useState("");
   const [sendingMessage, setSendingMessage] = useState(false);
+  const [solvingTicket, setSolvingTicket] = useState(false);
 
   const isAdmin = user?.role === "admin";
   const isSupport = user?.role === "support";
@@ -338,6 +339,25 @@ export default function SupportPage() {
     }
   };
 
+  const handleSolveTicket = async () => {
+    if (!selectedTicket) return;
+    
+    setSolvingTicket(true);
+    try {
+      const res = await fetchWithAuth(`/api/support/tickets/${selectedTicket}/solve`, {
+        method: "PATCH",
+      });
+      if (!res.ok) throw new Error("Failed to solve ticket");
+      toast({ title: "Success", description: "Ticket marked as solved!" });
+      setSelectedTicket(null);
+      queryClient.invalidateQueries({ queryKey: ["support-tickets"] });
+    } catch (error) {
+      toast({ variant: "destructive", title: "Error", description: "Failed to solve ticket" });
+    } finally {
+      setSolvingTicket(false);
+    }
+  };
+
   return (
     <Layout>
       <div className="space-y-4 sm:space-y-6 px-2 sm:px-4" data-testid="support-page">
@@ -493,9 +513,21 @@ export default function SupportPage() {
             <div className="lg:col-span-3 bg-white dark:bg-gray-900/50 rounded-lg border border-gray-200 dark:border-gray-800 overflow-hidden flex flex-col min-h-96">
               {selectedTicket && selectedTicketData ? (
                 <>
-                  <div className="p-4 border-b border-gray-200 dark:border-gray-800">
-                    <h3 className="font-semibold text-gray-900 dark:text-white">{selectedTicketData.subject}</h3>
-                    <p className="text-xs text-gray-500 dark:text-gray-400">From: <span className="font-medium">{selectedTicketData.userId}</span> | Status: <span className="capitalize">{selectedTicketData.status}</span></p>
+                  <div className="p-4 border-b border-gray-200 dark:border-gray-800 flex items-center justify-between">
+                    <div>
+                      <h3 className="font-semibold text-gray-900 dark:text-white">{selectedTicketData.subject}</h3>
+                      <p className="text-xs text-gray-500 dark:text-gray-400">From: <span className="font-medium">{selectedTicketData.userId}</span> | Status: <span className="capitalize">{selectedTicketData.status}</span></p>
+                    </div>
+                    {isSupport && selectedTicketData.status !== "solved" && (
+                      <Button 
+                        onClick={handleSolveTicket}
+                        disabled={solvingTicket}
+                        className="bg-green-600 hover:bg-green-700 text-white whitespace-nowrap ml-4"
+                        data-testid="button-solve-ticket"
+                      >
+                        {solvingTicket ? "..." : "Solved"}
+                      </Button>
+                    )}
                   </div>
                   <div className="flex-1 overflow-y-auto p-4 space-y-3">
                     <div className="p-3 bg-gray-100 dark:bg-gray-800 rounded-lg">
