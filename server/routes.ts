@@ -421,10 +421,13 @@ export async function registerRoutes(
         return res.status(403).json({ message: "Your account is frozen. You cannot post ads until your account is unfrozen." });
       }
 
-      // Check KYC status first
-      const kyc = await storage.getKycByUserId(req.user!.userId);
-      if (!kyc || kyc.status !== "approved") {
-        return res.status(403).json({ message: "KYC verification required before posting ads. Please complete your KYC verification." });
+      // Check KYC status only if KYC is required
+      const maintenanceSettings = await storage.getMaintenanceSettings();
+      if (maintenanceSettings?.kycRequired) {
+        const kyc = await storage.getKycByUserId(req.user!.userId);
+        if (!kyc || kyc.status !== "approved") {
+          return res.status(403).json({ message: "KYC verification required before posting ads. Please complete your KYC verification." });
+        }
       }
 
       // Check 2FA is enabled
