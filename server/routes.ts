@@ -3456,6 +3456,15 @@ export async function registerRoutes(
         return res.status(403).json({ message: "Admin accounts cannot post loader ads. Admins are for platform monitoring only." });
       }
 
+      // Check KYC requirement if enabled
+      const maintenanceSettings = await storage.getMaintenanceSettings();
+      if (maintenanceSettings?.kycRequired) {
+        const kycRecord = await storage.getKycByUserId(req.user!.userId);
+        if (!kycRecord || kycRecord.status !== "approved") {
+          return res.status(403).json({ message: "KYC verification is required to post loading ads. Please complete your KYC verification first." });
+        }
+      }
+
       const { assetType, dealAmount, loadingTerms, upfrontPercentage, paymentMethods, countdownTime } = req.body;
       
       if (!assetType || !dealAmount || !paymentMethods || paymentMethods.length === 0) {
