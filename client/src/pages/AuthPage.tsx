@@ -47,6 +47,8 @@ export default function AuthPage() {
     },
   });
 
+  const [devCode, setDevCode] = useState("");
+
   const sendVerificationMutation = useMutation({
     mutationFn: async (email: string) => {
       const res = await fetch("/api/auth/send-verification-code", {
@@ -58,8 +60,9 @@ export default function AuthPage() {
       if (!res.ok) throw new Error(json.message);
       return json;
     },
-    onSuccess: () => {
-      toast({ title: "Code Sent", description: "Check your email for the verification code" });
+    onSuccess: (data) => {
+      setDevCode(data.code || "");
+      toast({ title: "Code Sent", description: `Your verification code: ${data.code}` });
       setRegistrationStep("verify");
     },
     onError: (error: Error) => {
@@ -223,6 +226,11 @@ export default function AuthPage() {
                     <div className="space-y-2">
                       <Label className="text-foreground">Verification Code</Label>
                       <p className="text-xs text-muted-foreground mb-2">Enter the code sent to {registerForm.email}</p>
+                      {devCode && (
+                        <div className="p-3 bg-blue-900/20 border border-blue-700/50 rounded-md text-sm">
+                          <p className="text-blue-400">Dev Code: <span className="font-mono font-bold text-lg">{devCode}</span></p>
+                        </div>
+                      )}
                       <div className="relative">
                         <Input
                           data-testid="input-verification-code"
