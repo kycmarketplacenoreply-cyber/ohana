@@ -14,7 +14,7 @@ const transporter = brevoPassword
       host: "smtp-relay.brevo.com",
       port: 587,
       auth: {
-        user: brevoSender,
+        user: "apikey",
         pass: brevoPassword,
       },
     })
