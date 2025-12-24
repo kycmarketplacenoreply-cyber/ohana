@@ -1,0 +1,100 @@
+2025-12-24T08:37:16.400351587Z ../dist/public/assets/ProfilePage-B7lKqPU_.js         10.64 kB │ gzip:   2.71 kB
+2025-12-24T08:37:16.400354777Z ../dist/public/assets/scroll-area-BARHoFGz.js         12.56 kB │ gzip:   3.98 kB
+2025-12-24T08:37:16.400390508Z ../dist/public/assets/VendorPage-CAncN8EF.js          14.60 kB │ gzip:   4.08 kB
+2025-12-24T08:37:16.400393538Z ../dist/public/assets/SettingsPage-CtK9lu2n.js        18.76 kB │ gzip:   4.87 kB
+2025-12-24T08:37:16.400421518Z ../dist/public/assets/OrderDetailPage-Yzh9TH2R.js     22.25 kB │ gzip:   6.19 kB
+2025-12-24T08:37:16.400428469Z ../dist/public/assets/FinancePage-ByiQdyTv.js         22.82 kB │ gzip:   5.06 kB
+2025-12-24T08:37:16.400450779Z ../dist/public/assets/select-xuAsf7uq.js              23.72 kB │ gzip:   8.36 kB
+2025-12-24T08:37:16.40048585Z ../dist/public/assets/SupportPage-CI7zdEda.js         32.39 kB │ gzip:   6.30 kB
+2025-12-24T08:37:16.40049261Z ../dist/public/assets/LoaderOrderPage-CC1zNFIt.js     35.81 kB │ gzip:   7.80 kB
+2025-12-24T08:37:16.40051301Z ../dist/public/assets/WalletPage-z0v34cQZ.js          41.36 kB │ gzip:  14.37 kB
+2025-12-24T08:37:16.400542431Z ../dist/public/assets/ThemeToggle-C3xqmPyZ.js         43.08 kB │ gzip:  13.78 kB
+2025-12-24T08:37:16.400562681Z ../dist/public/assets/DisputeAdminPage-JKb_u5pF.js    43.12 kB │ gzip:   6.97 kB
+2025-12-24T08:37:16.400582372Z ../dist/public/assets/AdminPage-BsxokZog.js           52.94 kB │ gzip:  11.24 kB
+2025-12-24T08:37:16.400599732Z ../dist/public/assets/HomePage-3nTvsMrm.js            57.00 kB │ gzip:  14.61 kB
+2025-12-24T08:37:16.400605122Z ../dist/public/assets/index-D845fdug.js              408.02 kB │ gzip: 132.16 kB
+2025-12-24T08:37:16.400904088Z ✓ built in 4.30s
+2025-12-24T08:37:16.40104547Z building server...
+2025-12-24T08:37:16.679878676Z 
+2025-12-24T08:37:16.679896606Z   dist/index.cjs  1.6mb ⚠️
+2025-12-24T08:37:16.679900066Z 
+2025-12-24T08:37:16.679903376Z ⚡ Done in 277ms
+2025-12-24T08:37:20.923238364Z ==> Uploading build...
+2025-12-24T08:37:33.094785567Z ==> Uploaded in 7.2s. Compression took 5.0s
+2025-12-24T08:37:33.155461106Z ==> Build successful 🎉
+2025-12-24T08:37:37.118433405Z ==> Setting WEB_CONCURRENCY=1 by default, based on available CPUs in the instance
+2025-12-24T08:37:37.135204844Z ==> Deploying...
+2025-12-24T08:38:04.076219749Z ==> Running 'npm run start'
+2025-12-24T08:38:05.895169272Z 
+2025-12-24T08:38:05.895193593Z > rest-express@1.0.0 start
+2025-12-24T08:38:05.895198653Z > NODE_ENV=production node dist/index.cjs
+2025-12-24T08:38:05.895201313Z 
+2025-12-24T08:38:07.671244328Z ✅ Brevo configured - email sending enabled
+2025-12-24T08:38:08.66187095Z Sweep destination configured: 0xdb0bca3231368b452b3bba9b1ac8921207f14a74
+2025-12-24T08:38:08.762607089Z Initializing database...
+2025-12-24T08:38:08.962018879Z Database initialization failed: Error: getaddrinfo ENOTFOUND dpg-d55q2hemcj7s73fgaetg-a
+2025-12-24T08:38:08.96204375Z     at /opt/render/project/src/dist/index.cjs:70:13330
+2025-12-24T08:38:08.96204714Z     at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+2025-12-24T08:38:08.96205011Z     at async Jce (/opt/render/project/src/dist/index.cjs:153:118131)
+2025-12-24T08:38:08.96205272Z     at async tF (/opt/render/project/src/dist/index.cjs:673:11387)
+2025-12-24T08:38:08.962241646Z     at async /opt/render/project/src/dist/index.cjs:673:18391 {
+2025-12-24T08:38:08.962245366Z   errno: -3008,
+2025-12-24T08:38:08.962248026Z   code: 'ENOTFOUND',
+2025-12-24T08:38:08.962250636Z   syscall: 'getaddrinfo',
+2025-12-24T08:38:08.962253416Z   hostname: 'dpg-d55q2hemcj7s73fgaetg-a'
+2025-12-24T08:38:08.962256106Z }
+2025-12-24T08:38:08.96239166Z node:internal/process/promises:394
+2025-12-24T08:38:08.96240223Z     triggerUncaughtException(err, true /* fromPromise */);
+2025-12-24T08:38:08.96240492Z     ^
+2025-12-24T08:38:08.962407231Z 
+2025-12-24T08:38:08.962409851Z Error: getaddrinfo ENOTFOUND dpg-d55q2hemcj7s73fgaetg-a
+2025-12-24T08:38:08.962412321Z     at /opt/render/project/src/dist/index.cjs:70:13330
+2025-12-24T08:38:08.962415231Z     at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+2025-12-24T08:38:08.962784522Z     at async Jce (/opt/render/project/src/dist/index.cjs:153:118131)
+2025-12-24T08:38:08.962790082Z     at async tF (/opt/render/project/src/dist/index.cjs:673:11387)
+2025-12-24T08:38:08.962793112Z     at async /opt/render/project/src/dist/index.cjs:673:18391 {
+2025-12-24T08:38:08.962795862Z   errno: -3008,
+2025-12-24T08:38:08.962798752Z   code: 'ENOTFOUND',
+2025-12-24T08:38:08.962801342Z   syscall: 'getaddrinfo',
+2025-12-24T08:38:08.962804182Z   hostname: 'dpg-d55q2hemcj7s73fgaetg-a'
+2025-12-24T08:38:08.962806732Z }
+2025-12-24T08:38:08.962809092Z 
+2025-12-24T08:38:08.962811572Z Node.js v22.16.0
+2025-12-24T08:38:10.495930762Z ==> Exited with status 1
+2025-12-24T08:38:10.52409954Z ==> Common ways to troubleshoot your deploy: https://render.com/docs/troubleshooting-deploys
+2025-12-24T08:38:15.975508993Z ==> Running 'npm run start'
+2025-12-24T08:38:17.06327242Z 
+2025-12-24T08:38:17.063304781Z > rest-express@1.0.0 start
+2025-12-24T08:38:17.063349992Z > NODE_ENV=production node dist/index.cjs
+2025-12-24T08:38:17.063358423Z 
+2025-12-24T08:38:18.674252295Z ✅ Brevo configured - email sending enabled
+2025-12-24T08:38:19.669507322Z Sweep destination configured: 0xdb0bca3231368b452b3bba9b1ac8921207f14a74
+2025-12-24T08:38:19.672406206Z Initializing database...
+2025-12-24T08:38:19.768614904Z Database initialization failed: Error: getaddrinfo ENOTFOUND dpg-d55q2hemcj7s73fgaetg-a
+2025-12-24T08:38:19.768633835Z     at /opt/render/project/src/dist/index.cjs:70:13330
+2025-12-24T08:38:19.768637935Z     at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+2025-12-24T08:38:19.768642165Z     at async Jce (/opt/render/project/src/dist/index.cjs:153:118131)
+2025-12-24T08:38:19.768645625Z     at async tF (/opt/render/project/src/dist/index.cjs:673:11387)
+2025-12-24T08:38:19.768649045Z     at async /opt/render/project/src/dist/index.cjs:673:18391 {
+2025-12-24T08:38:19.768652785Z   errno: -3008,
+2025-12-24T08:38:19.768657305Z   code: 'ENOTFOUND',
+2025-12-24T08:38:19.768661946Z   syscall: 'getaddrinfo',
+2025-12-24T08:38:19.768666246Z   hostname: 'dpg-d55q2hemcj7s73fgaetg-a'
+2025-12-24T08:38:19.768670306Z }
+2025-12-24T08:38:19.768775249Z node:internal/process/promises:394
+2025-12-24T08:38:19.768782969Z     triggerUncaughtException(err, true /* fromPromise */);
+2025-12-24T08:38:19.768786859Z     ^
+2025-12-24T08:38:19.768790479Z 
+2025-12-24T08:38:19.768794459Z Error: getaddrinfo ENOTFOUND dpg-d55q2hemcj7s73fgaetg-a
+2025-12-24T08:38:19.76879821Z     at /opt/render/project/src/dist/index.cjs:70:13330
+2025-12-24T08:38:19.76880255Z     at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+2025-12-24T08:38:19.76880721Z     at async Jce (/opt/render/project/src/dist/index.cjs:153:118131)
+2025-12-24T08:38:19.76881108Z     at async tF (/opt/render/project/src/dist/index.cjs:673:11387)
+2025-12-24T08:38:19.76881482Z     at async /opt/render/project/src/dist/index.cjs:673:18391 {
+2025-12-24T08:38:19.76881855Z   errno: -3008,
+2025-12-24T08:38:19.768852681Z   code: 'ENOTFOUND',
+2025-12-24T08:38:19.768858181Z   syscall: 'getaddrinfo',
+2025-12-24T08:38:19.768862391Z   hostname: 'dpg-d55q2hemcj7s73fgaetg-a'
+2025-12-24T08:38:19.768866201Z }
+2025-12-24T08:38:19.768869852Z 
+2025-12-24T08:38:19.768873462Z Node.js v22.16.0
