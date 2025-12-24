@@ -1,0 +1,49 @@
+services:
+  - type: web
+    name: kyc-marketplace
+    env: node
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 3000
+      - key: DATABASE_URL
+        fromDatabase:
+          name: kyc-db
+          property: connectionString
+      - key: JWT_SECRET
+        sync: false
+      - key: ADMIN_KAI_PASSWORD
+        sync: false
+      - key: ADMIN_TURBO_PASSWORD
+        sync: false
+      - key: CS_PASSWORD
+        sync: false
+      - key: FINANCE_MANAGER_PASSWORD
+        sync: false
+      - key: BREVO_SMTP_PASSWORD
+        sync: false
+      - key: BSC_RPC_URL
+        value: https://bsc-dataseed1.bnbchain.org:443
+      - key: BSCSCAN_API_KEY
+        sync: false
+      - key: MASTER_WALLET_PRIVATE_KEY
+        sync: false
+      - key: MASTER_WALLET_ADDRESS
+        sync: false
+      - key: ENCRYPTED_MASTER_WALLET_KEY
+        sync: false
+      - key: HD_WALLET_SEED
+        sync: false
+      - key: SWEEP_WALLET_ADDRESS
+        sync: false
+      - key: ENCRYPTION_KEY
+        sync: false
+
+databases:
+  - name: kyc-db
+    databaseName: kyc
+    user: kyc_user
+    region: frankfurt
