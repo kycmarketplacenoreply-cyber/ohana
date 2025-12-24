@@ -1,0 +1,50 @@
+2025-12-24T09:11:38.198647701Z     at async tF (/opt/render/project/src/dist/index.cjs:673:11387)
+2025-12-24T09:11:38.198651911Z     at async /opt/render/project/src/dist/index.cjs:673:18391 {
+2025-12-24T09:11:38.198655892Z   length: 37,
+2025-12-24T09:11:38.198660472Z   severity: 'FATAL',
+2025-12-24T09:11:38.198664252Z   code: '28000',
+2025-12-24T09:11:38.198668002Z   detail: undefined,
+2025-12-24T09:11:38.198671702Z   hint: undefined,
+2025-12-24T09:11:38.198675742Z   position: undefined,
+2025-12-24T09:11:38.198681913Z   internalPosition: undefined,
+2025-12-24T09:11:38.198686093Z   internalQuery: undefined,
+2025-12-24T09:11:38.198689763Z   where: undefined,
+2025-12-24T09:11:38.198693463Z   schema: undefined,
+2025-12-24T09:11:38.198697033Z   table: undefined,
+2025-12-24T09:11:38.198700723Z   column: undefined,
+2025-12-24T09:11:38.198704363Z   dataType: undefined,
+2025-12-24T09:11:38.198708414Z   constraint: undefined,
+2025-12-24T09:11:38.198712114Z   file: undefined,
+2025-12-24T09:11:38.198715914Z   line: undefined,
+2025-12-24T09:11:38.198719614Z   routine: undefined
+2025-12-24T09:11:38.198723294Z }
+2025-12-24T09:11:38.198897141Z node:internal/process/promises:394
+2025-12-24T09:11:38.198907031Z     triggerUncaughtException(err, true /* fromPromise */);
+2025-12-24T09:11:38.198910841Z     ^
+2025-12-24T09:11:38.198914271Z 
+2025-12-24T09:11:38.198918471Z error: SSL/TLS required
+2025-12-24T09:11:38.198921902Z     at /opt/render/project/src/dist/index.cjs:70:13330
+2025-12-24T09:11:38.198939042Z     at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+2025-12-24T09:11:38.198945032Z     at async Jce (/opt/render/project/src/dist/index.cjs:153:118131)
+2025-12-24T09:11:38.19914646Z     at async tF (/opt/render/project/src/dist/index.cjs:673:11387)
+2025-12-24T09:11:38.199159591Z     at async /opt/render/project/src/dist/index.cjs:673:18391 {
+2025-12-24T09:11:38.199164451Z   length: 37,
+2025-12-24T09:11:38.199169691Z   severity: 'FATAL',
+2025-12-24T09:11:38.199173881Z   code: '28000',
+2025-12-24T09:11:38.199177861Z   detail: undefined,
+2025-12-24T09:11:38.199182271Z   hint: undefined,
+2025-12-24T09:11:38.199186152Z   position: undefined,
+2025-12-24T09:11:38.199192792Z   internalPosition: undefined,
+2025-12-24T09:11:38.199196892Z   internalQuery: undefined,
+2025-12-24T09:11:38.199200912Z   where: undefined,
+2025-12-24T09:11:38.199204892Z   schema: undefined,
+2025-12-24T09:11:38.199209442Z   table: undefined,
+2025-12-24T09:11:38.199213502Z   column: undefined,
+2025-12-24T09:11:38.199217142Z   dataType: undefined,
+2025-12-24T09:11:38.199220903Z   constraint: undefined,
+2025-12-24T09:11:38.199225003Z   file: undefined,
+2025-12-24T09:11:38.199229343Z   line: undefined,
+2025-12-24T09:11:38.199245214Z   routine: undefined
+2025-12-24T09:11:38.199248354Z }
+2025-12-24T09:11:38.199251214Z 
+2025-12-24T09:11:38.199253874Z Node.js v22.16.0

@@ -4,19 +4,12 @@ import * as schema from "@shared/schema";
 
 const { Pool } = pg;
 
-// Enhanced database URL validation and debugging
+// Enhanced database URL validation and debugging with SSL support
 function getDatabaseUrl(): string {
-  // Check all possible sources
-  const sources = {
-    "process.env.DATABASE_URL": process.env.DATABASE_URL,
-    "NODE_OPTIONS env": process.env.DATABASE_URL,
-  };
-  
   const dbUrl = process.env.DATABASE_URL;
   
   if (!dbUrl) {
     console.error("❌ CRITICAL ERROR: DATABASE_URL not set!");
-    console.error("Environment variables available:", Object.keys(process.env).filter(k => !k.includes('PASSWORD')));
     throw new Error(
       "DATABASE_URL must be set. Configure it in Render environment variables with key 'DATABASE_URL'"
     );
@@ -25,8 +18,6 @@ function getDatabaseUrl(): string {
   // Validate it looks like a postgres URL
   if (!dbUrl.includes("postgresql://") && !dbUrl.includes("postgres://")) {
     console.error("❌ ERROR: DATABASE_URL doesn't look like a PostgreSQL connection string");
-    console.error("Expected format: postgresql://user:password@host:port/database");
-    console.error("Got:", dbUrl.substring(0, 50) + "...");
     throw new Error("Invalid DATABASE_URL format");
   }
   
@@ -40,5 +31,20 @@ function getDatabaseUrl(): string {
 }
 
 const connectionString = getDatabaseUrl();
-export const pool = new Pool({ connectionString });
+
+// Create Pool with SSL required for Render PostgreSQL
+const poolConfig: any = { 
+  connectionString 
+};
+
+// Enable SSL for production (Render requires this)
+if (process.env.NODE_ENV === "production" || process.env.DATABASE_URL) {
+  poolConfig.ssl = {
+    rejectUnauthorized: false // Required for Render's managed PostgreSQL
+  };
+}
+
+console.log("🔒 SSL/TLS:", process.env.NODE_ENV === "production" ? "ENABLED (required for Render)" : "DISABLED (dev mode)");
+
+export const pool = new Pool(poolConfig);
 export const db = drizzle(pool, { schema });
