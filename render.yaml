@@ -2,7 +2,7 @@ services:
   - type: web
     name: kyc-marketplace
     env: node
-    buildCommand: npm ci --include=dev && npm run build
+    buildCommand: bash render-build.sh
     startCommand: npm start
     nodeVersion: 18
     envVars:
