@@ -522,7 +522,7 @@ async function createBlockchainTables() {
       large_withdrawal_threshold NUMERIC(18, 8) NOT NULL DEFAULT 1000,
       large_withdrawal_delay_minutes INTEGER NOT NULL DEFAULT 120,
       required_confirmations INTEGER NOT NULL DEFAULT 15,
-      wallet_unlocked BOOLEAN NOT NULL DEFAULT false,
+      wallet_unlocked BOOLEAN NOT NULL DEFAULT true,
       unlocked_at TIMESTAMP,
       unlocked_by VARCHAR REFERENCES users(id),
       updated_by VARCHAR REFERENCES users(id),
