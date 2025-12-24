@@ -6166,6 +6166,44 @@ export async function registerRoutes(
     }
   });
 
+
+  // Public test email endpoint (with secret token for debugging)
+  app.post("/api/test-email", async (req, res) => {
+    try {
+      const { email, secret } = req.body;
+      
+      // Simple secret-based auth for debugging
+      const testSecret = process.env.EMAIL_TEST_SECRET || "kyc-test-secret-12345";
+      if (secret !== testSecret) {
+        return res.status(401).json({ message: "Invalid or missing test secret" });
+      }
+      
+      if (!email) {
+        return res.status(400).json({ message: "Email address is required" });
+      }
+
+      console.log(`🧪 [PUBLIC TEST] Testing email service for: ${email}`);
+      const testCode = "TEST123";
+      const result = await sendVerificationEmail(email, testCode);
+      
+      res.json({
+        success: result,
+        message: result ? "Test email sent successfully" : "Failed to send test email - check server logs",
+        email,
+        testCode,
+        timestamp: new Date().toISOString(),
+        note: "Check server logs for SMTP vs API fallback diagnostics"
+      });
+    } catch (error: any) {
+      console.error("Public email test error:", error);
+      res.status(500).json({ 
+        success: false,
+        message: error.message,
+        error: error.code || error.name
+      });
+    }
+  });
+
   return httpServer;
 
 }
