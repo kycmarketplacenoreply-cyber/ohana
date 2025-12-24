@@ -70,6 +70,33 @@ async function createTablesIfNotExist() {
       is_star_verified BOOLEAN NOT NULL DEFAULT false
     );
 
+    CREATE TABLE IF NOT EXISTS email_verification_codes (
+      id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid(),
+      user_id VARCHAR NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      code TEXT NOT NULL,
+      expires_at TIMESTAMP NOT NULL,
+      used_at TIMESTAMP,
+      created_at TIMESTAMP NOT NULL DEFAULT now()
+    );
+
+    CREATE TABLE IF NOT EXISTS password_reset_codes (
+      id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid(),
+      user_id VARCHAR NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      code TEXT NOT NULL,
+      expires_at TIMESTAMP NOT NULL,
+      used_at TIMESTAMP,
+      created_at TIMESTAMP NOT NULL DEFAULT now()
+    );
+
+    CREATE TABLE IF NOT EXISTS two_factor_reset_codes (
+      id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid(),
+      user_id VARCHAR NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      code TEXT NOT NULL,
+      expires_at TIMESTAMP NOT NULL,
+      used_at TIMESTAMP,
+      created_at TIMESTAMP NOT NULL DEFAULT now()
+    );
+
     CREATE TABLE IF NOT EXISTS vendor_profiles (
       id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid(),
       user_id VARCHAR NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -636,6 +663,12 @@ async function createIndexesIfNotExist() {
     `CREATE INDEX IF NOT EXISTS idx_users_is_active ON users(is_active);`,
     `CREATE INDEX IF NOT EXISTS idx_kyc_user_id ON kyc(user_id);`,
     `CREATE INDEX IF NOT EXISTS idx_kyc_status ON kyc(status);`,
+    `CREATE INDEX IF NOT EXISTS idx_email_verification_codes_user_id ON email_verification_codes(user_id);`,
+    `CREATE INDEX IF NOT EXISTS idx_email_verification_codes_expires_at ON email_verification_codes(expires_at);`,
+    `CREATE INDEX IF NOT EXISTS idx_password_reset_codes_user_id ON password_reset_codes(user_id);`,
+    `CREATE INDEX IF NOT EXISTS idx_password_reset_codes_expires_at ON password_reset_codes(expires_at);`,
+    `CREATE INDEX IF NOT EXISTS idx_two_factor_reset_codes_user_id ON two_factor_reset_codes(user_id);`,
+    `CREATE INDEX IF NOT EXISTS idx_two_factor_reset_codes_expires_at ON two_factor_reset_codes(expires_at);`,
     `CREATE INDEX IF NOT EXISTS idx_vendor_profiles_user_id ON vendor_profiles(user_id);`,
     `CREATE INDEX IF NOT EXISTS idx_vendor_profiles_is_approved ON vendor_profiles(is_approved);`,
     `CREATE INDEX IF NOT EXISTS idx_vendor_profiles_country ON vendor_profiles(country);`,
