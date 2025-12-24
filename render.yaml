@@ -3,7 +3,7 @@ services:
     name: kyc-marketplace
     env: node
     buildCommand: npm install --omit=dev
-    startCommand: node start.js
+    startCommand: npx drizzle-kit push && node start.js
     nodeVersion: 18
     envVars:
       - key: NODE_ENV
