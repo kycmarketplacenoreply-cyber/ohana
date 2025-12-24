@@ -54,10 +54,29 @@ export async function registerRoutes(
       const code = generateVerificationCode();
       const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
       
+      // Send the verification email
       const emailSent = await sendVerificationEmail(email, code);
       if (!emailSent) {
         console.warn(`Warning: Email sending returned false for ${email}, but continuing...`);
       }
+
+      // Create a temporary/pending user to store the verification code
+      // The user will be marked as verified when they complete registration
+      const tempUser = await storage.createUser({
+        username: `temp_${email}_${Date.now()}`,
+        email: email,
+        password: "temp", // Will be replaced during registration
+        emailVerified: false,
+      });
+
+      // Save the verification code with the temporary user
+      await storage.createEmailVerificationCode({
+        userId: tempUser.id,
+        code: code,
+        expiresAt: expiresAt,
+      });
+
+      console.log(`✅ Verification code sent to ${email} and saved to database`);
       
       res.json({
         message: "Verification code sent to your email",
@@ -80,9 +99,16 @@ export async function registerRoutes(
 
       const validatedData = insertUserSchema.parse({ username, email, password });
       
-      const existingUser = await storage.getUserByEmail(validatedData.email);
-      if (existingUser) {
-        return res.status(400).json({ message: "Email already exists" });
+      // Find the temporary user created during send-verification-code
+      const tempUser = await storage.getUserByEmail(validatedData.email);
+      if (!tempUser) {
+        return res.status(400).json({ message: "Please request a verification code first" });
+      }
+
+      // Validate the verification code
+      const savedCode = await storage.getEmailVerificationCode(tempUser.id);
+      if (!savedCode || savedCode.code !== verificationCode) {
+        return res.status(400).json({ message: "Invalid or expired verification code" });
       }
 
       const existingUsername = await storage.getUserByUsername(validatedData.username);
@@ -92,16 +118,28 @@ export async function registerRoutes(
 
       const hashedPassword = await hashPassword(validatedData.password);
       
-      const user = await storage.createUser({
-        ...validatedData,
+      // Update the temporary user with the real credentials
+      const user = await storage.updateUser(tempUser.id, {
+        username: validatedData.username,
         password: hashedPassword,
         emailVerified: true,
       });
 
-      await storage.createWallet({
-        userId: user.id,
-        currency: "USDT",
-      });
+      if (!user) {
+        throw new Error("Failed to update user after verification");
+      }
+
+      // Mark the code as used
+      await storage.markEmailVerificationAsUsed(savedCode.id);
+
+      // Create wallet if it doesn't exist
+      const wallet = await storage.getWalletByUserId(user.id);
+      if (!wallet) {
+        await storage.createWallet({
+          userId: user.id,
+          currency: "USDT",
+        });
+      }
 
       await storage.createAuditLog({
         userId: user.id,
