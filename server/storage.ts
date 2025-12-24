@@ -1,4 +1,4 @@
-import { eq, and, desc, sql, gte, lte, or, like, isNull, gt } from "drizzle-orm";
+import { eq, and, desc, sql, gte, lte, or, like, isNull, isNotNull, gt } from "drizzle-orm";
 import { emailVerificationCodes, passwordResetCodes, twoFactorResetCodes, type InsertEmailVerificationCode, type EmailVerificationCode, type InsertPasswordResetCode, type PasswordResetCode, type InsertTwoFactorResetCode, type TwoFactorResetCode } from "@shared/schema";
 import { db } from "./db";
 import {
@@ -1550,8 +1550,7 @@ export class DatabaseStorage implements IStorage {
   async getAllActiveDepositAddresses(): Promise<UserDepositAddress[]> {
     return await db
       .select()
-      .from(userDepositAddresses)
-      .where(eq(userDepositAddresses.isActive, true));
+      .from(userDepositAddresses);
   }
 
   // Blockchain Wallet - Deposits
@@ -1584,14 +1583,14 @@ export class DatabaseStorage implements IStorage {
     return await db
       .select()
       .from(blockchainDeposits)
-      .where(eq(blockchainDeposits.status, "confirmed"));
+      .where(and(eq(blockchainDeposits.status, "confirmed"), isNull(blockchainDeposits.creditedAt)));
   }
 
   async getCreditedUnsweptDeposits(): Promise<BlockchainDeposit[]> {
     return await db
       .select()
       .from(blockchainDeposits)
-      .where(eq(blockchainDeposits.status, "credited"));
+      .where(isNotNull(blockchainDeposits.creditedAt));
   }
 
   async createBlockchainDeposit(deposit: InsertBlockchainDeposit): Promise<BlockchainDeposit> {

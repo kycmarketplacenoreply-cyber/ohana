@@ -515,11 +515,21 @@ export const blockchainDeposits = pgTable("blockchain_deposits", {
   userId: varchar("user_id").notNull().references(() => users.id),
   depositAddressId: varchar("deposit_address_id").notNull().references(() => userDepositAddresses.id),
   txHash: text("tx_hash").notNull().unique(),
+  fromAddress: text("from_address"),
+  toAddress: text("to_address"),
   amount: numeric("amount", { precision: 18, scale: 8 }).notNull(),
+  tokenContract: text("token_contract"),
+  network: text("network"),
+  blockNumber: integer("block_number"),
   confirmations: integer("confirmations").notNull().default(0),
+  requiredConfirmations: integer("required_confirmations"),
   status: text("status").notNull().default("pending"),
-  credited: boolean("credited").notNull().default(false),
+  confirmedAt: timestamp("confirmed_at"),
+  creditedAt: timestamp("credited_at"),
+  creditedTransactionId: varchar("credited_transaction_id"),
+  detectedAt: timestamp("detected_at"),
   createdAt: timestamp("created_at").notNull().default(sql`now()`),
+  updatedAt: timestamp("updated_at").notNull().default(sql`now()`),
 });
 
 export const depositSweeps = pgTable("deposit_sweeps", {
