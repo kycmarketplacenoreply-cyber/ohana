@@ -6126,6 +6126,46 @@ export async function registerRoutes(
     }
   });
 
+  // ==================== HEALTH & DIAGNOSTICS ====================
+  
+  // Health check endpoint
+  app.get("/api/health", (req, res) => {
+    res.json({
+      status: "ok",
+      timestamp: new Date().toISOString(),
+      environment: process.env.NODE_ENV,
+    });
+  });
+
+  // Email service diagnostics endpoint (admin only)
+  app.post("/api/admin/test-email", requireAuth, requireAdmin, async (req: AuthRequest, res) => {
+    try {
+      const { email } = req.body;
+      if (!email) {
+        return res.status(400).json({ message: "Email address is required" });
+      }
+
+      console.log(`🧪 Testing email service for: ${email}`);
+      const testCode = "123456";
+      const result = await sendVerificationEmail(email, testCode);
+      
+      res.json({
+        success: result,
+        message: result ? "Test email sent successfully" : "Failed to send test email - check logs",
+        email,
+        testCode,
+        timestamp: new Date().toISOString(),
+      });
+    } catch (error: any) {
+      console.error("Email test endpoint error:", error);
+      res.status(500).json({ 
+        success: false,
+        message: error.message,
+        error: error.code || error.name
+      });
+    }
+  });
+
   return httpServer;
 
 }
