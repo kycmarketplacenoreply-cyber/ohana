@@ -589,6 +589,25 @@ async function createBlockchainTables() {
       last_email_change_at TIMESTAMP,
       created_at TIMESTAMP NOT NULL DEFAULT now()
     );
+
+    CREATE TABLE IF NOT EXISTS support_tickets (
+      id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid(),
+      user_id VARCHAR NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      subject TEXT NOT NULL,
+      message TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'open',
+      assigned_to VARCHAR REFERENCES users(id),
+      created_at TIMESTAMP NOT NULL DEFAULT now(),
+      updated_at TIMESTAMP NOT NULL DEFAULT now()
+    );
+
+    CREATE TABLE IF NOT EXISTS support_messages (
+      id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid(),
+      ticket_id VARCHAR NOT NULL REFERENCES support_tickets(id) ON DELETE CASCADE,
+      sender_id VARCHAR NOT NULL REFERENCES users(id),
+      message TEXT NOT NULL,
+      created_at TIMESTAMP NOT NULL DEFAULT now()
+    );
   `);
 
   const existingControls = await pool.query(`SELECT id FROM platform_wallet_controls LIMIT 1`);
@@ -720,6 +739,11 @@ async function createIndexesIfNotExist() {
     `CREATE INDEX IF NOT EXISTS idx_loader_orders_receiver_id ON loader_orders(receiver_id);`,
     `CREATE INDEX IF NOT EXISTS idx_loader_orders_status ON loader_orders(status);`,
     `CREATE INDEX IF NOT EXISTS idx_loader_order_messages_order_id ON loader_order_messages(order_id);`,
+    `CREATE INDEX IF NOT EXISTS idx_support_tickets_user_id ON support_tickets(user_id);`,
+    `CREATE INDEX IF NOT EXISTS idx_support_tickets_status ON support_tickets(status);`,
+    `CREATE INDEX IF NOT EXISTS idx_support_tickets_created_at ON support_tickets(created_at DESC);`,
+    `CREATE INDEX IF NOT EXISTS idx_support_messages_ticket_id ON support_messages(ticket_id);`,
+    `CREATE INDEX IF NOT EXISTS idx_support_messages_sender_id ON support_messages(sender_id);`,
   ];
 
   for (const query of indexQueries) {
