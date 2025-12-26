@@ -760,9 +760,14 @@ export async function registerRoutes(
         const requiredEscrow = (availableAmount * pricePerUnit).toFixed(8);
         
         // Check buyer's wallet balance
-        const buyerWallet = await storage.getWalletByUserId(req.user!.userId, "USDT");
+        let buyerWallet = await storage.getWalletByUserId(req.user!.userId, "USDT");
+        
+        // Auto-create wallet if it doesn't exist
         if (!buyerWallet) {
-          return res.status(400).json({ message: "Wallet not found. Please contact support." });
+          buyerWallet = await storage.createWallet({
+            userId: req.user!.userId,
+            currency: "USDT",
+          });
         }
 
         const availableBalance = parseFloat(buyerWallet.availableBalance);
@@ -945,9 +950,14 @@ export async function registerRoutes(
       if (tradeIntent === "sell_ad") {
         orderBuyerId = req.user!.userId;
 
-        const buyerWallet = await storage.getWalletByUserId(req.user!.userId, "USDT");
+        let buyerWallet = await storage.getWalletByUserId(req.user!.userId, "USDT");
+        
+        // Auto-create wallet if it doesn't exist
         if (!buyerWallet) {
-          return res.status(400).json({ message: "Wallet not found" });
+          buyerWallet = await storage.createWallet({
+            userId: req.user!.userId,
+            currency: "USDT",
+          });
         }
 
         const buyerBalance = parseFloat(buyerWallet.availableBalance);
