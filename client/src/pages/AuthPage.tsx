@@ -15,7 +15,7 @@ export default function AuthPage() {
   const { t } = useTranslation();
   const [, setLocation] = useLocation();
   const { toast } = useToast();
-  const [loginForm, setLoginForm] = useState({ username: "", email: "", password: "", twoFactorToken: "" });
+  const [loginForm, setLoginForm] = useState({ email: "", password: "", twoFactorToken: "" });
   const [registerForm, setRegisterForm] = useState({ username: "", email: "", password: "" });
   const [verificationCode, setVerificationCode] = useState("");
   const [registrationStep, setRegistrationStep] = useState<"email" | "verify" | "create">("email");
@@ -36,8 +36,7 @@ export default function AuthPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          username: data.username || undefined,
-          email: data.email || undefined,
+          email: data.email,
           password: data.password,
           twoFactorToken: data.twoFactorToken,
           emailVerificationCode: data.emailVerificationCode,
@@ -198,23 +197,17 @@ export default function AuthPage() {
                   className="space-y-4"
                 >
                   <div className="space-y-2">
-                    <Label htmlFor="login-identifier" className="text-foreground">Username or Email</Label>
+                    <Label htmlFor="login-email" className="text-foreground">Email Address</Label>
                     <div className="relative">
-                      <User className="absolute left-3 top-2.5 h-5 w-5 text-muted-foreground" />
+                      <Mail className="absolute left-3 top-2.5 h-5 w-5 text-muted-foreground" />
                       <Input
-                        id="login-identifier"
-                        data-testid="input-login-identifier"
-                        placeholder="Enter username or email"
+                        id="login-email"
+                        data-testid="input-login-email"
+                        type="email"
+                        placeholder="Enter your email address"
                         className="pl-10 bg-muted border-border text-foreground"
-                        value={loginForm.username}
-                        onChange={(e) => {
-                          const value = e.target.value;
-                          setLoginForm({ 
-                            ...loginForm, 
-                            username: value.includes("@") ? "" : value,
-                            email: value.includes("@") ? value : "",
-                          });
-                        }}
+                        value={loginForm.email}
+                        onChange={(e) => setLoginForm({ ...loginForm, email: e.target.value })}
                       />
                     </div>
                   </div>
