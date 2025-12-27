@@ -187,7 +187,7 @@ export default function TradePage() {
           </CardHeader>
           <CardContent className="space-y-6">
             <div className="flex items-center gap-4 p-4 bg-gray-800 rounded-lg">
-              <div className="h-12 w-12 rounded-full bg-purple-600 dark:bg-purple-700 flex items-center justify-center">
+              <div className="h-12 w-12 rounded-full bg-purple-600 flex items-center justify-center">
                 <Star className="h-6 w-6 text-white" />
               </div>
               <div>
@@ -276,8 +276,8 @@ export default function TradePage() {
             <div className="p-4 bg-purple-900/30 border border-purple-700 rounded-lg flex items-start gap-3">
               <Shield className="h-5 w-5 text-purple-400 mt-0.5" />
               <div>
-                <p className="text-purple-300 dark:text-purple-300 font-medium">Escrow Protection</p>
-                <p className="text-purple-400 dark:text-purple-300 text-sm">
+                <p className="text-purple-300 font-medium">Escrow Protection</p>
+                <p className="text-purple-400 text-sm">
                   {offer.tradeIntent === "sell_ad" 
                     ? "Your funds will be held in escrow immediately. Seller delivers, then you confirm to release payment."
                     : "After seller accepts, you'll need to deposit funds. Once escrowed, seller delivers and you confirm."}
@@ -298,7 +298,7 @@ export default function TradePage() {
             )}
 
             <Button
-              className="w-full bg-purple-600 dark:bg-purple-700 hover:bg-purple-700 dark:hover:bg-purple-800 h-12 text-lg"
+              className="w-full bg-purple-600 hover:bg-purple-700 h-12 text-lg"
               disabled={!isValidAmount || createOrderMutation.isPending}
               onClick={() => createOrderMutation.mutate()}
               data-testid="button-create-order"
