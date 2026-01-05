@@ -44,37 +44,32 @@ function getDatabaseConfig() {
   };
   
   // SSL configuration at the pool level. Prefer a provided CA certificate
-  // via the `PG_SSL_ROOT_CERT` env var. This allows verify-full style
-  // verification without disabling TLS checks globally.
-  poolConfig.ssl = {
-    rejectUnauthorized: true
-  } as any;
-
-  // If the deploy environment supplies a PEM-encoded CA certificate in
-  // `PG_SSL_ROOT_CERT`, use it to verify the DB server's certificate.
+  // via the `PG_SSL_ROOT_CERT` env var. This enables full verification
+  // of the Postgres server certificate and is the recommended production
+  // configuration for Render or any managed Postgres.
   if (process.env.PG_SSL_ROOT_CERT) {
-    poolConfig.ssl.ca = process.env.PG_SSL_ROOT_CERT;
-    console.log('🔒 Using PG_SSL_ROOT_CERT for DB TLS verification');
+    poolConfig.ssl = { ca: process.env.PG_SSL_ROOT_CERT, rejectUnauthorized: true } as any;
+    console.log('🔒 Using PG_SSL_ROOT_CERT for DB TLS verification (rejectUnauthorized=true)');
+  } else if (process.env.ALLOW_INSECURE_DB_TLS === 'true') {
+    // Explicit emergency override (not recommended). Only enable if you
+    // understand the risks. This will allow connections to servers using
+    // self-signed certs without requiring a CA.
+    poolConfig.ssl = { rejectUnauthorized: false } as any;
+    console.warn('⚠️ ALLOW_INSECURE_DB_TLS=true — DB TLS verification DISABLED (emergency mode)');
+  } else if (process.env.NODE_ENV === 'production') {
+    // In production we require an explicit CA or an explicit emergency flag.
+    console.error('❌ Missing PG_SSL_ROOT_CERT in production. Aborting startup.');
+    console.error('Set PG_SSL_ROOT_CERT (PEM) in Render environment variables, or set ALLOW_INSECURE_DB_TLS=true as a temporary emergency workaround.');
+    throw new Error('PG_SSL_ROOT_CERT is required in production for secure DB TLS verification');
   } else {
-    // No CA provided: fall back to an permissive mode so the app can start.
-    // This is less secure — prefer setting `PG_SSL_ROOT_CERT` in Render.
-    poolConfig.ssl.rejectUnauthorized = false;
-    console.warn('⚠️ No PG_SSL_ROOT_CERT provided; TLS verification disabled for DB connection');
-
-    // As a last resort, set Node's global TLS reject flag so third-party
-    // libraries also accept self-signed certs in environments where that
-    // is required. Keep this inside a try/catch to avoid accidental failures.
-    try {
-      if (!process.env.NODE_TLS_REJECT_UNAUTHORIZED) {
-        process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
-        console.warn('⚠️ NODE_TLS_REJECT_UNAUTHORIZED set to 0 to allow self-signed DB certs');
-      }
-    } catch (err) {
-      // Non-fatal.
-    }
+    // Development fallback: allow permissive TLS so local dev environments
+    // without a CA don't break. This branch keeps developer experience
+    // convenient while production remains strict.
+    poolConfig.ssl = { rejectUnauthorized: false } as any;
+    console.warn('⚠️ No PG_SSL_ROOT_CERT provided; running with DB TLS verification disabled (development fallback)');
   }
-  
-  console.log("✅ SSL/TLS: ENABLED for Render PostgreSQL");
+
+  console.log('✅ SSL/TLS: configured for Postgres connection');
   
   return poolConfig;
 }
