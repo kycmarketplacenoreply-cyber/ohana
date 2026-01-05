@@ -47,6 +47,20 @@ function getDatabaseConfig() {
   poolConfig.ssl = {
     rejectUnauthorized: false
   };
+
+  // Fallback: Some hosting environments (Render with certain network setups)
+  // present self-signed certificates which cause TLS verification errors.
+  // As a temporary mitigation we disable Node's strict TLS verification so
+  // the DB connection can succeed. This is insecure — prefer installing
+  // a proper CA or using a verified certificate in production.
+  try {
+    if (!process.env.NODE_TLS_REJECT_UNAUTHORIZED) {
+      process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
+      console.warn('⚠️ NODE_TLS_REJECT_UNAUTHORIZED set to 0 to allow self-signed DB certs');
+    }
+  } catch (err) {
+    // Non-fatal: proceed without changing global TLS behavior if not allowed
+  }
   
   console.log("✅ SSL/TLS: ENABLED for Render PostgreSQL");
   
