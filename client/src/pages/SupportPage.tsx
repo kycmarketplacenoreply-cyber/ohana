@@ -501,7 +501,8 @@ export default function SupportPage() {
                     >
                       <div className="font-medium text-sm truncate">{ticket.subject}</div>
                       <div className={`text-xs truncate ${selectedTicket === ticket.id ? "text-blue-100" : "text-gray-500 dark:text-gray-400"}`}>
-                        {userTickets.find((t: any) => t.id === ticket.id) && new Date(ticket.createdAt).toLocaleDateString()}
+                        <div>From: <span className="font-medium">{ticket.userEmail || ticket.userUsername || ticket.userId}</span></div>
+                        <div>{userTickets.find((t: any) => t.id === ticket.id) && new Date(ticket.createdAt).toLocaleDateString()}</div>
                       </div>
                     </button>
                   ))
@@ -516,7 +517,7 @@ export default function SupportPage() {
                   <div className="p-4 border-b border-gray-200 dark:border-gray-800 flex items-center justify-between">
                     <div>
                       <h3 className="font-semibold text-gray-900 dark:text-white">{selectedTicketData.subject}</h3>
-                      <p className="text-xs text-gray-500 dark:text-gray-400">From: <span className="font-medium">{selectedTicketData.userId}</span> | Status: <span className="capitalize">{selectedTicketData.status}</span></p>
+                      <p className="text-xs text-gray-500 dark:text-gray-400">From: <span className="font-medium">{selectedTicketData.submitterEmail || selectedTicketData.userEmail || selectedTicketData.submitterUsername || selectedTicketData.userId}</span> | Status: <span className="capitalize">{selectedTicketData.status}</span></p>
                     </div>
                     {isSupport && selectedTicketData.status !== "solved" && (
                       <Button 
@@ -537,6 +538,7 @@ export default function SupportPage() {
                     {selectedTicketData.messages?.sort((a: any, b: any) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()).map((msg: any) => (
                       <div key={msg.id} className={`flex ${msg.senderId === user?.id ? "justify-end" : "justify-start"}`}>
                         <div className={`p-3 rounded-lg max-w-xs ${msg.senderId === user?.id ? "bg-blue-600 text-white" : "bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white"}`}>
+                          <p className="text-xs text-gray-500 mb-1">From: <span className="font-medium">{msg.senderEmail || msg.senderUsername || msg.senderId}</span></p>
                           <p className="text-sm">{msg.message}</p>
                           <p className={`text-xs mt-1 ${msg.senderId === user?.id ? "text-blue-100" : "text-gray-500"}`}>{new Date(msg.createdAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</p>
                         </div>

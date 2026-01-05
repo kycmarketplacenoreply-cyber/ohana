@@ -18,7 +18,7 @@ import {
   notifyAccountFrozen,
   notifyAccountUnfrozen
 } from "./services/notifications";
-import { insertUserSchema, insertKycSchema, insertVendorProfileSchema, insertOfferSchema, insertOrderSchema, insertExchangeSchema, disputes, supportTickets } from "@shared/schema";
+import { insertUserSchema, insertKycSchema, insertVendorProfileSchema, insertOfferSchema, insertOrderSchema, insertExchangeSchema, disputes, supportTickets, users } from "@shared/schema";
 import { db } from "./db";
 import { emailVerificationLimiter, passwordResetLimiter, emailResendLimiter } from "./middleware/emailRateLimiter";
 import { sendVerificationEmail, sendPasswordResetEmail, send2FAResetEmail } from "./services/email";
@@ -26,7 +26,7 @@ import { validatePassword, generateVerificationCode } from "./utils/validation";
 import { emailVerificationLimiter, passwordResetLimiter, emailResendLimiter } from "./middleware/emailRateLimiter";
 import { sendVerificationEmail, sendPasswordResetEmail, send2FAResetEmail } from "./services/email";
 import { validatePassword, generateVerificationCode } from "./utils/validation";
-import { desc } from "drizzle-orm";
+import { desc, eq } from "drizzle-orm";
 
 export async function registerRoutes(
   httpServer: Server,
@@ -5417,15 +5417,20 @@ export async function registerRoutes(
 
   // ==================== SUPPORT ROUTES ====================
 
-  // Search user by username (for support)
+  // Search user by username or email (for support)
   app.get("/api/support/user/search", requireAuth, requireSupport, async (req: AuthRequest, res) => {
     try {
-      const { username } = req.query;
-      if (!username || typeof username !== "string") {
-        return res.status(400).json({ message: "Username required" });
+      const { username, email } = req.query;
+
+      let user;
+      if (email && typeof email === "string") {
+        user = await storage.getUserByEmail(email);
+      } else if (username && typeof username === "string") {
+        user = await storage.getUserByUsername(username);
+      } else {
+        return res.status(400).json({ message: "Username or email required" });
       }
 
-      const user = await storage.getUserByUsername(username);
       if (!user) {
         return res.status(404).json({ message: "User not found" });
       }
@@ -6098,7 +6103,17 @@ export async function registerRoutes(
       
       if (isSupport) {
         // Support staff see all tickets
-        tickets = await db.select().from(supportTickets).orderBy(desc(supportTickets.createdAt));
+        // include submitter email/username for display
+        tickets = await db
+          .select({ ticket: supportTickets, user: users })
+          .from(supportTickets)
+          .leftJoin(users, eq(supportTickets.userId, users.id))
+          .orderBy(desc(supportTickets.createdAt));
+        tickets = tickets.map((r: any) => ({
+          ...r.ticket,
+          userEmail: r.user?.email,
+          userUsername: r.user?.username,
+        }));
       } else {
         // Regular users see only their tickets
         tickets = await storage.getSupportTicketsByUser(req.user!.userId);
@@ -6125,7 +6140,21 @@ export async function registerRoutes(
       }
 
       const messages = await storage.getSupportMessagesByTicket(ticket.id);
-      res.json({ ...ticket, messages });
+
+      // Enrich messages with sender email/username
+      const enrichedMessages = await Promise.all(messages.map(async (m) => {
+        const sender = await storage.getUser(m.senderId);
+        return {
+          ...m,
+          senderEmail: sender?.email,
+          senderUsername: sender?.username,
+        };
+      }));
+
+      // Include ticket submitter email
+      const submitter = await storage.getUser(ticket.userId);
+
+      res.json({ ...ticket, submitterEmail: submitter?.email, submitterUsername: submitter?.username, messages: enrichedMessages });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
@@ -6156,7 +6185,8 @@ export async function registerRoutes(
         message,
       });
 
-      res.json(newMessage);
+      const sender = await storage.getUser(req.user!.userId);
+      res.json({ ...newMessage, senderEmail: sender?.email, senderUsername: sender?.username });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
