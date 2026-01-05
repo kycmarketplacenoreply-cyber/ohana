@@ -20,7 +20,6 @@ import {
 } from "./services/notifications";
 import { insertUserSchema, insertKycSchema, insertVendorProfileSchema, insertOfferSchema, insertOrderSchema, insertExchangeSchema, disputes, supportTickets } from "@shared/schema";
 import { db } from "./db";
-import { seedAdminUsers } from "./init-db";
 import { emailVerificationLimiter, passwordResetLimiter, emailResendLimiter } from "./middleware/emailRateLimiter";
 import { sendVerificationEmail, sendPasswordResetEmail, send2FAResetEmail } from "./services/email";
 import { validatePassword, generateVerificationCode } from "./utils/validation";
@@ -652,34 +651,7 @@ export async function registerRoutes(
     }
   });
 
-  // Debug endpoint to check admin users (temporary)
-  app.get("/api/debug/admin-users", async (req, res) => {
-    try {
-      const adminUsers = await storage.getUsersByRole("admin");
-      const disputeAdmins = await storage.getUsersByRole("dispute_admin");
-      const supportUsers = await storage.getUsersByRole("support");
-      const financeUsers = await storage.getUsersByRole("finance_manager");
-
-      res.json({
-        admin: adminUsers.map(u => ({ id: u.id, username: u.username, email: u.email, emailVerified: u.emailVerified, isActive: u.isActive })),
-        dispute_admin: disputeAdmins.map(u => ({ id: u.id, username: u.username, email: u.email, emailVerified: u.emailVerified, isActive: u.isActive })),
-        support: supportUsers.map(u => ({ id: u.id, username: u.username, email: u.email, emailVerified: u.emailVerified, isActive: u.isActive })),
-        finance_manager: financeUsers.map(u => ({ id: u.id, username: u.username, email: u.email, emailVerified: u.emailVerified, isActive: u.isActive })),
-      });
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
-    }
-  });
-
-  // Debug endpoint to re-run admin seeding (will update existing admin emails/passwords from env)
-  app.post("/api/debug/refresh-admin-seed", async (req, res) => {
-    try {
-      await seedAdminUsers();
-      res.json({ message: "Admin seed executed" });
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
-    }
-  });
+  // (Debug endpoints removed) 
 
   // ==================== VENDOR ROUTES ====================
   
