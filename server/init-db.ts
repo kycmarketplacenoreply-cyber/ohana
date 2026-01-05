@@ -805,24 +805,37 @@ async function seedOrUpdateAdmin(
 }
 
 async function seedAdminUsers() {
-  // Do NOT use fallback default admin passwords. Require these to be set
+  // Do NOT use fallback default admin passwords or emails. Require these to be set
   // via environment variables in production to avoid compromised accounts.
+  const kaiEmail = process.env.ADMIN_KAI_EMAIL;
   const kaiPassword = process.env.ADMIN_KAI_PASSWORD;
+  const turboEmail = process.env.ADMIN_TURBO_EMAIL;
   const turboPassword = process.env.ADMIN_TURBO_PASSWORD;
+  const csEmail = process.env.CS_EMAIL;
   const csPassword = process.env.CS_PASSWORD;
+  const financeEmail = process.env.FINANCE_MANAGER_EMAIL;
   const financePassword = process.env.FINANCE_MANAGER_PASSWORD;
 
-  if (!kaiPassword || !turboPassword || !csPassword || !financePassword) {
+  const missing = [];
+  if (!kaiEmail) missing.push("ADMIN_KAI_EMAIL");
+  if (!kaiPassword) missing.push("ADMIN_KAI_PASSWORD");
+  if (!turboEmail) missing.push("ADMIN_TURBO_EMAIL");
+  if (!turboPassword) missing.push("ADMIN_TURBO_PASSWORD");
+  if (!csEmail) missing.push("CS_EMAIL");
+  if (!csPassword) missing.push("CS_PASSWORD");
+  if (!financeEmail) missing.push("FINANCE_MANAGER_EMAIL");
+  if (!financePassword) missing.push("FINANCE_MANAGER_PASSWORD");
+
+  if (missing.length > 0) {
     throw new Error(
-      "All admin passwords must be set as environment variables: " +
-      "ADMIN_KAI_PASSWORD, ADMIN_TURBO_PASSWORD, CS_PASSWORD, FINANCE_MANAGER_PASSWORD"
+      "All admin emails and passwords must be set as environment variables: " + missing.join(", ")
     );
   }
 
-  await seedOrUpdateAdmin("Kai", "kai@admin.local", kaiPassword, "admin");
-  await seedOrUpdateAdmin("Turbo", "turbo@admin.local", turboPassword, "dispute_admin");
-  await seedOrUpdateAdmin("Support", "support@admin.local", csPassword, "support");
-  await seedOrUpdateAdmin("Finance", "finance@admin.local", financePassword, "finance_manager");
+  await seedOrUpdateAdmin("Kai", kaiEmail, kaiPassword, "admin");
+  await seedOrUpdateAdmin("Turbo", turboEmail, turboPassword, "dispute_admin");
+  await seedOrUpdateAdmin("Support", csEmail, csPassword, "support");
+  await seedOrUpdateAdmin("Finance", financeEmail, financePassword, "finance_manager");
 }
 
 async function seedExchanges() {

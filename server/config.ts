@@ -9,9 +9,13 @@ export function validateConfig() {
   if (!process.env.DATABASE_URL) missing.push("DATABASE_URL");
   if (!process.env.JWT_SECRET) missing.push("JWT_SECRET");
   if (!process.env.ENCRYPTION_KEY) missing.push("ENCRYPTION_KEY");
+  if (!process.env.ADMIN_KAI_EMAIL) missing.push("ADMIN_KAI_EMAIL");
   if (!process.env.ADMIN_KAI_PASSWORD) missing.push("ADMIN_KAI_PASSWORD");
+  if (!process.env.ADMIN_TURBO_EMAIL) missing.push("ADMIN_TURBO_EMAIL");
   if (!process.env.ADMIN_TURBO_PASSWORD) missing.push("ADMIN_TURBO_PASSWORD");
+  if (!process.env.CS_EMAIL) missing.push("CS_EMAIL");
   if (!process.env.CS_PASSWORD) missing.push("CS_PASSWORD");
+  if (!process.env.FINANCE_MANAGER_EMAIL) missing.push("FINANCE_MANAGER_EMAIL");
   if (!process.env.FINANCE_MANAGER_PASSWORD) missing.push("FINANCE_MANAGER_PASSWORD");
 
   if (process.env.ENCRYPTION_KEY && process.env.ENCRYPTION_KEY.length !== 32) {
