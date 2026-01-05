@@ -55,6 +55,15 @@ function getDatabaseConfig() {
     // understand the risks. This will allow connections to servers using
     // self-signed certs without requiring a CA.
     poolConfig.ssl = { rejectUnauthorized: false } as any;
+    // Some underlying TLS consumers (or older libraries) still consult
+    // the global `NODE_TLS_REJECT_UNAUTHORIZED`. In emergency mode set it
+    // so all TLS checks are relaxed to avoid DEPTH_ZERO_SELF_SIGNED_CERT
+    // failures while you restore a proper CA certificate.
+    try {
+      process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
+    } catch (e) {
+      /* ignore */
+    }
     console.warn('⚠️ ALLOW_INSECURE_DB_TLS=true — DB TLS verification DISABLED (emergency mode)');
   } else if (process.env.NODE_ENV === 'production') {
     // In production we require an explicit CA or an explicit emergency flag.
