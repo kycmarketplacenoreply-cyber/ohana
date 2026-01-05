@@ -6,6 +6,9 @@ import { createServer } from "http";
 import { initializeDatabase } from "./init-db";
 import { validateConfig, redactObjectForLogs } from "./config";
 import compression from "compression";
+import helmet from "helmet";
+import cors from "cors";
+import rateLimit from "express-rate-limit";
 import { storage } from "./storage";
 import { startDepositScanner } from "./services/depositScanner";
 import { restoreMasterWalletState } from "./services/blockchain";
@@ -31,15 +34,38 @@ declare module "http" {
   }
 }
 
-app.use(
-  express.json({
-    verify: (req, _res, buf) => {
-      req.rawBody = buf;
-    },
-  }),
-);
+app.use(express.json({
+  limit: process.env.REQUEST_SIZE_LIMIT || '100kb',
+  verify: (req, _res, buf) => {
+    req.rawBody = buf;
+  },
+}));
 
 app.use(express.urlencoded({ extended: false }));
+app.use(express.urlencoded({ extended: false, limit: process.env.REQUEST_SIZE_LIMIT || '100kb' }));
+
+// Security headers
+app.use(helmet());
+
+// CORS - restrict to a configured origin in production
+const allowedOrigin = process.env.FRONTEND_ORIGIN || '';
+if (process.env.NODE_ENV === 'production') {
+  if (!allowedOrigin) {
+    console.warn('⚠️ FRONTEND_ORIGIN not set; CORS is restrictive by default.');
+  }
+  app.use(cors({ origin: allowedOrigin || false }));
+} else {
+  app.use(cors());
+}
+
+// Basic rate limiting for API endpoints
+const apiLimiter = rateLimit({
+  windowMs: 60 * 1000, // 1 minute
+  max: parseInt(process.env.RATE_LIMIT_MAX || '300', 10),
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+app.use('/api/', apiLimiter);
 
 // Serve uploaded files statically (for chat attachments, profile pics, KYC docs)
 app.use("/uploads", express.static(path.join(process.cwd(), "uploads")));

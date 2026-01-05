@@ -8,6 +8,8 @@
     "dev": "NODE_ENV=development tsx server/index.ts",
     "build": "tsx script/build.ts",
     "start": "NODE_ENV=production node dist/index.cjs",
+    "security:scan": "node scripts/scan-secrets.js",
+    "lint": "eslint . --ext .ts,.tsx || true",
     "check": "tsc",
     "db:push": "drizzle-kit push"
   },
@@ -48,6 +50,9 @@
     "@types/multer": "^2.0.0",
     "@types/nodemailer": "^7.0.4",
     "@types/qrcode": "^1.5.6",
+    "helmet": "^6.0.1",
+    "cors": "^2.8.5",
+    "express-rate-limit": "^7.0.0",
     "@types/speakeasy": "^2.0.10",
     "bcrypt": "^6.0.0",
     "class-variance-authority": "^0.7.1",
