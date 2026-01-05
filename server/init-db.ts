@@ -765,21 +765,37 @@ async function seedOrUpdateAdmin(
     .limit(1);
 
   if (existingUser.length > 0) {
-    console.log(`Admin user ${username} already exists. Ensuring wallet exists...`);
-    
+    console.log(`Admin user ${username} already exists. Ensuring wallet exists and updating credentials if needed...`);
+
+    const userRow = existingUser[0];
+
+    // Update email / password / role if they differ from the environment values
+    const updates: any = {};
+    if (userRow.email !== email) updates.email = email;
+    const hashedEnvPassword = await hashPassword(password);
+    // Always update password to match env value so deploys can rotate passwords via env
+    updates.password = hashedEnvPassword;
+    if (userRow.role !== role) updates.role = role;
+
+    if (Object.keys(updates).length > 0) {
+      await db.update(users).set(updates).where(eq(users.id, userRow.id));
+      console.log(`Updated credentials for ${username}.`);
+    }
+
     const existingWallet = await db
       .select()
       .from(wallets)
-      .where(eq(wallets.userId, existingUser[0].id))
+      .where(eq(wallets.userId, userRow.id))
       .limit(1);
-      
+
     if (existingWallet.length === 0) {
       await db.insert(wallets).values({
-        userId: existingUser[0].id,
+        userId: userRow.id,
         currency: "USDT",
       });
       console.log(`Wallet created for ${username}!`);
     }
+
     return;
   }
 
