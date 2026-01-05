@@ -809,13 +809,20 @@ async function seedAdminUsers() {
   // via environment variables in production to avoid compromised accounts.
   const kaiPassword = process.env.ADMIN_KAI_PASSWORD;
   const turboPassword = process.env.ADMIN_TURBO_PASSWORD;
+  const csPassword = process.env.CS_PASSWORD;
+  const financePassword = process.env.FINANCE_MANAGER_PASSWORD;
 
-  if (!kaiPassword || !turboPassword) {
-    throw new Error("ADMIN_KAI_PASSWORD and ADMIN_TURBO_PASSWORD must be set as environment variables; no defaults allowed.");
+  if (!kaiPassword || !turboPassword || !csPassword || !financePassword) {
+    throw new Error(
+      "All admin passwords must be set as environment variables: " +
+      "ADMIN_KAI_PASSWORD, ADMIN_TURBO_PASSWORD, CS_PASSWORD, FINANCE_MANAGER_PASSWORD"
+    );
   }
 
   await seedOrUpdateAdmin("Kai", "kai@admin.local", kaiPassword, "admin");
   await seedOrUpdateAdmin("Turbo", "turbo@admin.local", turboPassword, "dispute_admin");
+  await seedOrUpdateAdmin("Support", "support@admin.local", csPassword, "support");
+  await seedOrUpdateAdmin("Finance", "finance@admin.local", financePassword, "finance_manager");
 }
 
 async function seedExchanges() {
