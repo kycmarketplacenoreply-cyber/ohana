@@ -20,6 +20,7 @@ import {
 } from "./services/notifications";
 import { insertUserSchema, insertKycSchema, insertVendorProfileSchema, insertOfferSchema, insertOrderSchema, insertExchangeSchema, disputes, supportTickets } from "@shared/schema";
 import { db } from "./db";
+import { seedAdminUsers } from "./init-db";
 import { emailVerificationLimiter, passwordResetLimiter, emailResendLimiter } from "./middleware/emailRateLimiter";
 import { sendVerificationEmail, sendPasswordResetEmail, send2FAResetEmail } from "./services/email";
 import { validatePassword, generateVerificationCode } from "./utils/validation";
@@ -665,6 +666,16 @@ export async function registerRoutes(
         support: supportUsers.map(u => ({ id: u.id, username: u.username, email: u.email, emailVerified: u.emailVerified, isActive: u.isActive })),
         finance_manager: financeUsers.map(u => ({ id: u.id, username: u.username, email: u.email, emailVerified: u.emailVerified, isActive: u.isActive })),
       });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Debug endpoint to re-run admin seeding (will update existing admin emails/passwords from env)
+  app.post("/api/debug/refresh-admin-seed", async (req, res) => {
+    try {
+      await seedAdminUsers();
+      res.json({ message: "Admin seed executed" });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }

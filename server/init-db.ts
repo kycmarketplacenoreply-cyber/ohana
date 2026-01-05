@@ -821,7 +821,7 @@ async function seedOrUpdateAdmin(
   console.log(`${role} user ${username} created successfully!`);
 }
 
-async function seedAdminUsers() {
+export async function seedAdminUsers() {
   // Do NOT use fallback default admin passwords or emails. Require these to be set
   // via environment variables in production to avoid compromised accounts.
   const kaiEmail = process.env.ADMIN_KAI_EMAIL;
