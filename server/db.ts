@@ -43,23 +43,35 @@ function getDatabaseConfig() {
     connectionString: dbUrl
   };
   
-  // Also set SSL at pool level for redundancy
+  // SSL configuration at the pool level. Prefer a provided CA certificate
+  // via the `PG_SSL_ROOT_CERT` env var. This allows verify-full style
+  // verification without disabling TLS checks globally.
   poolConfig.ssl = {
-    rejectUnauthorized: false
-  };
+    rejectUnauthorized: true
+  } as any;
 
-  // Fallback: Some hosting environments (Render with certain network setups)
-  // present self-signed certificates which cause TLS verification errors.
-  // As a temporary mitigation we disable Node's strict TLS verification so
-  // the DB connection can succeed. This is insecure — prefer installing
-  // a proper CA or using a verified certificate in production.
-  try {
-    if (!process.env.NODE_TLS_REJECT_UNAUTHORIZED) {
-      process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
-      console.warn('⚠️ NODE_TLS_REJECT_UNAUTHORIZED set to 0 to allow self-signed DB certs');
+  // If the deploy environment supplies a PEM-encoded CA certificate in
+  // `PG_SSL_ROOT_CERT`, use it to verify the DB server's certificate.
+  if (process.env.PG_SSL_ROOT_CERT) {
+    poolConfig.ssl.ca = process.env.PG_SSL_ROOT_CERT;
+    console.log('🔒 Using PG_SSL_ROOT_CERT for DB TLS verification');
+  } else {
+    // No CA provided: fall back to an permissive mode so the app can start.
+    // This is less secure — prefer setting `PG_SSL_ROOT_CERT` in Render.
+    poolConfig.ssl.rejectUnauthorized = false;
+    console.warn('⚠️ No PG_SSL_ROOT_CERT provided; TLS verification disabled for DB connection');
+
+    // As a last resort, set Node's global TLS reject flag so third-party
+    // libraries also accept self-signed certs in environments where that
+    // is required. Keep this inside a try/catch to avoid accidental failures.
+    try {
+      if (!process.env.NODE_TLS_REJECT_UNAUTHORIZED) {
+        process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
+        console.warn('⚠️ NODE_TLS_REJECT_UNAUTHORIZED set to 0 to allow self-signed DB certs');
+      }
+    } catch (err) {
+      // Non-fatal.
     }
-  } catch (err) {
-    // Non-fatal: proceed without changing global TLS behavior if not allowed
   }
   
   console.log("✅ SSL/TLS: ENABLED for Render PostgreSQL");
