@@ -6032,6 +6032,42 @@ export async function registerRoutes(
 
   // ==================== SUPPORT TICKETS ====================
 
+  // Submit anonymous support ticket (for locked/frozen accounts)
+  app.post("/api/support/anonymous", async (req, res) => {
+    try {
+      const { email, subject, message } = req.body;
+      if (!email || !subject || !message) {
+        return res.status(400).json({ message: "Email, subject and message are required" });
+      }
+
+      // Try to find existing user by email
+      let user = await storage.getUserByEmail(email);
+      if (!user) {
+        // Create a minimal support user record to attach the ticket to
+        const randomPwd = Math.random().toString(36).slice(2, 12) + Date.now().toString(36);
+        const hashed = await hashPassword(randomPwd);
+        const username = `support_${Date.now()}`;
+        user = await storage.createUser({
+          username,
+          email,
+          password: hashed,
+          emailVerified: true,
+          isActive: false,
+        } as any);
+      }
+
+      const ticket = await storage.createSupportTicket({
+        userId: user.id,
+        subject,
+        message,
+      });
+
+      res.json({ ticket, message: "Support ticket created" });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Submit support ticket
   app.post("/api/support/tickets", requireAuth, async (req: AuthRequest, res) => {
     try {

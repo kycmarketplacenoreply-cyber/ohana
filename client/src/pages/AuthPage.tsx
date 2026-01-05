@@ -10,6 +10,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { Shield, Mail, Lock, User } from "lucide-react";
+import { Textarea } from "@/components/ui/textarea";
 
 export default function AuthPage() {
   const { t } = useTranslation();
@@ -155,6 +156,35 @@ export default function AuthPage() {
     },
     onError: (error: Error) => {
       toast({ variant: "destructive", title: "Failed", description: error.message });
+    },
+  });
+
+  // Anonymous support ticket mutation (for frozen accounts / locked users)
+  const [supportOpen, setSupportOpen] = useState(false);
+  const [supportEmail, setSupportEmail] = useState("");
+  const [supportSubject, setSupportSubject] = useState("");
+  const [supportMessage, setSupportMessage] = useState("");
+
+  const supportMutation = useMutation({
+    mutationFn: async (payload: { email: string; subject: string; message: string }) => {
+      const res = await fetch("/api/support/anonymous", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.message || "Failed to submit support request");
+      return json;
+    },
+    onSuccess: () => {
+      toast({ title: "Support request sent", description: "Our team will contact you via email." });
+      setSupportOpen(false);
+      setSupportEmail("");
+      setSupportSubject("");
+      setSupportMessage("");
+    },
+    onError: (err: Error) => {
+      toast({ variant: "destructive", title: "Failed", description: err.message });
     },
   });
 
@@ -383,6 +413,38 @@ export default function AuthPage() {
                         )}
                       </DialogContent>
                     </Dialog>
+                    <div className="mt-3">
+                      <Dialog open={supportOpen} onOpenChange={setSupportOpen}>
+                        <DialogTrigger asChild>
+                          <Button variant="link" className="text-sm p-0" onClick={() => setSupportEmail(loginForm.email)}>
+                            Contact Support
+                          </Button>
+                        </DialogTrigger>
+                        <DialogContent className="max-w-md">
+                          <DialogHeader>
+                            <DialogTitle className="text-foreground">Contact Support</DialogTitle>
+                            <p className="text-sm text-muted-foreground">If your account is frozen, submit this form and our support team will assist you.</p>
+                          </DialogHeader>
+                          <div className="space-y-4 pt-4">
+                            <div className="space-y-2">
+                              <Label htmlFor="support-email" className="text-foreground">Your Email</Label>
+                              <Input id="support-email" type="email" className="bg-muted border-border" value={supportEmail} onChange={(e) => setSupportEmail(e.target.value)} />
+                            </div>
+                            <div className="space-y-2">
+                              <Label htmlFor="support-subject" className="text-foreground">Subject</Label>
+                              <Input id="support-subject" className="bg-muted border-border" value={supportSubject} onChange={(e) => setSupportSubject(e.target.value)} />
+                            </div>
+                            <div className="space-y-2">
+                              <Label htmlFor="support-message" className="text-foreground">Message</Label>
+                              <Textarea id="support-message" className="bg-muted border-border" value={supportMessage} onChange={(e) => setSupportMessage(e.target.value)} />
+                            </div>
+                            <Button className="w-full" onClick={() => supportMutation.mutate({ email: supportEmail, subject: supportSubject, message: supportMessage })} disabled={!supportEmail || !supportSubject || !supportMessage || supportMutation.isPending}>
+                              {supportMutation.isPending ? "Sending..." : "Send to Support"}
+                            </Button>
+                          </div>
+                        </DialogContent>
+                      </Dialog>
+                    </div>
                   </div>
                 </form>
               </TabsContent>
