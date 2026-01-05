@@ -6,6 +6,7 @@ import { eq } from "drizzle-orm";
 async function createEnumsIfNotExist() {
   const enumQueries = [
     `DO $$ BEGIN CREATE TYPE user_role AS ENUM ('admin', 'vendor', 'customer', 'support', 'dispute_admin', 'finance_manager'); EXCEPTION WHEN duplicate_object THEN null; END $$;`,
+    `DO $$ BEGIN ALTER TYPE user_role ADD VALUE 'finance_manager'; EXCEPTION WHEN duplicate_object THEN null; END $$;`,
     `DO $$ BEGIN CREATE TYPE kyc_status AS ENUM ('pending', 'approved', 'rejected', 'resubmit'); EXCEPTION WHEN duplicate_object THEN null; END $$;`,
     `DO $$ BEGIN CREATE TYPE kyc_tier AS ENUM ('tier0', 'tier1', 'tier2'); EXCEPTION WHEN duplicate_object THEN null; END $$;`,
     `DO $$ BEGIN CREATE TYPE trade_intent AS ENUM ('sell_ad', 'buy_ad'); EXCEPTION WHEN duplicate_object THEN null; END $$;`,
