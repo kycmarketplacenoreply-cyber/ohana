@@ -163,7 +163,10 @@ export default function SupportPage() {
     queryKey: ["support-search-user", searchUsername],
     queryFn: async () => {
       if (!searchUsername.trim()) return null;
-      const res = await fetchWithAuth(`/api/support/user/search?username=${encodeURIComponent(searchUsername)}`);
+      // If the input looks like an email, search by email, otherwise by username
+      const isEmail = searchUsername.includes("@");
+      const param = isEmail ? `email=${encodeURIComponent(searchUsername)}` : `username=${encodeURIComponent(searchUsername)}`;
+      const res = await fetchWithAuth(`/api/support/user/search?${param}`);
       if (!res.ok) return null;
       return res.json();
     },
