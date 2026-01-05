@@ -6388,8 +6388,13 @@ export async function registerRoutes(
     try {
       const { email, secret } = req.body;
       
-      // Simple secret-based auth for debugging
-      const testSecret = process.env.EMAIL_TEST_SECRET || "kyc-test-secret-12345";
+      // Simple secret-based auth for debugging. Only enabled when
+      // EMAIL_TEST_SECRET is configured in the environment. No default
+      // test secret is allowed in production.
+      const testSecret = process.env.EMAIL_TEST_SECRET;
+      if (!testSecret) {
+        return res.status(503).json({ message: "Email test endpoint disabled" });
+      }
       if (secret !== testSecret) {
         return res.status(401).json({ message: "Invalid or missing test secret" });
       }

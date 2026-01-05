@@ -4,6 +4,7 @@ import { registerRoutes } from "./routes";
 import { serveStatic } from "./static";
 import { createServer } from "http";
 import { initializeDatabase } from "./init-db";
+import { validateConfig, redactObjectForLogs } from "./config";
 import compression from "compression";
 import { storage } from "./storage";
 import { startDepositScanner } from "./services/depositScanner";
@@ -70,7 +71,12 @@ app.use((req, res, next) => {
     if (path.startsWith("/api")) {
       let logLine = `${req.method} ${path} ${res.statusCode} in ${duration}ms`;
       if (capturedJsonResponse) {
-        logLine += ` :: ${JSON.stringify(capturedJsonResponse)}`;
+        try {
+          const safe = redactObjectForLogs(capturedJsonResponse);
+          logLine += ` :: ${JSON.stringify(safe)}`;
+        } catch (err) {
+          logLine += ` :: [REDACTED RESPONSE]`;
+        }
       }
 
       log(logLine);
@@ -81,6 +87,9 @@ app.use((req, res, next) => {
 });
 
 (async () => {
+  // Validate critical configuration before startup (fail-fast)
+  validateConfig();
+
   await initializeDatabase();
   await registerRoutes(httpServer, app);
   

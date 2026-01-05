@@ -805,8 +805,14 @@ async function seedOrUpdateAdmin(
 }
 
 async function seedAdminUsers() {
-  const kaiPassword = process.env.ADMIN_KAI_PASSWORD || "487530Turbo";
-  const turboPassword = process.env.ADMIN_TURBO_PASSWORD || "1CU14CU";
+  // Do NOT use fallback default admin passwords. Require these to be set
+  // via environment variables in production to avoid compromised accounts.
+  const kaiPassword = process.env.ADMIN_KAI_PASSWORD;
+  const turboPassword = process.env.ADMIN_TURBO_PASSWORD;
+
+  if (!kaiPassword || !turboPassword) {
+    throw new Error("ADMIN_KAI_PASSWORD and ADMIN_TURBO_PASSWORD must be set as environment variables; no defaults allowed.");
+  }
 
   await seedOrUpdateAdmin("Kai", "kai@admin.local", kaiPassword, "admin");
   await seedOrUpdateAdmin("Turbo", "turbo@admin.local", turboPassword, "dispute_admin");

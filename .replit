@@ -46,12 +46,8 @@ integrations = ["javascript_database:1.0.0"]
 [userenv]
 
 [userenv.shared]
-JWT_SECRET = "LcPbiSl74LDtkJdguGB6bCr4y27ypPyfi81vFeIlzP8="
-MASTER_WALLET_ADDRESS = "0x75d33f2efbf743ebb95b67209af736533f511997"
-MASTER_WALLET_PRIVATE_KEY = "0x49eba0f7f0bd61e268557d64c3a506bb665bdbb61d52dc390e306b9da6e702e1"
-SWEEP_WALLET_ADDRESS = "0xdb0bca3231368b452b3bba9b1ac8921207f14a74"
-BSC_RPC_URL = "https://bsc-mainnet.core.chainstack.com/149e314fddbe073ad969f973206acac2"
-ENCRYPTION_KEY = "83f33f2f5224cbc6a2baa2ff6c054bcb"
-HD_WALLET_SEED = "sort cancel owner tattoo lion lawn meadow can soldier paper dove fat"
-"BScsCAΝ_ΑΡΙ KΕΥ" = "2U5D81Z4EB3XJRSVMYU5ANBYIQ3ZTU5NF6"
-GMAIL_APP_PASSWORD = "#28522520Turbo"
+[userenv.shared]
+# Sensitive environment variables removed from repository for security.
+# Configure these in your environment or CI/deployment platform (Render, GitHub Actions secrets, etc.).
+# Required: JWT_SECRET, ENCRYPTION_KEY, DATABASE_URL
+# Optional but sensitive: MASTER_WALLET_PRIVATE_KEY, MASTER_WALLET_ADDRESS, HD_WALLET_SEED, BREVO_API_KEY, BREVO_SMTP_PASSWORD, BSCSCAN_API_KEY
